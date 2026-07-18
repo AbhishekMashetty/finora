@@ -72,11 +72,15 @@ A conformance review caught two real bugs before this was called done, both fixe
 
 ---
 
-### Phase 6 — Cross-cutting hardening
+### Phase 6 — Cross-cutting hardening — 🟡 IN PROGRESS (started 2026-07-19)
 
 **Goal:** integration tests using Mongo testcontainers, rate limiting, standardized pagination/error handling across all services, full request-validation coverage, complete OpenAPI specs served as docs, and a green CI matrix (lint/test/build).
 
 **Done when:** CI is green and integration tests cover the critical flows.
+
+**Progress so far:** the two pieces the user explicitly asked for first — integration tests and a working CI matrix — are done. `shared/mongotest` (new) starts a real, disposable `mongo:7` container per test via testcontainers-go, pinned at v0.32.0 (the newest version still compatible with this repo's pinned Go 1.21.3 — v0.34.0+ requires Go 1.22, and upgrading the toolchain project-wide is a separate decision from "add integration tests"). Every service that owns a MongoDB (`user-service`, `expense-service`, `budget-service`, `notification-service` — `gateway` owns no data) got a full `internal/repository/*_integration_test.go` suite, build-tagged `integration` so the default `go test ./...` stays exactly as fast/dependency-free as `CLAUDE.md` §7 requires — these are opt-in via `make test-integration` or CI's separate `go-integration` job. Every repository method is covered against a **real** database: CRUD round-trips, ownership scoping enforced at the actual Mongo query (not just application code), and — critically — that `EnsureIndexes` genuinely creates the documented indexes with the right shape (compound field order, sparse flags, uniqueness). `.github/workflows/ci.yml` (new) runs three jobs on every push/PR: `go-unit` (mirrors `make test`, matrixed per service), `go-integration` (mirrors `make test-integration`, real Docker containers — GitHub's `ubuntu-latest` runners ship Docker pre-installed, no extra setup needed), and `frontend` (build + lint). Full detail, including a real gap the integration tests caught (user-service's `refresh_tokens` collection was missing its documented TTL and `user_id` indexes since Phase 0 — fixed in the same pass), is in `plan.md`'s Phase 6 progress log.
+
+**Still open:** rate limiting, standardized pagination/error handling across all services, full request-validation coverage audit, and OpenAPI specs served live as docs (today they're static files in each service's repo, correct but not exposed as a browsable endpoint).
 
 ---
 

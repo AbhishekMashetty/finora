@@ -39,6 +39,19 @@ This is the simplest way to get a real, reachable MongoDB for a native run witho
 
 The service's own `Makefile` also exposes `make build`, `make test`, and `make tidy` — see each service's `README.md` for specifics; they all follow the same target names per `CLAUDE.md`.
 
+## Testing
+
+Two separate tiers, matching `CLAUDE.md` §7:
+
+- **`make test`** (or `go test ./...` inside any service) — fast, unit-level, runs against hand-written in-memory fakes of the `domain` repository interfaces. No Docker, no network, no external state. This is what runs on every `go test` invocation and what CI's `go-unit` job runs.
+- **`make test-integration`** — real-MongoDB integration tests, added in Phase 6 (`shared/mongotest`, backed by [testcontainers-go](https://golang.testcontainers.org/)). **Requires Docker running locally** — each test spins up a genuine, disposable `mongo:7` container (the same image `docker-compose.yml` runs in production), exercises the actual Mongo-backed repository implementation against it, and tears the container down automatically. Covers `user-service`, `expense-service`, `budget-service`, and `notification-service` (every service that owns a MongoDB — `gateway` owns no data, so it has none). These live in `internal/repository/*_integration_test.go` files, build-tagged `integration` so they're **excluded from `make test`/plain `go test ./...`** — they only run when explicitly requested:
+  ```bash
+  make test-integration
+  # or, for a single service:
+  cd services/expense-service && go test -tags=integration ./...
+  ```
+  This tier is slower (each test's own container startup, a few seconds) but tests real behavior a fake can't: that a unique index genuinely rejects a duplicate, that a compound index has the right field order, that a TTL index actually expires after the right duration, that ownership scoping is enforced by the real Mongo query and not just application code. CI runs this as its own `go-integration` job (`.github/workflows/ci.yml`), separate from `go-unit`, on GitHub's `ubuntu-latest` runners (Docker is pre-installed there, no extra setup needed).
+
 ## Ports
 
 | Service | Host port | Notes |

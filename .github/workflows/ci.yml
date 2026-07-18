@@ -1,0 +1,117 @@
+# Phase 6's "green CI matrix" (architecture/development-roadmap.md).
+# Mirrors the local workflow exactly, so a red CI run always reproduces
+# locally with the same commands:
+#   - go-unit    ~= `make test`        (fast, fakes only, every push/PR)
+#   - go-integration ~= `make test-integration` (real Mongo via
+#     testcontainers-go — see shared/mongotest's doc comment for why this
+#     is a separate tier from go-unit, not folded into it)
+#   - frontend   ~= `npm run build && npm run lint` in frontend/
+#
+# Go version (1.21.3) and Node version (20) are pinned to match this repo's
+# actual toolchain exactly — see docs/local-development.md's macOS-linker
+# note for why 1.21.3 specifically, and frontend/Dockerfile for the Node
+# version every build already uses.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go-unit:
+    name: Go unit tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: shared
+            dir: shared
+          - name: gateway
+            dir: services/gateway
+          - name: user-service
+            dir: services/user-service
+          - name: expense-service
+            dir: services/expense-service
+          - name: budget-service
+            dir: services/budget-service
+          - name: notification-service
+            dir: services/notification-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21.3"
+
+      - name: gofmt (no unformatted files)
+        working-directory: ${{ matrix.dir }}
+        run: |
+          UNFORMATTED="$(gofmt -l .)"
+          if [ -n "$UNFORMATTED" ]; then
+            echo "::error::gofmt found unformatted files:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+
+      - name: go vet
+        working-directory: ${{ matrix.dir }}
+        run: go vet ./...
+
+      - name: go build
+        working-directory: ${{ matrix.dir }}
+        run: go build ./...
+
+      - name: go test
+        working-directory: ${{ matrix.dir }}
+        run: go test ./...
+
+  go-integration:
+    name: Go integration tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: user-service
+            dir: services/user-service
+          - name: expense-service
+            dir: services/expense-service
+          - name: budget-service
+            dir: services/budget-service
+          - name: notification-service
+            dir: services/notification-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21.3"
+
+      # ubuntu-latest runners ship Docker Engine pre-installed, which is
+      # all testcontainers-go needs — no extra setup step required.
+      - name: go test -tags=integration (real mongo:7 via testcontainers)
+        working-directory: ${{ matrix.dir }}
+        run: go test -tags=integration ./...
+
+  frontend:
+    name: Frontend build + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - working-directory: frontend
+        run: npm ci
+
+      - working-directory: frontend
+        run: npm run build
+
+      - working-directory: frontend
+        run: npm run lint

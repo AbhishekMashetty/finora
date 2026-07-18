@@ -125,15 +125,18 @@ a fresh dev machine; use a container (`docker run -p 27017:27017 mongo:7`)
 or the root docker-compose stack described below.
 
 ```sh
-make build   # go build ./...
-make test    # go test ./...
-make tidy    # go mod tidy
+make build             # go build ./...
+make test              # go test ./...           (fast, fakes only)
+make tidy              # go mod tidy
+go test -tags=integration ./...  # real-Mongo integration tests (Phase 6,
+                                  # requires Docker — see docs/local-
+                                  # development.md's Testing section, or
+                                  # `make test-integration` from the repo root)
 ```
 
 Normally this service is **not** run standalone — it's started via the
-root `docker-compose.yml` (being built by another agent in parallel; it
-does not exist yet), which wires up its dedicated `mongo-user` container
-and the other Finora services.
+root `docker-compose.yml`, which wires up its dedicated `mongo-user`
+container and the other Finora services.
 
 ## Docker
 

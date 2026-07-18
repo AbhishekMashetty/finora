@@ -61,7 +61,7 @@ This brings up the gateway, all four services, their four MongoDB instances, and
 - API (via gateway): http://localhost:8080/api/v1/...
 - Gateway health: http://localhost:8080/health
 
-See `docs/local-development.md` for the full workflow (including a native, non-Docker per-service option) and a sample end-to-end curl flow (register → login → `/users/me` → refresh).
+See `docs/local-development.md` for the full workflow (including a native, non-Docker per-service option), a sample end-to-end curl flow (register → login → `/users/me` → refresh), and the **Testing** section (`make test` for fast fake-backed unit tests, `make test-integration` for real-Mongo integration tests via testcontainers — Phase 6).
 
 > Note: `docker-compose.yml` is one of the last pieces wired up in the build process for this repository. If you're reading this before it lands, the workflow above is the documented target — check `docker compose config` or the repo root for its current status.
 

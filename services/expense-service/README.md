@@ -97,8 +97,12 @@ or, equivalently, from this directory: `make docker-build`.
 
 ```sh
 make build   # go build ./cmd/server
-make test    # go test ./...
+make test    # go test ./...            (fast, fakes only)
 make tidy    # go mod tidy
+go test -tags=integration ./...  # real-Mongo integration tests (Phase 6,
+                                  # requires Docker — see docs/local-
+                                  # development.md's Testing section, or
+                                  # `make test-integration` from the repo root)
 ```
 
 ### Architecture

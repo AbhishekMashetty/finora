@@ -86,9 +86,13 @@ the other Finora services, all reachable through the gateway.
 ```sh
 make run           # go run ./cmd/server
 make build         # go build -o bin/server ./cmd/server
-make test          # go test ./...
+make test          # go test ./...            (fast, fakes only)
 make tidy          # go mod tidy
 make docker-build  # builds the image (see note on build context below)
+go test -tags=integration ./...  # real-Mongo integration tests (Phase 6,
+                                  # requires Docker — see docs/local-
+                                  # development.md's Testing section, or
+                                  # `make test-integration` from the repo root)
 ```
 
 ### Docker build context
