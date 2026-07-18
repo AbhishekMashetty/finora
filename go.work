@@ -1,0 +1,10 @@
+go 1.21.3
+
+use (
+	./services/budget-service
+	./services/expense-service
+	./services/gateway
+	./services/notification-service
+	./services/user-service
+	./shared
+)
