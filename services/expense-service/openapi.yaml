@@ -1,0 +1,501 @@
+openapi: 3.0.3
+info:
+  title: expense-service
+  description: >
+    Owns accounts, transactions, and categories for Finora. Every resource is
+    scoped to the caller's user id (X-User-Id, set by the gateway). See
+    architecture/api-contracts.md at the repo root for the cross-service
+    contract this spec conforms to.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8082
+    description: Standalone local run
+  - url: http://expense-service:8082
+    description: docker-compose network (called via the gateway in practice)
+
+tags:
+  - name: accounts
+  - name: transactions
+  - name: categories
+  - name: health
+
+paths:
+  /live:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: expense-service }
+
+  /ready:
+    get:
+      tags: [health]
+      summary: Readiness probe (MongoDB ping)
+      security: []
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+
+  /health:
+    get:
+      tags: [health]
+      summary: Aggregate health for humans/dashboards
+      security: []
+      responses:
+        "200":
+          description: OK or degraded (status code still reflects health)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+
+  /api/v1/accounts:
+    get:
+      tags: [accounts]
+      summary: List the caller's accounts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accounts:
+                            type: array
+                            items: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [accounts]
+      summary: Create an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAccountRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          account: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/accounts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/AccountId"
+    get:
+      tags: [accounts]
+      summary: Get one account
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          account: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [accounts]
+      summary: Update an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAccountRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          account: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [accounts]
+      summary: Delete an account
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/transactions:
+    get:
+      tags: [transactions]
+      summary: List the caller's transactions, paginated and filterable
+      parameters:
+        - name: account_id
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          description: Inclusive lower bound on transaction date (RFC3339 or YYYY-MM-DD)
+          schema: { type: string }
+        - name: to
+          in: query
+          description: Inclusive upper bound on transaction date (RFC3339 or YYYY-MM-DD)
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          transactions:
+                            type: array
+                            items: { $ref: "#/components/schemas/Transaction" }
+                          page: { type: integer }
+                          total: { type: integer }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [transactions]
+      summary: Create a transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTransactionRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          transaction: { $ref: "#/components/schemas/Transaction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/transactions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/TransactionId"
+    get:
+      tags: [transactions]
+      summary: Get one transaction
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          transaction: { $ref: "#/components/schemas/Transaction" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [transactions]
+      summary: Update a transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTransactionRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          transaction: { $ref: "#/components/schemas/Transaction" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [transactions]
+      summary: Delete a transaction
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/categories:
+    get:
+      tags: [categories]
+      summary: List the caller's categories
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          categories:
+                            type: array
+                            items: { $ref: "#/components/schemas/Category" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [categories]
+      summary: Create a category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCategoryRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          category: { $ref: "#/components/schemas/Category" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  parameters:
+    AccountId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    TransactionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+
+  securitySchemes:
+    UserIdHeader:
+      type: apiKey
+      in: header
+      name: X-User-Id
+      description: >
+        Set by the gateway after verifying the caller's JWT. Downstream
+        services trust this header on the internal network and never
+        validate JWTs themselves (architecture/api-contracts.md).
+
+  responses:
+    Unauthorized:
+      description: Missing X-User-Id
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Envelope" }
+    NotFound:
+      description: Resource does not exist, or is not owned by the caller
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Envelope" }
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Envelope" }
+
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: { type: object, nullable: true }
+        error:
+          type: object
+          nullable: true
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+            message: { type: string }
+            details: { type: object, nullable: true }
+        request_id: { type: string }
+
+    HealthStatus:
+      type: object
+      properties:
+        status: { type: string }
+        service: { type: string }
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              ok: { type: boolean }
+              error: { type: string }
+
+    Account:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        name: { type: string }
+        type:
+          type: string
+          enum: [checking, savings, credit, cash]
+        currency: { type: string, example: USD }
+        balance: { type: number, format: double }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateAccountRequest:
+      type: object
+      required: [name, type, currency]
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum: [checking, savings, credit, cash]
+        currency: { type: string, example: USD }
+
+    UpdateAccountRequest:
+      type: object
+      required: [name, type, currency]
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum: [checking, savings, credit, cash]
+        currency: { type: string, example: USD }
+        balance: { type: number, format: double }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        account_id: { type: string }
+        category_id: { type: string, nullable: true }
+        type:
+          type: string
+          enum: [income, expense]
+        amount: { type: number, format: double }
+        currency: { type: string, example: USD }
+        date: { type: string, format: date-time }
+        note: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateTransactionRequest:
+      type: object
+      required: [account_id, type, amount, currency, date]
+      properties:
+        account_id: { type: string }
+        category_id: { type: string, nullable: true }
+        type:
+          type: string
+          enum: [income, expense]
+        amount: { type: number, format: double }
+        currency: { type: string, example: USD }
+        date:
+          type: string
+          description: RFC3339 or YYYY-MM-DD
+        note: { type: string }
+
+    Category:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        name: { type: string }
+        type:
+          type: string
+          enum: [income, expense]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateCategoryRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum: [income, expense]
+
+security:
+  - UserIdHeader: []
