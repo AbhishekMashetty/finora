@@ -1,0 +1,553 @@
+openapi: 3.0.3
+info:
+  title: budget-service
+  description: >
+    Finora budget-service: owns budgets, savings goals, and reports.
+    Part of a personal-finance SaaS built primarily as a
+    Kubernetes/DevOps learning platform.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8083
+    description: Direct-to-service (local debugging only; not exposed externally in production)
+  - url: http://localhost:8080
+    description: Via the gateway (the only externally-reachable path)
+
+tags:
+  - name: budgets
+  - name: goals
+  - name: reports
+  - name: health
+
+paths:
+  /api/v1/budgets:
+    get:
+      tags: [budgets]
+      summary: List the caller's budgets
+      security:
+        - userIdHeader: []
+      responses:
+        "200":
+          description: Budgets for the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetListEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [budgets]
+      summary: Create a budget
+      security:
+        - userIdHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBudgetRequest"
+      responses:
+        "201":
+          description: Budget created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/budgets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [budgets]
+      summary: Get a budget by id
+      security:
+        - userIdHeader: []
+      responses:
+        "200":
+          description: The budget
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: >
+            Not found — either the budget doesn't exist, or it belongs to a
+            different user. These two cases are never distinguished in the
+            response (ownership rule).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    put:
+      tags: [budgets]
+      summary: Update a budget
+      security:
+        - userIdHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBudgetRequest"
+      responses:
+        "200":
+          description: The updated budget
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found / not owned by caller (see GET above)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      tags: [budgets]
+      summary: Delete a budget
+      security:
+        - userIdHeader: []
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found / not owned by caller (see GET above)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/goals:
+    get:
+      tags: [goals]
+      summary: List the caller's savings goals
+      security:
+        - userIdHeader: []
+      responses:
+        "200":
+          description: Goals for the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalListEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [goals]
+      summary: Create a savings goal
+      security:
+        - userIdHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "201":
+          description: Goal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/goals/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [goals]
+      summary: Get a savings goal by id
+      security:
+        - userIdHeader: []
+      responses:
+        "200":
+          description: The goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: >
+            Not found — either the goal doesn't exist, or it belongs to a
+            different user. These two cases are never distinguished in the
+            response (ownership rule).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    put:
+      tags: [goals]
+      summary: Update a savings goal, including manual progress logging
+      description: >
+        Full-replace PUT: resend name/target_amount/target_date alongside
+        current_amount (manual user progress, e.g. "I moved $500 into
+        savings"). current_amount of exactly 0 is a valid value (resetting
+        progress), not treated as "field omitted". Goals do not get the
+        cross-service expense-linkage treatment that reports get — this is
+        purely user-entered progress.
+      security:
+        - userIdHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGoalRequest"
+      responses:
+        "200":
+          description: The updated goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found / not owned by caller (see GET above)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      tags: [goals]
+      summary: Delete a savings goal
+      security:
+        - userIdHeader: []
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found / not owned by caller (see GET above)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/reports/summary:
+    get:
+      tags: [reports]
+      summary: Real, computed budget-vs-actual report summary
+      description: >
+        Computes actual spend per budget category by calling expense-service
+        over REST (GET /api/v1/categories to resolve the budget's category
+        name to expense-service's category_id, then GET /api/v1/transactions
+        filtered by that id and the from/to range, paginated). If a budget's
+        category name has no match among the caller's expense-service
+        categories, that category's `actual` is 0 — not an error, the user
+        simply hasn't logged anything under that name yet. See
+        architecture/api-contracts.md's budget-service → expense-service
+        subsection for the full call sequence.
+
+
+        Side effect (Phase 4): for any category found over budget
+        (`remaining < 0`), this endpoint also calls notification-service to
+        create an in-app "Budget exceeded" notification for the caller,
+        deduplicated so repeated calls for the same `[from, to]` range don't
+        re-notify (see architecture/api-contracts.md's budget-service →
+        notification-service subsection). This does not change the response
+        shape below — `actual`/`remaining` are computed identically whether
+        or not a notification fires.
+      security:
+        - userIdHeader: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+          description: RFC3339 timestamp or YYYY-MM-DD date. Required — no implicit default range.
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+          description: RFC3339 timestamp or YYYY-MM-DD date. Required — no implicit default range.
+      responses:
+        "200":
+          description: Computed budget-vs-actual summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSummaryEnvelope"
+        "400":
+          description: from/to missing or unparseable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /live:
+    get:
+      tags: [health]
+      summary: Liveness probe (never depends on downstream state)
+      responses:
+        "200":
+          description: Process is up
+  /ready:
+    get:
+      tags: [health]
+      summary: Readiness probe (depends on Mongo connectivity)
+      responses:
+        "200":
+          description: Ready
+        "503":
+          description: Not ready
+  /health:
+    get:
+      tags: [health]
+      summary: Aggregate health, richer payload for humans/dashboards
+      responses:
+        "200":
+          description: Healthy
+        "503":
+          description: Degraded
+
+components:
+  securitySchemes:
+    userIdHeader:
+      type: apiKey
+      in: header
+      name: X-User-Id
+      description: >
+        Set by the gateway after verifying the caller's JWT. Services trust
+        this header on the internal network and never validate JWTs
+        themselves. See architecture/api-contracts.md.
+
+  responses:
+    Unauthorized:
+      description: Missing X-User-Id (no identity forwarded by the gateway)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    Budget:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        category: { type: string }
+        amount: { type: number, format: double }
+        period:
+          type: string
+          enum: [weekly, monthly, yearly]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateBudgetRequest:
+      type: object
+      required: [category, amount, period]
+      properties:
+        category: { type: string }
+        amount: { type: number, format: double, minimum: 0, exclusiveMinimum: true }
+        period:
+          type: string
+          enum: [weekly, monthly, yearly]
+
+    UpdateBudgetRequest:
+      $ref: "#/components/schemas/CreateBudgetRequest"
+
+    Goal:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        name: { type: string }
+        target_amount: { type: number, format: double }
+        target_date: { type: string, format: date-time }
+        current_amount:
+          type: number
+          format: double
+          description: >
+            Manual user progress logging, updated via PUT. Not derived from
+            expense-service — goals do not get the cross-service linkage
+            that reports get.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateGoalRequest:
+      type: object
+      required: [name, target_amount, target_date]
+      properties:
+        name: { type: string }
+        target_amount: { type: number, format: double, minimum: 0, exclusiveMinimum: true }
+        target_date:
+          type: string
+          description: RFC3339 timestamp or YYYY-MM-DD date; must be in the future.
+
+    UpdateGoalRequest:
+      type: object
+      required: [name, target_amount, target_date]
+      properties:
+        name: { type: string }
+        target_amount: { type: number, format: double, minimum: 0, exclusiveMinimum: true }
+        target_date:
+          type: string
+          description: RFC3339 timestamp or YYYY-MM-DD date; must be in the future.
+        current_amount:
+          type: number
+          format: double
+          description: >
+            Manual progress update. Optional in the request body — omitting
+            it is equivalent to sending 0, since 0 is a legitimate value
+            (e.g. resetting progress), not a "leave unchanged" sentinel
+            (this is a full-replace PUT, matching budgets' Update
+            convention).
+
+    CategorySummary:
+      type: object
+      description: One budget's computed budget-vs-actual figures for the requested range.
+      properties:
+        category: { type: string }
+        period:
+          type: string
+          enum: [weekly, monthly, yearly]
+        budgeted: { type: number, format: double }
+        actual:
+          type: number
+          format: double
+          description: >
+            Real spend for this category in [from, to], computed via a
+            REST call to expense-service. 0 if the budget's category name
+            has no match among the caller's expense-service categories
+            (not an error).
+        remaining:
+          type: number
+          format: double
+          description: budgeted - actual. Can be negative (over budget).
+
+    ReportSummary:
+      type: object
+      description: >
+        Real, computed budget-vs-actual report — one CategorySummary per the
+        caller's budgets in [from, to], plus totals. Built on read from
+        budgets plus a REST call to expense-service; never persisted.
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategorySummary"
+        total_budgeted: { type: number, format: double }
+        total_actual: { type: number, format: double }
+
+    ErrorBody:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+        message: { type: string }
+        details: {}
+
+    Envelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: {}
+        error:
+          nullable: true
+          $ref: "#/components/schemas/ErrorBody"
+        request_id: { type: string }
+
+    ErrorEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+
+    BudgetEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                budget:
+                  $ref: "#/components/schemas/Budget"
+
+    BudgetListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                budgets:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Budget"
+
+    GoalEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                goal:
+                  $ref: "#/components/schemas/Goal"
+
+    GoalListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                goals:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Goal"
+
+    ReportSummaryEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                summary:
+                  $ref: "#/components/schemas/ReportSummary"
