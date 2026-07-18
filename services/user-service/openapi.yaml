@@ -1,0 +1,461 @@
+openapi: 3.0.3
+info:
+  title: Finora user-service
+  description: >
+    Owns users, credentials, refresh tokens, profile and settings for the
+    Finora platform. Every response uses the standard Finora envelope
+    (see components.schemas.Envelope). See architecture/api-contracts.md
+    at the repo root for the authoritative cross-service contract.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8081
+    description: user-service, local/docker-compose (direct — normally reached via the gateway at :8080)
+
+tags:
+  - name: auth
+  - name: users
+  - name: health
+
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Log in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rotate a refresh token for a new access+refresh pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New token pair issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke a refresh token (idempotent)
+      description: >
+        Authenticates via the refresh token in the body, not via X-User-Id.
+        Always returns 204 unless a genuine internal error occurs — an
+        already-revoked or unknown token still succeeds, so the endpoint
+        never leaks whether a token was ever valid.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Revoked (or already revoked/unknown — idempotent)
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/auth/password-reset:
+    post:
+      tags: [auth]
+      summary: Request a password reset (Phase 1 stub)
+      description: >
+        Phase 1 stub: always returns 202 regardless of whether the email is
+        registered, so this endpoint can never be used to enumerate
+        accounts. No reset token is issued and no email is sent yet — full
+        delivery (a reset-token record, a consume/confirm endpoint, and a
+        real notification-service email send) is follow-up Phase 1 work.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '202':
+          description: Accepted — a reset email will be sent if the account exists
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/users/me:
+    get:
+      tags: [users]
+      summary: Get the authenticated user's profile
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    put:
+      tags: [users]
+      summary: Update the authenticated user's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/users/me/settings:
+    get:
+      tags: [users]
+      summary: Get the authenticated user's settings
+      responses:
+        '200':
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    put:
+      tags: [users]
+      summary: Update the authenticated user's settings
+      description: Only fields provided are changed; omitted fields keep their current value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /live:
+    get:
+      tags: [health]
+      summary: Liveness probe (never depends on downstream state)
+      security: []
+      responses:
+        '200':
+          description: Process is up
+  /ready:
+    get:
+      tags: [health]
+      summary: Readiness probe (checks MongoDB connectivity)
+      security: []
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
+  /health:
+    get:
+      tags: [health]
+      summary: Aggregate health for humans/dashboards
+      security: []
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Degraded
+
+components:
+  securitySchemes:
+    UserIdHeader:
+      type: apiKey
+      in: header
+      name: X-User-Id
+      description: >
+        Set by the gateway after verifying the caller's access token
+        (never sent directly by clients in production). Enforced here via
+        shared/middleware.RequireIdentity().
+
+  responses:
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            data: null
+            error: { code: VALIDATION_ERROR, message: "email is required", details: { field: email } }
+            request_id: "8f3e2c1a-0000-0000-0000-000000000000"
+    UnauthorizedError:
+      description: Missing/invalid/expired token, or missing X-User-Id
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            data: null
+            error: { code: UNAUTHORIZED, message: "invalid credentials" }
+            request_id: "8f3e2c1a-0000-0000-0000-000000000000"
+    ConflictError:
+      description: Duplicate resource (e.g. email already registered)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            data: null
+            error: { code: CONFLICT, message: "email already registered" }
+            request_id: "8f3e2c1a-0000-0000-0000-000000000000"
+    NotFoundError:
+      description: Resource does not exist / not owned by caller
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            data: null
+            error: { code: NOT_FOUND, message: "user not found" }
+            request_id: "8f3e2c1a-0000-0000-0000-000000000000"
+
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          nullable: true
+          $ref: '#/components/schemas/ErrorBody'
+        request_id:
+          type: string
+      required: [success, data, error, request_id]
+
+    ErrorBody:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+        message:
+          type: string
+        details:
+          nullable: true
+      required: [code, message]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, email, name, created_at, updated_at]
+
+    Settings:
+      type: object
+      properties:
+        user_id:
+          type: string
+        currency:
+          type: string
+          example: USD
+        timezone:
+          type: string
+          example: UTC
+        updated_at:
+          type: string
+          format: date-time
+      required: [user_id, currency, timezone]
+
+    RegisterRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        name: { type: string }
+      required: [email, password, name]
+
+    LoginRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+      required: [email, password]
+
+    RefreshRequest:
+      type: object
+      properties:
+        refresh_token: { type: string }
+      required: [refresh_token]
+
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token: { type: string }
+      required: [refresh_token]
+
+    PasswordResetRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+      required: [email]
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: >
+            Trimmed of surrounding whitespace before validation; must be
+            non-blank after trimming.
+      required: [name]
+
+    UpdateSettingsRequest:
+      type: object
+      properties:
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: >
+            3-letter uppercase currency code (lightweight format check, not a
+            full ISO-4217 lookup). Omit to leave the current value unchanged.
+        timezone:
+          type: string
+          description: >
+            Must be a valid IANA timezone name (validated via Go's
+            time.LoadLocation). Omit to leave the current value unchanged.
+
+    UserEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user:
+                  $ref: '#/components/schemas/User'
+
+    SettingsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                settings:
+                  $ref: '#/components/schemas/Settings'
+
+    LoginEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                access_token: { type: string }
+                refresh_token: { type: string }
+                user:
+                  $ref: '#/components/schemas/User'
+
+    TokenPairEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                access_token: { type: string }
+                refresh_token: { type: string }
+
+security:
+  - UserIdHeader: []
