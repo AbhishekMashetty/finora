@@ -10,6 +10,13 @@ export interface User {
   [key: string]: unknown;
 }
 
+export interface Settings {
+  user_id: string;
+  currency: string;
+  timezone: string;
+  updated_at: string;
+}
+
 export interface LoginResponse {
   access_token: string;
   refresh_token: string;

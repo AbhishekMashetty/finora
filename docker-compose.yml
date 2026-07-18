@@ -6,6 +6,38 @@ x-mongo-healthcheck: &mongo-healthcheck
   timeout: 5s
   retries: 10
 
+# mongod's default verbosity logs a connection-accepted/client-metadata/
+# access-control/ended line quartet for every single client connection —
+# including the 5s healthcheck above, which opens fresh mongosh connections
+# every interval, across all 4 Mongo containers. Two things were tried and
+# ruled out before landing on this:
+#   1. --quiet alone (Mongo 7) only suppresses the "Connection accepted"/
+#      "Connection ended" pair; "client metadata"/"Received first command"
+#      (NETWORK) and "Connection not authenticating" (ACCESS) still print.
+#   2. Dropping component verbosity to -1 via --setParameter
+#      logComponentVerbosity — confirmed via `db.adminCommand({getParameter:
+#      1, logComponentVerbosity: 1})` that this was genuinely applied, but
+#      it had zero effect on these lines: component verbosity only gates
+#      Debug-level (D1-D5) messages, never Informational ("I") severity,
+#      which is what connection-lifecycle logging uses. There is no
+#      supported mongod flag to selectively hide Informational messages.
+# The actual fix: redirect mongod's own log output to a file inside the
+# already-persistent /data/db volume instead of stdout, so `docker compose
+# logs` (which only ever sees a container's stdout/stderr) shows nothing
+# from routine Mongo operation. This is a real trade-off, not a free lunch:
+# if mongod ever fails outright, `docker compose logs` won't show why —
+# inspect the file directly instead, e.g.
+# `docker compose exec mongo-user cat /data/db/mongod.log`. Writing under
+# /data/db (not a separate path) means the log survives container
+# recreation as long as the named volume does, which is a bonus for
+# post-mortem debugging, not just a location of convenience.
+x-mongo-command: &mongo-command
+  - mongod
+  - --quiet
+  - --logpath
+  - /data/db/mongod.log
+  - --logappend
+
 x-go-service-env: &go-service-env
   LOG_LEVEL: ${LOG_LEVEL:-info}
   SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-10s}
@@ -16,24 +48,28 @@ services:
   mongo-user:
     image: mongo:7
     restart: unless-stopped
+    command: *mongo-command
     volumes: ["mongo-user-data:/data/db"]
     healthcheck: *mongo-healthcheck
 
   mongo-expense:
     image: mongo:7
     restart: unless-stopped
+    command: *mongo-command
     volumes: ["mongo-expense-data:/data/db"]
     healthcheck: *mongo-healthcheck
 
   mongo-budget:
     image: mongo:7
     restart: unless-stopped
+    command: *mongo-command
     volumes: ["mongo-budget-data:/data/db"]
     healthcheck: *mongo-healthcheck
 
   mongo-notification:
     image: mongo:7
     restart: unless-stopped
+    command: *mongo-command
     volumes: ["mongo-notification-data:/data/db"]
     healthcheck: *mongo-healthcheck
 

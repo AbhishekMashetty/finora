@@ -62,11 +62,13 @@ A conformance review caught two real bugs before this was called done, both fixe
 
 ---
 
-### Phase 5 — Frontend depth
+### Phase 5 — Frontend depth — ✅ COMPLETE (2026-07-19)
 
 **Goal:** wire every product screen (accounts, transactions, budgets, goals, reports, search, profile, settings) to live APIs; real forms, client state, charts, auth-guarded routing, and token-refresh handling.
 
 **Done when:** all listed product features are usable through the UI.
+
+**Verified:** accounts/transactions/budgets/goals/reports/notifications were wired incrementally across Phases 3-4 (pulled forward by explicit user request each time, since reports/budgets are meaningless without real data to point at); this pass closed the final three — profile (view/edit name, email read-only), settings (currency/timezone, backed by user-service's Phase 1 endpoints which already had sane defaults + full validation), and search (a client-side composition over the accounts/categories/transactions/budgets/goals endpoints — no dedicated search service exists or was warranted at this data scale). "Charts" is satisfied by the reports page's `BudgetBar` bullet-chart (built via the `dataviz` skill method during the frontend redesign), not a charting library — real data visualization without an unjustified new dependency. Token-refresh handling was already complete from Phase 0 (`lib/api.ts`'s silent-refresh-then-retry). A real, previously undiscovered production bug was caught while testing the new Settings page: `user-service`'s Alpine base image had no `tzdata` package, so `time.LoadLocation` could only ever resolve `"UTC"` inside the container — every genuinely valid IANA timezone was silently rejected with the same error a garbage string gets, invisible to `go test` since unit tests run on a host machine that has tzdata. Fixed in `services/user-service/Dockerfile`, confirmed live (a real zone now succeeds, garbage still correctly 400s), and documented in `docs/local-development.md`'s Troubleshooting section. Full detail in `plan.md`'s Phase 5 progress log.
 
 ---
 

@@ -12,6 +12,14 @@ RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server ./cmd/server
 
 FROM alpine:3.19
+# tzdata is required for time.LoadLocation to resolve any IANA zone other
+# than UTC — Alpine ships without it, so settings' timezone validation
+# (internal/service/user_service.go's UpdateSettings) would silently reject
+# every real timezone except "UTC" without this. Caught live: a genuinely
+# valid zone (Europe/London) was rejected with the same 400 VALIDATION_ERROR
+# a garbage string gets, because LoadLocation itself failed to find zone
+# data on disk, not because the input was actually invalid.
+RUN apk add --no-cache tzdata
 RUN adduser -D -u 10001 appuser
 COPY --from=builder /out/server /usr/local/bin/server
 USER appuser

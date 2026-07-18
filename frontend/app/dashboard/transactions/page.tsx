@@ -304,9 +304,17 @@ export default function TransactionsPage() {
       {/* Filters */}
       <Card className="mt-6">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Filters</h2>
-        <div className="mt-3 flex flex-wrap items-end gap-3">
+        {/* A grid, not a flex-wrap row: account/category names vary a lot in
+            length, and a native date input has a different intrinsic width
+            than a <select> — left to their own content width, the four
+            controls never lined up. Fixed columns + w-full on each control
+            keeps every field (and its label) aligned in a clean row, and
+            wraps predictably (2x2, then stacked) on smaller screens instead
+            of raggedly. */}
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Select
             label="Account"
+            className="w-full"
             value={filterAccountId}
             onChange={(e) => {
               setFilterAccountId(e.target.value);
@@ -322,6 +330,7 @@ export default function TransactionsPage() {
           </Select>
           <Select
             label="Category"
+            className="w-full"
             value={filterCategoryId}
             onChange={(e) => {
               setFilterCategoryId(e.target.value);
@@ -338,6 +347,7 @@ export default function TransactionsPage() {
           <Input
             type="date"
             label="From"
+            className="w-full"
             value={filterFrom}
             onChange={(e) => {
               setFilterFrom(e.target.value);
@@ -347,13 +357,16 @@ export default function TransactionsPage() {
           <Input
             type="date"
             label="To"
+            className="w-full"
             value={filterTo}
             onChange={(e) => {
               setFilterTo(e.target.value);
               setPage(1);
             }}
           />
-          {(filterAccountId || filterCategoryId || filterFrom || filterTo) && (
+        </div>
+        {(filterAccountId || filterCategoryId || filterFrom || filterTo) && (
+          <div className="mt-3 flex justify-end">
             <Button
               variant="secondary"
               size="sm"
@@ -367,8 +380,8 @@ export default function TransactionsPage() {
             >
               Clear filters
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </Card>
 
       {/* Create form */}
@@ -408,9 +421,15 @@ export default function TransactionsPage() {
 
         {refDataLoaded && hasAccounts && showCreateForm && (
           <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-3">
-            <div className="flex flex-wrap items-end gap-3">
+            {/* Same grid-not-flex fix as the filter row above: Account's
+                option text, a 2-letter Type, a number, a 3-letter currency
+                code, and a date all have wildly different intrinsic widths
+                — a fixed-span grid keeps every field's label and control
+                aligned instead of raggedly sized to its own content. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
               <Select
                 label="Account"
+                className="w-full lg:col-span-4"
                 value={form.accountId}
                 onChange={(e) => setForm({ ...form, accountId: e.target.value })}
                 required
@@ -423,36 +442,35 @@ export default function TransactionsPage() {
               </Select>
               <Select
                 label="Type"
+                className="w-full lg:col-span-2"
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value as "income" | "expense" })}
               >
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
               </Select>
-              <div className="w-28">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  label="Amount"
-                  required
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  className="tabular-nums"
-                />
-              </div>
-              <div className="w-20">
-                <Input
-                  label="Currency"
-                  required
-                  value={form.currency}
-                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                  maxLength={3}
-                />
-              </div>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                label="Amount"
+                className="w-full tabular-nums lg:col-span-2"
+                required
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              />
+              <Input
+                label="Currency"
+                className="w-full lg:col-span-1"
+                required
+                value={form.currency}
+                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                maxLength={3}
+              />
               <Input
                 type="date"
                 label="Date"
+                className="w-full lg:col-span-3"
                 required
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
