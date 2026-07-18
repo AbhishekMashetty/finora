@@ -1,0 +1,243 @@
+openapi: 3.0.3
+info:
+  title: Finora notification-service
+  description: >
+    Owns in-app notifications for Finora. Every route under /api/v1 is
+    owner-scoped by the caller's X-User-Id (set by the gateway after JWT
+    verification) — see architecture/api-contracts.md for the full
+    cross-service contract this service conforms to.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8084
+    description: Standalone local run
+  - url: http://notification-service:8084
+    description: Inside the docker-compose network (reached via the gateway in practice)
+
+tags:
+  - name: notifications
+  - name: health
+
+paths:
+  /api/v1/notifications:
+    get:
+      tags: [notifications]
+      summary: List the caller's notifications
+      security:
+        - UserIdHeader: []
+      parameters:
+        - name: unread_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: If true, only notifications with read=false are returned.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [notifications]
+      summary: Create a notification owned by the caller
+      description: >
+        The owner is always the caller's X-User-Id — there is no user_id field
+        in the request body. As of Phase 4, budget-service's overspend
+        notification trigger (see architecture/api-contracts.md's
+        budget-service → notification-service subsection) is exactly such a
+        service-to-service caller: it forwards the originating user's
+        X-User-Id rather than passing user_id in the body, so the ownership
+        model never has two shapes.
+      security:
+        - UserIdHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/notifications/{id}/read:
+    patch:
+      tags: [notifications]
+      summary: Mark a notification as read
+      security:
+        - UserIdHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /live:
+    get:
+      tags: [health]
+      summary: Liveness probe (always ok if the process is up)
+      responses:
+        "200":
+          description: OK
+  /ready:
+    get:
+      tags: [health]
+      summary: Readiness probe (ok only if Mongo ping succeeds)
+      responses:
+        "200":
+          description: Ready
+        "503":
+          description: Not ready
+  /health:
+    get:
+      tags: [health]
+      summary: Aggregate health for humans/dashboards
+      responses:
+        "200":
+          description: Healthy
+        "503":
+          description: Degraded
+
+components:
+  securitySchemes:
+    UserIdHeader:
+      type: apiKey
+      in: header
+      name: X-User-Id
+      description: >
+        Set by the gateway after verifying the caller's JWT. Trusted on the
+        internal network; this service never validates JWTs itself.
+
+  schemas:
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "64f1c2a5e13b4a2d9c8b4567"
+        user_id:
+          type: string
+          example: "64f1c2a5e13b4a2d9c8b0001"
+        title:
+          type: string
+          example: "Budget exceeded"
+        message:
+          type: string
+          example: "You have exceeded your groceries budget for July."
+        type:
+          type: string
+          description: >
+            Freeform, caller-assigned category label. "overspend" is used by
+            budget-service's Phase 4 overspend-notification trigger; other
+            values (e.g. "info") are used by direct clients.
+          example: "overspend"
+        read:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+      required: [id, user_id, title, message, type, read, created_at]
+
+    CreateNotificationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+      required: [title, message, type]
+
+    Envelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          nullable: true
+          $ref: "#/components/schemas/ErrorBody"
+        request_id:
+          type: string
+
+    ErrorBody:
+      type: object
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+        details:
+          nullable: true
+
+    NotificationEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                notification:
+                  $ref: "#/components/schemas/Notification"
+
+    NotificationListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                notifications:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Notification"
+
+  responses:
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    Unauthorized:
+      description: Missing X-User-Id
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    NotFound:
+      description: Resource does not exist / not owned by caller
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
