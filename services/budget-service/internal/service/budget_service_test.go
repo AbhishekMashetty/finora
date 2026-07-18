@@ -95,6 +95,11 @@ func TestBudgetService_Create(t *testing.T) {
 			in:      domain.CreateBudgetInput{Category: "groceries", Amount: 500, Period: "daily"},
 			wantErr: domain.ErrValidation,
 		},
+		{
+			name:    "amount above the ceiling is rejected",
+			in:      domain.CreateBudgetInput{Category: "groceries", Amount: 1e13, Period: domain.PeriodMonthly},
+			wantErr: domain.ErrValidation,
+		},
 	}
 
 	for _, tt := range tests {
@@ -201,6 +206,13 @@ func TestBudgetService_Update(t *testing.T) {
 
 	t.Run("invalid input is rejected", func(t *testing.T) {
 		_, err := svc.Update(ctx, "owner", created.ID, domain.UpdateBudgetInput{Category: "", Amount: 200, Period: domain.PeriodMonthly})
+		if !errors.Is(err, domain.ErrValidation) {
+			t.Fatalf("err = %v, want %v", err, domain.ErrValidation)
+		}
+	})
+
+	t.Run("amount above the ceiling is rejected", func(t *testing.T) {
+		_, err := svc.Update(ctx, "owner", created.ID, domain.UpdateBudgetInput{Category: "fun", Amount: 1e13, Period: domain.PeriodMonthly})
 		if !errors.Is(err, domain.ErrValidation) {
 			t.Fatalf("err = %v, want %v", err, domain.ErrValidation)
 		}

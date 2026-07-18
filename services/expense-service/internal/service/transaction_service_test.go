@@ -11,9 +11,19 @@ import (
 
 func setupTransactionServiceWithAccount(t *testing.T, userID string) (domain.TransactionService, *fakeAccountRepository, string) {
 	t.Helper()
+	svc, accountRepo, _, accountID := setupTransactionServiceWithAccountAndCategory(t, userID)
+	return svc, accountRepo, accountID
+}
+
+// setupTransactionServiceWithAccountAndCategory additionally seeds a
+// category owned by userID, for tests covering the category_id ownership
+// check.
+func setupTransactionServiceWithAccountAndCategory(t *testing.T, userID string) (domain.TransactionService, *fakeAccountRepository, *fakeCategoryRepository, string) {
+	t.Helper()
 	accountRepo := newFakeAccountRepository()
+	categoryRepo := newFakeCategoryRepository()
 	txRepo := newFakeTransactionRepository()
-	svc := service.NewTransactionService(txRepo, accountRepo)
+	svc := service.NewTransactionService(txRepo, accountRepo, categoryRepo)
 
 	accountSvc := service.NewAccountService(accountRepo)
 	account, err := accountSvc.Create(context.Background(), userID, domain.CreateAccountInput{
@@ -22,7 +32,7 @@ func setupTransactionServiceWithAccount(t *testing.T, userID string) (domain.Tra
 	if err != nil {
 		t.Fatalf("setup account: %v", err)
 	}
-	return svc, accountRepo, account.ID
+	return svc, accountRepo, categoryRepo, account.ID
 }
 
 func TestTransactionService_Create_Validation(t *testing.T) {
@@ -112,6 +122,129 @@ func TestTransactionService_Create_Validation(t *testing.T) {
 	}
 }
 
+// strPtr is a small helper so table-driven test cases can take the address
+// of a string literal inline.
+func strPtr(s string) *string { return &s }
+
+func TestTransactionService_Create_CategoryOwnership(t *testing.T) {
+	svc, _, categoryRepo, accountID := setupTransactionServiceWithAccountAndCategory(t, "user-1")
+	ctx := context.Background()
+	now := time.Now()
+
+	myCategory := domain.Category{UserID: "user-1", Name: "Groceries", Type: domain.TransactionTypeExpense}
+	if err := categoryRepo.Create(ctx, &myCategory); err != nil {
+		t.Fatalf("setup category: %v", err)
+	}
+	othersCategory := domain.Category{UserID: "someone-else", Name: "Rent", Type: domain.TransactionTypeExpense}
+	if err := categoryRepo.Create(ctx, &othersCategory); err != nil {
+		t.Fatalf("setup category: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		categoryID *string
+		wantErr    bool
+	}{
+		{
+			name:       "nil category_id is valid (optional field)",
+			categoryID: nil,
+			wantErr:    false,
+		},
+		{
+			name:       "own category_id is accepted",
+			categoryID: strPtr(myCategory.ID),
+			wantErr:    false,
+		},
+		{
+			name:       "category_id owned by another user is rejected",
+			categoryID: strPtr(othersCategory.ID),
+			wantErr:    true,
+		},
+		{
+			name:       "nonexistent category_id is rejected",
+			categoryID: strPtr("nonexistent-category"),
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.Create(ctx, "user-1", domain.CreateTransactionInput{
+				AccountID: accountID, CategoryID: tt.categoryID, Type: domain.TransactionTypeExpense, Amount: 10, Currency: "USD", Date: now,
+			})
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if _, ok := service.AsValidationError(err); !ok {
+					t.Fatalf("expected ValidationError, got %T: %v", err, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTransactionService_Create_AmountCeiling(t *testing.T) {
+	svc, _, accountID := setupTransactionServiceWithAccount(t, "user-1")
+	ctx := context.Background()
+	now := time.Now()
+
+	tests := []struct {
+		name    string
+		amount  float64
+		wantErr bool
+	}{
+		{name: "amount at the ceiling is rejected (must be strictly greater)", amount: 1_000_000_000_001, wantErr: true},
+		{name: "absurdly large amount is rejected", amount: 1e307, wantErr: true},
+		{name: "amount just under the ceiling is accepted", amount: 999_999_999_999, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.Create(ctx, "user-1", domain.CreateTransactionInput{
+				AccountID: accountID, Type: domain.TransactionTypeExpense, Amount: tt.amount, Currency: "USD", Date: now,
+			})
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if _, ok := service.AsValidationError(err); !ok {
+					t.Fatalf("expected ValidationError, got %T: %v", err, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTransactionService_List_InvertedDateRange(t *testing.T) {
+	svc, _, accountID := setupTransactionServiceWithAccount(t, "user-1")
+	ctx := context.Background()
+
+	if _, err := svc.Create(ctx, "user-1", domain.CreateTransactionInput{
+		AccountID: accountID, Type: domain.TransactionTypeExpense, Amount: 10, Currency: "USD", Date: time.Now(),
+	}); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	from := time.Now()
+	to := from.Add(-24 * time.Hour)
+	_, err := svc.List(ctx, "user-1", domain.ListTransactionsInput{From: &from, To: &to})
+	if err == nil {
+		t.Fatalf("expected error for inverted date range, got nil")
+	}
+	if _, ok := service.AsValidationError(err); !ok {
+		t.Fatalf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestTransactionService_Pagination(t *testing.T) {
 	svc, _, accountID := setupTransactionServiceWithAccount(t, "user-1")
 	ctx := context.Background()
@@ -192,8 +325,9 @@ func TestTransactionService_Pagination(t *testing.T) {
 
 func TestTransactionService_List_ScopedToUser(t *testing.T) {
 	accountRepo := newFakeAccountRepository()
+	categoryRepo := newFakeCategoryRepository()
 	txRepo := newFakeTransactionRepository()
-	svc := service.NewTransactionService(txRepo, accountRepo)
+	svc := service.NewTransactionService(txRepo, accountRepo, categoryRepo)
 	accountSvc := service.NewAccountService(accountRepo)
 	ctx := context.Background()
 

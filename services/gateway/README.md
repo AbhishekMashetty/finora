@@ -8,10 +8,15 @@ from outside the docker/Kubernetes network (see
 
 For each request the gateway:
 
-1. Runs the shared middleware chain: `RequestID -> Logging -> Recovery -> CORS
-   -> RateLimit` (Phase 6; per-client-IP token bucket, configured via
-   `RATE_LIMIT_REQUESTS_PER_SECOND`/`RATE_LIMIT_BURST`, fails open if unset —
-   see `architecture/api-contracts.md`'s Rate Limiting section).
+1. Runs the shared middleware chain: `RequestID -> Logging -> Recovery ->
+   BodyLimit -> CORS -> RateLimit` (Phase 6). `BodyLimit` caps request body
+   size (`MAX_REQUEST_BODY_BYTES`, default 1 MiB) as early as possible, so an
+   oversized body is rejected before CORS/proxying do any work; an oversized
+   request is reported as `400 VALIDATION_ERROR`, not a generic proxy error
+   — see `services/gateway/internal/proxy/proxy.go`'s `ErrorHandler`, which
+   special-cases this. `RateLimit` is a per-client-IP token bucket
+   (`RATE_LIMIT_REQUESTS_PER_SECOND`/`RATE_LIMIT_BURST`). Both fail open if
+   unset — see `architecture/api-contracts.md`'s Rate Limiting section.
 2. Serves `/live`, `/ready`, `/health` directly (public, via `shared/health`;
    the gateway owns no data, so it registers no checkers — `/ready` always
    mirrors `/live`) and `GET /openapi.yaml` (the gateway's own aggregate
@@ -60,6 +65,9 @@ string unchanged — the gateway does no path rewriting.
 | `LOG_LEVEL`                  | `debug`/`info`/`warn`/`error` (default `info`)         |
 | `SHUTDOWN_TIMEOUT`           | Graceful shutdown drain period, e.g. `10s` (default `10s`) |
 | `CORS_ALLOWED_ORIGINS`       | Comma-separated list of allowed origins (default `http://localhost:3000`) |
+| `RATE_LIMIT_REQUESTS_PER_SECOND` | Per-client-IP sustained request rate (default `10`); `<= 0` disables rate limiting |
+| `RATE_LIMIT_BURST`           | Per-client-IP burst allowance above the sustained rate (default `20`); `<= 0` disables rate limiting |
+| `MAX_REQUEST_BODY_BYTES`     | Max request body size in bytes before a `400 VALIDATION_ERROR` (default `1048576`, 1 MiB); `<= 0` disables the limit |
 
 Exact names match `.env.example` at the repo root. `USER_SERVICE_URL`,
 `EXPENSE_SERVICE_URL`, `BUDGET_SERVICE_URL`, `NOTIFICATION_SERVICE_URL` and

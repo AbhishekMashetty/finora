@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finora — The Holy Grail Guide</title>
+<style>
+  :root {
+    --plane: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f2f2ee;
+    --ink-1: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --hairline: rgba(11,11,11,.10);
+    --grid: #e1e0d9;
+    --brand: #4a3aa7;
+    --brand-soft: rgba(74,58,167,.09);
+    --good: #0ca30c;
+    --warn: #b9820b;
+    --crit: #d03b3b;
+    --code-bg: #f4f3ee;
+    --code-ink: #2a2a28;
+    --sidebar-w: 300px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --plane: #0d0d0d;
+      --surface: #1a1a19;
+      --surface-2: #232322;
+      --ink-1: #ffffff;
+      --ink-2: #c3c2b7;
+      --ink-muted: #898781;
+      --hairline: rgba(255,255,255,.12);
+      --grid: #2c2c2a;
+      --brand: #9085e9;
+      --brand-soft: rgba(144,133,233,.14);
+      --good: #34c759;
+      --warn: #fab219;
+      --crit: #ff6b6b;
+      --code-bg: #111110;
+      --code-ink: #d6d5cc;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--plane);
+    color: var(--ink-2);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Layout */
+  .layout { display: flex; align-items: flex-start; }
+  nav.toc {
+    position: sticky; top: 0; height: 100vh; width: var(--sidebar-w);
+    flex: 0 0 var(--sidebar-w);
+    overflow-y: auto; padding: 26px 18px 60px 26px;
+    border-right: 1px solid var(--hairline); background: var(--surface);
+  }
+  nav.toc .brand { font-size: 20px; font-weight: 700; color: var(--ink-1); letter-spacing: -.5px; }
+  nav.toc .brand span { color: var(--brand); }
+  nav.toc .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-muted); margin: 4px 0 22px; }
+  nav.toc .group { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-muted); margin: 20px 0 7px; }
+  nav.toc a { display: block; color: var(--ink-2); padding: 3px 10px; border-radius: 6px; font-size: 13.5px; border-left: 2px solid transparent; }
+  nav.toc a:hover { background: var(--brand-soft); text-decoration: none; color: var(--ink-1); }
+  nav.toc a.active { color: var(--brand); background: var(--brand-soft); border-left-color: var(--brand); font-weight: 600; }
+  nav.toc a.sub { padding-left: 22px; font-size: 12.5px; color: var(--ink-muted); }
+
+  main { flex: 1 1 auto; min-width: 0; padding: 40px 52px 120px; max-width: 960px; }
+
+  section { scroll-margin-top: 20px; padding-top: 26px; margin-top: 26px; border-top: 1px solid var(--hairline); }
+  section:first-of-type { border-top: none; margin-top: 0; }
+  h1 { font-size: 34px; line-height: 1.15; color: var(--ink-1); letter-spacing: -.8px; margin: 0 0 8px; font-weight: 700; }
+  h2 { font-size: 25px; color: var(--ink-1); letter-spacing: -.4px; margin: 4px 0 14px; font-weight: 700; }
+  h3 { font-size: 18px; color: var(--ink-1); margin: 26px 0 8px; font-weight: 650; }
+  h4 { font-size: 14px; color: var(--ink-1); margin: 18px 0 6px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  strong { color: var(--ink-1); font-weight: 650; }
+  code { background: var(--code-bg); color: var(--code-ink); padding: 1.5px 5px; border-radius: 4px; font-family: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: 12.8px; }
+  pre { background: var(--code-bg); color: var(--code-ink); padding: 16px 18px; border-radius: 10px; overflow-x: auto; border: 1px solid var(--hairline); font-family: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: 12.6px; line-height: 1.55; }
+  pre code { background: none; padding: 0; }
+
+  .lead { font-size: 17px; color: var(--ink-2); }
+  .kicker { display:inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .13em; color: var(--brand); background: var(--brand-soft); padding: 4px 10px; border-radius: 999px; margin-bottom: 14px; }
+
+  /* Callouts */
+  .note { border-left: 3px solid var(--brand); background: var(--brand-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .note.warn { border-left-color: var(--warn); background: rgba(185,130,11,.09); }
+  .note.crit { border-left-color: var(--crit); background: rgba(208,59,59,.09); }
+  .note .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-1); display:block; margin-bottom: 3px; }
+
+  /* Tables */
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th { color: var(--ink-1); font-weight: 650; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; background: var(--surface-2); }
+  tbody tr:hover { background: var(--brand-soft); }
+  td code { font-size: 12px; }
+  .tbl-wrap { overflow-x: auto; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin: 18px 0; }
+  .card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; padding: 16px 18px; }
+  .card h4 { margin: 0 0 6px; text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--brand); }
+  .card p { margin: 4px 0 0; font-size: 13px; }
+  .card .port { font-size: 11.5px; color: var(--ink-muted); font-family: ui-monospace, monospace; }
+
+  /* Flow diagram */
+  .flow { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; padding: 22px; margin: 18px 0; overflow-x: auto; }
+  .flow-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+  .box { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 9px; padding: 9px 13px; font-size: 12.8px; color: var(--ink-1); font-weight: 550; white-space: nowrap; }
+  .box.brand { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+  .box.good  { border-color: var(--good); }
+  .box.crit  { border-color: var(--crit); }
+  .box.data  { border-radius: 9px 9px 22px 22px; }
+  .arrow { color: var(--ink-muted); font-weight: 700; font-size: 15px; }
+  .arrow small { display:block; font-size: 10px; font-weight: 500; color: var(--ink-muted); white-space: nowrap; text-align:center; }
+  .stepnum { display:inline-flex; align-items:center; justify-content:center; width: 22px; height: 22px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 12px; font-weight: 700; flex: 0 0 22px; }
+  @media (prefers-color-scheme: dark) { .stepnum { color: #0d0d0d; } }
+
+  ol.steps { list-style: none; padding: 0; margin: 16px 0; counter-reset: s; }
+  ol.steps > li { display: flex; gap: 14px; margin: 0; padding: 12px 0; border-bottom: 1px dashed var(--hairline); }
+  ol.steps > li:last-child { border-bottom: none; }
+  ol.steps > li::before { counter-increment: s; content: counter(s); flex: 0 0 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  @media (prefers-color-scheme: dark) { ol.steps > li::before { color: #0d0d0d; } }
+  ol.steps .st { color: var(--ink-2); }
+  ol.steps .st b { color: var(--ink-1); }
+
+  .pill { display:inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-family: ui-monospace, monospace; }
+  .m-get { background: rgba(12,163,12,.14); color: var(--good); }
+  .m-post { background: var(--brand-soft); color: var(--brand); }
+  .m-put { background: rgba(185,130,11,.16); color: var(--warn); }
+  .m-del { background: rgba(208,59,59,.14); color: var(--crit); }
+  .m-patch { background: rgba(185,130,11,.16); color: var(--warn); }
+
+  .filemap { font-family: ui-monospace, monospace; font-size: 12.5px; line-height: 1.7; }
+  .filemap .dir { color: var(--brand); font-weight: 600; }
+  .filemap .cm { color: var(--ink-muted); }
+
+  hr.soft { border: none; border-top: 1px solid var(--hairline); margin: 22px 0; }
+  .back-top { font-size: 12px; color: var(--ink-muted); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 1080px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* Mobile */
+  .menu-btn { display: none; }
+  @media (max-width: 900px) {
+    .layout { display: block; }
+    nav.toc { position: fixed; z-index: 40; transform: translateX(-100%); transition: transform .2s ease; top:0; left:0; box-shadow: 0 0 40px rgba(0,0,0,.3); }
+    nav.toc.open { transform: translateX(0); }
+    main { padding: 70px 22px 100px; max-width: none; }
+    .menu-btn { display: inline-flex; position: fixed; top: 14px; left: 14px; z-index: 50; background: var(--brand); color:#fff; border:none; border-radius: 8px; padding: 9px 13px; font-size: 14px; font-weight:600; cursor: pointer; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<button class="menu-btn" onclick="document.querySelector('nav.toc').classList.toggle('open')">☰ Contents</button>
+<div class="layout">
+
+<!-- ============================== SIDEBAR ============================== -->
+<nav class="toc" id="toc">
+  <div class="brand">Fin<span>ora</span></div>
+  <div class="tag">The Holy Grail Guide</div>
+
+  <div class="group">Start here</div>
+  <a href="#intro">1 · What Finora Is</a>
+  <a href="#bigpicture">2 · The Big Picture</a>
+  <a href="#lifecycle">3 · Request Lifecycle</a>
+
+  <div class="group">How it's built</div>
+  <a href="#clean">4 · Clean Architecture</a>
+  <a href="#layers">5 · The Layer Flow</a>
+  <a href="#shared">6 · The <code>shared/</code> Library</a>
+  <a href="#envelope">7 · Envelope &amp; Errors</a>
+  <a href="#auth-model">8 · The Auth Model</a>
+
+  <div class="group">The five services</div>
+  <a href="#svc-gateway">9 · gateway</a>
+  <a href="#svc-user">10 · user-service</a>
+  <a href="#svc-expense">11 · expense-service</a>
+  <a href="#svc-budget">12 · budget-service</a>
+  <a href="#svc-notification">13 · notification-service</a>
+  <a href="#svc-comms">14 · How Services Talk</a>
+
+  <div class="group">Feature walkthroughs</div>
+  <a href="#f-register" class="sub">Registration</a>
+  <a href="#f-login" class="sub">Login</a>
+  <a href="#f-protected" class="sub">A protected call</a>
+  <a href="#f-refresh" class="sub">Refresh &amp; rotation</a>
+  <a href="#f-logout" class="sub">Logout</a>
+  <a href="#f-accounts" class="sub">Accounts</a>
+  <a href="#f-transactions" class="sub">Transactions</a>
+  <a href="#f-categories" class="sub">Categories</a>
+  <a href="#f-budgets" class="sub">Budgets</a>
+  <a href="#f-goals" class="sub">Goals</a>
+  <a href="#f-reports" class="sub">Reports ★</a>
+  <a href="#f-notifications" class="sub">Notifications</a>
+  <a href="#f-settings" class="sub">Profile &amp; settings</a>
+
+  <div class="group">Data &amp; platform</div>
+  <a href="#data">15 · Data Model</a>
+  <a href="#crosscut">16 · Cross-Cutting Concerns</a>
+  <a href="#frontend">17 · The Frontend</a>
+  <a href="#deploy">18 · Build &amp; Deploy</a>
+  <a href="#security">19 · Security Posture</a>
+  <a href="#roadmap">20 · Roadmap</a>
+
+  <div class="group">Reference</div>
+  <a href="#filemap">21 · Codebase Map</a>
+  <a href="#glossary">22 · Glossary</a>
+</nav>
+
+<!-- ============================== CONTENT ============================== -->
+<main>
+
+<!-- ---------- 1 INTRO ---------- -->
+<section id="intro">
+  <span class="kicker">Learning guide · read top to bottom the first time</span>
+  <h1>Finora, explained end to end</h1>
+  <p class="lead">Finora is a personal-finance SaaS built as five Go microservices, four MongoDB databases, and a Next.js frontend. This page is a single guided tour of the whole thing: what each piece does, how a feature flows from a browser click all the way to the database and back, and <em>why</em> every significant decision was made the way it was. If you have never seen this codebase, start at the top and follow the links.</p>
+
+  <h3>The dual purpose (this matters for every decision)</h3>
+  <p>Finora has two goals, and the second is the real one:</p>
+  <ol>
+    <li><strong>Product goal</strong> — a realistic personal-finance app: registration, JWT auth, accounts, transactions, budgets, savings goals, notifications, reports.</li>
+    <li><strong>Platform goal (the actual point)</strong> — a long-lived, production-shaped distributed system for practicing Kubernetes, Docker, CI/CD, Argo CD, networking, observability, secrets, scaling, and security against something more realistic than a "hello world."</li>
+  </ol>
+  <p>Every architectural choice is judged against the second goal first: <strong>does this make the system easier to deploy, observe, scale, and operate later?</strong> The finance domain simply gives that infrastructure something non-trivial to run. That is why you will see "heavier" choices (four separate databases, five separate Go modules) preferred over the locally-cheaper option — they mirror what the Kubernetes deployment will look like.</p>
+
+  <div class="note">
+    <span class="lbl">The project's constitution</span>
+    The root <code>CLAUDE.md</code> is the permanent source of truth for how Finora is built (Clean Architecture, one DB per service, REST-only for now, the gateway as sole JWT validator, and more). When code and <code>CLAUDE.md</code> disagree, the code is considered wrong. This guide is a friendlier narration of the same rules, with the runtime flows drawn out.
+  </div>
+
+  <h3>Where everything lives</h3>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Path</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><code>services/</code></td><td>The five Go microservices, each its own module.</td></tr>
+      <tr><td><code>shared/</code></td><td>A Go module (<code>github.com/finora/shared</code>) every service imports: logging, HTTP envelope, middleware, health, config, JWT, Mongo helper.</td></tr>
+      <tr><td><code>frontend/</code></td><td>Next.js (App Router, TypeScript) web app.</td></tr>
+      <tr><td><code>architecture/</code></td><td>The design docs this guide summarizes — plus this page.</td></tr>
+      <tr><td><code>infrastructure/</code></td><td>Docker / Kubernetes / Helm — owned by the DevOps maintainer, mostly placeholders today.</td></tr>
+      <tr><td><code>docker-compose.yml</code></td><td>The local topology: gateway + 4 services + 4 Mongos + frontend.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ---------- 2 BIG PICTURE ---------- -->
+<section id="bigpicture">
+  <h2>2 · The big picture</h2>
+  <p>Everything the browser sends goes through <strong>one public door: the gateway</strong> (port 8080). The gateway validates your token, stamps your identity onto the request, and reverse-proxies it to exactly one owning service. Each service talks only to its own database. Here is the whole system on one screen:</p>
+
+  <div class="flow">
+    <div class="flow-row">
+      <div class="box">Browser</div>
+      <span class="arrow">→</span>
+      <div class="box brand">frontend · Next.js :3000</div>
+      <span class="arrow">→</span>
+      <div class="box brand">gateway :8080<br><small style="font-weight:400;color:var(--ink-muted)">validates JWT · injects X-User-Id</small></div>
+    </div>
+    <div class="flow-row" style="margin-top:18px;">
+      <span class="arrow" style="margin-left:auto;margin-right:auto;">↓ reverse-proxy by path prefix ↓</span>
+    </div>
+    <div class="flow-row" style="justify-content:space-between; align-items:stretch;">
+      <div style="text-align:center"><div class="box">user-service :8081</div><span class="arrow" style="display:block;margin:6px 0">↓</span><div class="box data">finora_users</div></div>
+      <div style="text-align:center"><div class="box">expense-service :8082</div><span class="arrow" style="display:block;margin:6px 0">↓</span><div class="box data">finora_expenses</div></div>
+      <div style="text-align:center"><div class="box">budget-service :8083</div><span class="arrow" style="display:block;margin:6px 0">↓</span><div class="box data">finora_budgets</div></div>
+      <div style="text-align:center"><div class="box">notification-service :8084</div><span class="arrow" style="display:block;margin:6px 0">↓</span><div class="box data">finora_notifications</div></div>
+    </div>
+    <div class="flow-row" style="margin-top:16px; justify-content:center;">
+      <div class="box" style="border-style:dashed">budget-service → expense-service &amp; → notification-service (the only service-to-service REST calls, for reports &amp; overspend alerts)</div>
+    </div>
+  </div>
+
+  <h3>Who owns what</h3>
+  <div class="cards">
+    <div class="card"><h4>gateway</h4><div class="port">:8080 · owns no data</div><p>Public entrypoint. Validates JWTs, injects trusted identity headers, applies CORS + rate limiting, reverse-proxies to the owning service.</p></div>
+    <div class="card"><h4>user-service</h4><div class="port">:8081 · finora_users</div><p>Auth (register / login / refresh / logout), profile, settings. Owns users + refresh tokens.</p></div>
+    <div class="card"><h4>expense-service</h4><div class="port">:8082 · finora_expenses</div><p>Accounts, transactions, categories — the record of what money moved, where, and when.</p></div>
+    <div class="card"><h4>budget-service</h4><div class="port">:8083 · finora_budgets</div><p>Budgets, savings goals, and reports (budget-vs-actual, computed across services).</p></div>
+    <div class="card"><h4>notification-service</h4><div class="port">:8084 · finora_notifications</div><p>In-app notification feed (create / list / mark-read). Email sits behind an interface (log stub today).</p></div>
+    <div class="card"><h4>frontend</h4><div class="port">:3000 · Next.js</div><p>The product UI. Talks only to the gateway; never to a service directly.</p></div>
+  </div>
+
+  <h3>The four hard rules that shape all of this</h3>
+  <ol>
+    <li><strong>One MongoDB per service, never shared.</strong> No service's code or config may point at another service's database. Isolation is <em>physical</em> (a separate container/URI each), not a permission convention. → <a href="#data">Data Model</a></li>
+    <li><strong>REST only, for now.</strong> Services talk synchronously over HTTP/JSON through documented contracts. Async messaging (NATS) is a planned Phase-7 seam — deliberately not built yet.</li>
+    <li><strong>The gateway is the only JWT validator.</strong> Downstream services trust the <code>X-User-Id</code> header the gateway injects. → <a href="#auth-model">The Auth Model</a></li>
+    <li><strong>Every service is independently deployable.</strong> Each has its own <code>go.mod</code>, <code>Dockerfile</code>, health endpoints, and boots without any other service running (its own Mongo excepted).</li>
+  </ol>
+</section>
+
+<!-- ---------- 3 LIFECYCLE ---------- -->
+<section id="lifecycle">
+  <h2>3 · The lifecycle of one protected request</h2>
+  <p>This is the single most important flow to internalize — almost every feature is a variation of it. Say the browser asks for <code>GET /api/v1/accounts</code> (list my accounts):</p>
+
+  <ol class="steps">
+    <li><span class="st"><b>Browser → gateway.</b> The frontend's <code>apiFetch</code> attaches <code>Authorization: Bearer &lt;access_token&gt;</code> and calls the gateway at <code>:8080</code>. It never calls <code>:8082</code> directly.</span></li>
+    <li><span class="st"><b>Gateway validates the token.</b> <code>authmw.RequireAccessToken</code> pulls the bearer token, calls <code>jwtx.Parse(secret, token, "access")</code> — which checks the HS256 signature, the expiry, and that the token <code>type</code> is <code>access</code>. On failure: <code>401 UNAUTHORIZED</code>, request stops here.</span></li>
+    <li><span class="st"><b>Gateway injects identity.</b> On success it sets <code>X-User-Id</code> from the token's <code>sub</code> claim (always <em>overwriting</em> any client-supplied value) and propagates <code>X-Request-Id</code>. No <code>Authorization</code> header is forwarded downstream.</span></li>
+    <li><span class="st"><b>Gateway routes by path prefix.</b> <code>proxy.Table.Resolve</code> matches <code>/api/v1/accounts</code> to the expense-service proxy (longest-prefix wins), then reverse-proxies the request byte-for-byte.</span></li>
+    <li><span class="st"><b>Service trusts the header.</b> expense-service's router runs <code>middleware.RequireIdentity</code>, which rejects any request missing <code>X-User-Id</code> (<code>401</code>) and otherwise stashes it as the caller's <code>user_id</code>.</span></li>
+    <li><span class="st"><b>Handler → service → repository.</b> The handler reads <code>user_id</code>, calls the service layer, which calls the repository, which runs a Mongo query <em>scoped to that user_id</em>. You can only ever see your own data.</span></li>
+    <li><span class="st"><b>Response envelope flows back.</b> The result is wrapped in the standard <code>{success, data, error, request_id}</code> envelope by <code>httpx.Success</code>, returned through the gateway to the browser, which unwraps <code>data</code>.</span></li>
+  </ol>
+
+  <h3>The same request, hop by hop — ports &amp; endpoints</h3>
+  <p>Here is that exact <code>GET /api/v1/accounts</code> as concrete network hops. Notice that the path is <strong>identical</strong> at the browser and at expense-service — the gateway forwards it byte-for-byte and never rewrites it; only the headers change (the <code>Authorization</code> token is dropped, <code>X-User-Id</code> is added).</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Port</th><th>Request</th><th>What happens / what travels</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>Browser → gateway</b></td><td><code>:8080</code></td><td><span class="pill m-get">GET</span> <code>/api/v1/accounts</code></td><td>Carries <code>Authorization: Bearer &lt;access_token&gt;</code>. The browser only ever talks to <code>:8080</code>.</td></tr>
+      <tr><td>2</td><td>gateway <em>(in-process)</em></td><td>—</td><td>—</td><td>Validates the JWT, sets <code>X-User-Id</code> (from <code>sub</code>) + <code>X-Request-Id</code>, longest-prefix-matches <code>/api/v1/accounts</code> → the expense-service proxy.</td></tr>
+      <tr><td>3</td><td><b>gateway → expense-service</b></td><td><code>:8082</code></td><td><span class="pill m-get">GET</span> <code>/api/v1/accounts</code></td><td>Same path, forwarded verbatim. <code>Authorization</code> is <em>not</em> forwarded; <code>X-User-Id</code> + <code>X-Request-Id</code> are.</td></tr>
+      <tr><td>4</td><td>expense-service <em>(in-process)</em></td><td>—</td><td>—</td><td><code>RequireIdentity</code> reads <code>X-User-Id</code> → handler → service → repository.</td></tr>
+      <tr><td>5</td><td><b>expense-service → mongo-expense</b></td><td><code>:27017</code></td><td><code>find(accounts, {user_id})</code></td><td>Owner-scoped query against <code>finora_expenses</code>. Each service dials its own Mongo by DNS name (<code>mongo-expense</code>).</td></tr>
+      <tr><td>6</td><td><b>expense-service → gateway → Browser</b></td><td><code>:8082 → :8080</code></td><td><span class="pill m-get">200</span> envelope</td><td><code>{success:true, data:{accounts:[…]}, request_id}</code> flows straight back out.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <span class="lbl">Which ports are actually reachable</span>
+    From your machine only <strong><code>:3000</code> (frontend)</strong> and <strong><code>:8080</code> (gateway)</strong> are meant to be called. The service ports <code>:8081–:8084</code> and the Mongo ports <code>:27017–:27020</code> are exposed in <code>docker-compose.yml</code> for local debugging only — in Kubernetes they are ClusterIP-internal. (That local exposure is the security caveat in <a href="#auth-model">§8</a>.)
+  </div>
+
+  <h3>A multi-service request — the report fan-out, hop by hop</h3>
+  <p>Most requests touch exactly one service. The one that fans out is <code>GET /api/v1/reports/summary</code>: budget-service can't answer it alone, so it calls expense-service (for actual spend) and, if a budget is overspent, notification-service. Hops 4–6 below are the <em>only</em> service-to-service calls in the entire system.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Port</th><th>Endpoint</th><th>When / why</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>Browser → gateway</b></td><td><code>:8080</code></td><td><span class="pill m-get">GET</span> <code>/api/v1/reports/summary?from=&amp;to=</code></td><td>Bearer token; <code>from</code>/<code>to</code> are required.</td></tr>
+      <tr><td>2</td><td><b>gateway → budget-service</b></td><td><code>:8083</code></td><td><span class="pill m-get">GET</span> <code>/api/v1/reports/summary?from=&amp;to=</code></td><td>Token validated, <code>X-User-Id</code> injected, proxied by prefix <code>/api/v1/reports</code>.</td></tr>
+      <tr><td>3</td><td><b>budget-service → mongo-budget</b></td><td><code>:27017</code></td><td><code>find(budgets, {user_id})</code></td><td>List this user's budgets from <code>finora_budgets</code>.</td></tr>
+      <tr><td>4</td><td><b>budget-service → expense-service</b></td><td><code>:8082</code></td><td><span class="pill m-get">GET</span> <code>/api/v1/categories</code></td><td>Per budget: resolve category <em>name</em> → expense-service's category <em>id</em>. Forwards the same <code>X-User-Id</code> (no token).</td></tr>
+      <tr><td>5</td><td><b>budget-service → expense-service</b></td><td><code>:8082</code></td><td><span class="pill m-get">GET</span> <code>/api/v1/transactions?category=&lt;id&gt;&amp;from=&amp;to=&amp;page_size=100</code></td><td>Sum <code>expense</code> amounts, paged (≤ 50 pages) = the <code>actual</code> spend.</td></tr>
+      <tr><td>6</td><td><b>budget-service → notification-service</b></td><td><code>:8084</code></td><td><span class="pill m-post">POST</span> <code>/api/v1/notifications</code></td><td><em>Only if</em> <code>remaining &lt; 0</code>. Best-effort, 3 s timeout, failure swallowed; deduped per period.</td></tr>
+      <tr><td>7</td><td><b>budget-service → gateway → Browser</b></td><td><code>:8083 → :8080</code></td><td><span class="pill m-get">200</span> summary envelope</td><td>The computed budget-vs-actual report.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The narrated version of hops 3–6, with the diagram and the overspend dedup rule, is in <a href="#f-reports">the Reports feature ★</a>; the full "who may call whom" matrix is in <a href="#svc-comms">§14</a>.</p>
+
+  <p><strong>Public routes are the exception.</strong> <code>register</code>, <code>login</code>, <code>refresh</code>, and <code>password-reset</code> skip steps 2–3 (there's no token yet) — the gateway proxies them straight through to user-service, which authenticates them by other means (credentials or the refresh token itself).</p>
+
+  <div class="note">
+    <span class="lbl">Why this shape</span>
+    Centralizing JWT validation at the gateway means the four backend services never touch tokens, secrets rotation, or JWKS — they just trust one header on the internal network. It's simpler and faster than every service re-validating a token. The cost is that the trust boundary is the network: backend ports must be unreachable from outside. That trade-off is documented, and per-service validation is a Phase-9 hardening candidate. See <a href="#security">Security Posture</a> for the current gap here.
+  </div>
+</section>
+
+<!-- ---------- 4 CLEAN ARCH ---------- -->
+<section id="clean">
+  <h2>4 · Clean Architecture, strictly</h2>
+  <p>Every Go service (except the gateway) is built the same way, and understanding this one pattern lets you read all four. The core idea: <strong>dependencies point inward.</strong> Inner layers know nothing about outer layers.</p>
+
+  <div class="flow">
+    <div class="flow-row" style="justify-content:center">
+      <div class="box">handler <small style="font-weight:400;color:var(--ink-muted)">HTTP in/out</small></div>
+      <span class="arrow">→</span>
+      <div class="box">service <small style="font-weight:400;color:var(--ink-muted)">business logic</small></div>
+      <span class="arrow">→</span>
+      <div class="box brand">domain <small style="font-weight:400">interfaces + entities</small></div>
+      <span class="arrow">←</span>
+      <div class="box">repository <small style="font-weight:400;color:var(--ink-muted)">MongoDB</small></div>
+    </div>
+    <p style="text-align:center;margin:14px 0 0;font-size:12.5px;color:var(--ink-muted)">Everyone depends on <b>domain</b>. <b>domain</b> depends on nothing — no Gin, no Mongo driver, no framework.</p>
+  </div>
+
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Layer</th><th>Its one job</th><th>Allowed to import</th></tr></thead>
+    <tbody>
+      <tr><td><code>domain</code></td><td>Define the entities (e.g. <code>User</code>, <code>Transaction</code>) and the <em>interfaces</em> for repositories and services. Zero framework imports.</td><td>Only the Go stdlib.</td></tr>
+      <tr><td><code>repository</code></td><td>Implement the domain repository interfaces against MongoDB. The <em>only</em> layer that knows Mongo exists.</td><td><code>domain</code>, mongo-driver.</td></tr>
+      <tr><td><code>service</code></td><td>The use-cases / business logic. Depends only on domain <em>interfaces</em>, never a concrete Mongo type — so it's unit-testable against fakes.</td><td><code>domain</code>.</td></tr>
+      <tr><td><code>handler</code></td><td>Parse &amp; validate the HTTP request, call the service, translate the result into the envelope. Does <em>no</em> business logic. The only layer (with router) that knows HTTP exists.</td><td><code>domain</code>, <code>service</code>, Gin, <code>httpx</code>.</td></tr>
+      <tr><td><code>router</code></td><td>Register routes, wire the middleware chain, mount health endpoints.</td><td>handlers, middleware, Gin.</td></tr>
+      <tr><td><code>config</code></td><td>Load &amp; validate env vars (wrapping <code>shared/config</code>).</td><td><code>shared/config</code>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The SOLID payoff: Dependency Inversion</h3>
+  <p>The service layer depends on an <em>interface</em> declared in <code>domain</code>, and the concrete Mongo type <em>implements</em> that interface. That inversion is what makes the whole test strategy work: a service test injects a hand-written in-memory fake instead of Mongo, so <code>go test ./...</code> is fast and needs no database. The report service is the clearest example — it depends on a <code>domain.ExpenseClient</code> interface, so tests inject a fake instead of standing up a real expense-service.</p>
+
+  <h4>The design principles, in one place</h4>
+  <ul>
+    <li><strong>No clever code.</strong> Optimize for the engineer reading it in two years, not for fewest lines. If a simpler, more explicit version exists, use it.</li>
+    <li><strong>Errors are values, handled at the boundary.</strong> Business logic returns typed domain errors (<code>ErrNotFound</code>, <code>ErrDuplicateEmail</code>, validation errors); handlers translate them to envelope error codes. Panics are a safety net (<code>middleware.Recovery</code>), never control flow.</li>
+    <li><strong>Every significant decision is documented</strong> with its rationale <em>and</em> the rejected alternative — "we picked X over Y because Z." That's why the <code>architecture/*.md</code> files read the way they do.</li>
+    <li><strong>Don't add complexity before there's a legitimate reason.</strong> Redis, NATS, tracing — all deferred to later phases with a documented seam, not built speculatively.</li>
+  </ul>
+</section>
+
+<!-- ---------- 5 LAYERS ---------- -->
+<section id="layers">
+  <h2>5 · The layer flow, traced through real code</h2>
+  <p>Let's watch one write — <code>POST /api/v1/transactions</code> — fall through the layers of expense-service. This shows exactly where each responsibility lives.</p>
+
+  <h4>① handler — <code>transaction_handler.go</code></h4>
+  <p>Binds JSON, reads the caller's <code>user_id</code> from the identity middleware, parses the date, and hands a typed input to the service. It makes <em>no</em> ownership or business decisions itself.</p>
+  <pre><code>userID := middleware.UserID(c)
+var req transactionRequest
+if err := c.ShouldBindJSON(&amp;req); err != nil {
+    httpx.Fail(c, 400, httpx.CodeValidation, "invalid request body", ...)
+    return
+}
+date, ok := parseDate(req.Date)     // RFC3339 or YYYY-MM-DD
+tx, err := h.svc.Create(ctx, userID, domain.CreateTransactionInput{...})</code></pre>
+
+  <h4>② service — <code>transaction_service.go</code></h4>
+  <p>All the business rules live here: field validation, and crucially the <strong>cross-tenant safety check</strong> — the <code>account_id</code> in the body is an unchecked reference until the service confirms that account belongs to this same user.</p>
+  <pre><code>if err := s.validateCommon(in.AccountID, in.Type, in.Amount, in.Currency, in.Date); err != nil {
+    return nil, err                 // typed validation error
+}
+// the account_id is otherwise an unchecked cross-tenant reference:
+if _, err := s.accountRepo.GetByIDForUser(ctx, in.AccountID, userID); err != nil {
+    if err == domain.ErrNotFound {
+        return nil, NewValidationError("account_id", "account does not exist")
+    }
+    return nil, err
+}</code></pre>
+
+  <h4>③ repository — <code>mongo_transaction.go</code></h4>
+  <p>The only Mongo-aware layer. Note every read/update/delete filters by <code>user_id</code> in the query itself — ownership is enforced at the database, not just in app code.</p>
+  <pre><code>// get / update / delete are ALL scoped like this:
+r.col.FindOne(ctx, bson.M{"_id": oid, "user_id": userID})
+// a cross-user id simply matches zero documents → domain.ErrNotFound → 404</code></pre>
+
+  <div class="note">
+    <span class="lbl">Why 404 and not 403 for someone else's data</span>
+    When you request a resource you don't own, the query matches nothing and you get <code>404 NOT_FOUND</code> — never <code>403 FORBIDDEN</code>. Returning 403 would <em>confirm the resource exists</em> to a non-owner. 404 leaks nothing. This is a fleet-wide rule.
+  </div>
+
+  <h4>Where it all gets wired: <code>cmd/server/main.go</code></h4>
+  <p>Each service's <code>main.go</code> is the composition root — it constructs the dependency graph by hand (no DI framework), inner-to-outer: <code>config → mongo connect → repositories → services → handlers → router → health → server.Run</code>. Here's budget-service, the richest example (it also builds two outbound HTTP clients):</p>
+  <pre><code>budgetRepo   := repository.NewMongoBudgetRepository(db)
+goalRepo     := repository.NewMongoGoalRepository(db)
+expenseClient := client.NewExpenseHTTPClient(cfg.ExpenseServiceURL)
+notifClient   := client.NewNotificationHTTPClient(cfg.NotificationServiceURL)
+
+reportService := service.NewReportService(budgetRepo, expenseClient, notifClient, log)
+reportHandler := handler.NewReportHandler(reportService)
+
+r := router.New(log, cfg.CORSAllowedOrigins, budgetHandler, goalHandler, reportHandler, spec, mongoChecker)
+server.Run("0.0.0.0:"+cfg.Port, r, log, cfg.ShutdownTimeout)</code></pre>
+</section>
+
+<!-- ---------- 6 SHARED ---------- -->
+<section id="shared">
+  <h2>6 · The <code>shared/</code> library — the fleet's common spine</h2>
+  <p><code>shared/</code> is its own Go module that every service imports. It exists so that cross-cutting behavior (logging shape, response envelope, health probes, identity handling) is written <em>once</em> and can't drift between five otherwise-independent services. Learn these eight packages and you've learned the plumbing of every service.</p>
+
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Package</th><th>What it gives every service</th></tr></thead>
+    <tbody>
+      <tr><td><code>logger</code></td><td>Builds a <code>slog</code> JSON logger (<code>logger.New("user-service", level)</code>). Every line carries <code>ts, level, service, request_id, msg</code>. Log-shipper-ready, zero external deps.</td></tr>
+      <tr><td><code>httpx</code></td><td>The one response envelope + the six standard error codes. <code>httpx.Success(c, status, data)</code> / <code>httpx.Fail(c, status, code, msg, details)</code>. → <a href="#envelope">§7</a></td></tr>
+      <tr><td><code>middleware</code></td><td><code>RequestID</code>, <code>Logging</code>, <code>Recovery</code>, <code>CORS</code>, and <code>RequireIdentity</code> (+ <code>UserID</code> accessor). The mandated chain and the identity contract.</td></tr>
+      <tr><td><code>health</code></td><td><code>/live</code>, <code>/ready</code>, <code>/health</code> handlers + a <code>Checker</code> interface. Liveness never depends on downstream state; readiness pings Mongo. → <a href="#crosscut">§16</a></td></tr>
+      <tr><td><code>config</code></td><td>Env-var helpers: <code>MustGetEnv</code> (fail-fast, no default — used for secrets &amp; Mongo URIs), <code>GetEnv</code>, <code>GetEnvDuration</code>, <code>GetEnvInt</code>.</td></tr>
+      <tr><td><code>server</code></td><td>An <code>http.Server</code> wrapper with graceful shutdown on SIGINT/SIGTERM — drains in-flight requests before exit (matters for Kubernetes pod eviction).</td></tr>
+      <tr><td><code>jwtx</code></td><td>The single source of truth for the JWT claim shape + <code>GenerateAccessToken</code>/<code>GenerateRefreshToken</code>/<code>Parse</code>. Imported by both the token issuer (user-service) and verifier (gateway) so the contract can't drift.</td></tr>
+      <tr><td><code>mongox</code></td><td>The one way to connect to Mongo (<code>Connect(uri)</code>, with a bounded ping) plus a <code>Checker</code> adapter so every <code>/ready</code> behaves identically.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>The identity contract, in code</h4>
+  <p>Two tiny functions carry the entire downstream auth model. The gateway <em>sets</em> the header after validating the token; every service <em>requires</em> it:</p>
+  <pre><code>// shared/middleware/identity.go — every backend route group uses this:
+func RequireIdentity() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        userID := c.GetHeader("X-User-Id")
+        if userID == "" { httpx.Fail(c, 401, CodeUnauthorized, "missing user identity", nil); c.Abort(); return }
+        c.Set("user_id", userID)     // read later via middleware.UserID(c)
+        c.Next()
+    }
+}</code></pre>
+</section>
+
+<!-- ---------- 7 ENVELOPE ---------- -->
+<section id="envelope">
+  <h2>7 · The response envelope &amp; error codes</h2>
+  <p>Every response from every service — success or failure — has the exact same top-level shape, so a client never has to special-case which service it's talking to. This is implemented once in <code>shared/httpx</code>; services are forbidden from hand-rolling a JSON shape.</p>
+
+  <div class="two-col">
+    <div>
+      <h4>Success</h4>
+      <pre><code>{
+  "success": true,
+  "data": { "accounts": [ ... ] },
+  "error": null,
+  "request_id": "8f3e2c1a-..."
+}</code></pre>
+    </div>
+    <div>
+      <h4>Error</h4>
+      <pre><code>{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "email is required",
+    "details": { "field": "email" }
+  },
+  "request_id": "8f3e2c1a-..."
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Code</th><th>HTTP</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>Request failed validation.</td></tr>
+      <tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>Missing / invalid / expired token or identity.</td></tr>
+      <tr><td><code>FORBIDDEN</code></td><td>403</td><td>Authenticated but not allowed (rarely used — ownership leaks return 404).</td></tr>
+      <tr><td><code>NOT_FOUND</code></td><td>404</td><td>Resource doesn't exist <em>or</em> isn't owned by the caller.</td></tr>
+      <tr><td><code>CONFLICT</code></td><td>409</td><td>Duplicate resource (e.g. email already registered).</td></tr>
+      <tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>Unhandled server error.</td></tr>
+      <tr><td><code>RATE_LIMITED</code></td><td>429</td><td>Too many requests (gateway only).</td></tr>
+    </tbody>
+  </table></div>
+  <p>The <code>request_id</code> is the same value echoed in the <code>X-Request-Id</code> response header and in every structured log line for that request — so a user-reported error can be traced across all services by one id.</p>
+</section>
+
+<!-- ---------- 8 AUTH MODEL ---------- -->
+<section id="auth-model">
+  <h2>8 · The auth model (tokens, secrets, trust)</h2>
+  <p>Finora uses a two-token JWT scheme. Understanding the two tokens and where each is validated unlocks the whole auth story.</p>
+
+  <div class="two-col">
+    <div class="card">
+      <h4>Access token</h4>
+      <p><code>type=access</code> · claims <code>{sub, email, type, iat, exp}</code> · <strong>TTL 15 min</strong> · HS256 with <code>JWT_ACCESS_SECRET</code>. Sent on every protected request as a Bearer token. <strong>Validated only by the gateway.</strong> Stateless — nothing is stored server-side.</p>
+    </div>
+    <div class="card">
+      <h4>Refresh token</h4>
+      <p><code>type=refresh</code> · claims <code>{sub, jti, type, iat, exp}</code> · <strong>TTL 7 days</strong> · HS256 with <code>JWT_REFRESH_SECRET</code>. Exchanged for a new pair when the access token expires. <strong>Stateful</strong> — its <code>jti</code> is stored (hashed) in Mongo so it can be revoked/rotated.</p>
+    </div>
+  </div>
+
+  <ul>
+    <li><strong>Only user-service issues tokens</strong> (on register/login/refresh). <strong>Only the gateway verifies access tokens</strong> (for routing). Both import <code>shared/jwtx</code>, so the claim shape can't drift between issuer and verifier.</li>
+    <li><strong>Downstream services never see a token.</strong> They trust the <code>X-User-Id</code> header the gateway injects, on the internal network. This is the "trust the network boundary" trade-off — simpler than per-service JWKS validation, revisited in Phase 9.</li>
+    <li><strong>The gateway always overwrites <code>X-User-Id</code></strong> with the value from the validated token — a client can never smuggle a fake identity <em>through</em> the gateway.</li>
+    <li><strong>Refresh tokens are stored as a SHA-256 hash of the <code>jti</code></strong>, never the raw token — a database leak alone can't forge a usable refresh token.</li>
+  </ul>
+
+  <div class="note warn">
+    <span class="lbl">Security caveat — read before deploying</span>
+    Because backend services blindly trust <code>X-User-Id</code>, they must be unreachable except through the gateway. In today's <code>docker-compose.yml</code> the service ports (8081–8084) are published to the host, which would let anyone bypass auth with a forged header if exposed to a network. This and other findings are catalogued in <a href="#security">§19 · Security Posture</a> and <code>security/security_analysis.md</code>.
+  </div>
+</section>
+
+<!-- ========================================================= SERVICES ========================================================= -->
+
+<!-- ---------- 9 GATEWAY ---------- -->
+<section id="svc-gateway">
+  <h2>9 · gateway <span class="port" style="font-size:13px;color:var(--ink-muted);font-weight:400">:8080 · owns no data</span></h2>
+  <p>The single public entrypoint. Because it owns no data, its layout differs from the other services — instead of <code>domain/repository/service</code> it has <code>proxy/</code>, <code>authmw/</code>, and <code>router/</code>.</p>
+
+  <h4>Middleware chain</h4>
+  <pre><code>RequestID → Logging → Recovery → CORS  ( → RateLimit, Phase 6)</code></pre>
+
+  <h4>Route table</h4>
+  <p>Public routes are declared as explicit static routes and proxied straight to user-service with no auth:</p>
+  <pre><code>POST /api/v1/auth/register | login | refresh | password-reset  → user-service (public)</code></pre>
+  <p>Everything else is protected. Rather than a wildcard route (which collides with Gin's radix tree once static auth routes exist), the gateway uses <code>NoRoute</code> — it runs <code>authmw.RequireAccessToken</code>, then a longest-prefix lookup picks the owning backend:</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Path prefix</th><th>Owning service</th></tr></thead>
+    <tbody>
+      <tr><td><code>/api/v1/auth/logout</code>, <code>/api/v1/users/me</code></td><td>user-service</td></tr>
+      <tr><td><code>/api/v1/accounts</code>, <code>/transactions</code>, <code>/categories</code></td><td>expense-service</td></tr>
+      <tr><td><code>/api/v1/budgets</code>, <code>/goals</code>, <code>/reports</code></td><td>budget-service</td></tr>
+      <tr><td><code>/api/v1/notifications</code></td><td>notification-service</td></tr>
+    </tbody>
+  </table></div>
+  <p>The proxy forwards the request byte-for-byte (path, query, method, body). If a backend is unreachable, the gateway returns a clean <code>502</code> envelope ("upstream service unavailable") rather than leaking a raw connection error.</p>
+
+  <div class="note">
+    <span class="lbl">Why CORS lives only here</span>
+    <code>httputil.ReverseProxy</code> copies backend headers with <code>Header().Add</code>. If a backend <em>also</em> set <code>Access-Control-Allow-Origin</code>, the browser would receive it twice as one comma-joined value and reject it. So the gateway is the sole CORS boundary; backend routers run <code>RequestID → Logging → Recovery</code> only. This exact bug shipped once in Phase 0 and was caught only by real browser testing (curl doesn't enforce CORS).
+  </div>
+</section>
+
+<!-- ---------- 10 USER ---------- -->
+<section id="svc-user">
+  <h2>10 · user-service <span class="port" style="font-size:13px;color:var(--ink-muted);font-weight:400">:8081 · finora_users</span></h2>
+  <p>Authentication and identity. Owns two collections: <code>users</code> and <code>refresh_tokens</code>. It's a pure data owner — it makes no outbound calls to any other service.</p>
+
+  <h4>Endpoints</h4>
+  <div class="tbl-wrap"><table>
+    <tbody>
+      <tr><td><span class="pill m-post">POST</span></td><td><code>/api/v1/auth/register</code></td><td>Create account → <code>201 {user}</code>. Public.</td></tr>
+      <tr><td><span class="pill m-post">POST</span></td><td><code>/api/v1/auth/login</code></td><td>→ <code>200 {access_token, refresh_token, user}</code>. Public.</td></tr>
+      <tr><td><span class="pill m-post">POST</span></td><td><code>/api/v1/auth/refresh</code></td><td>Exchange refresh for a new pair. Public (auth is the token itself).</td></tr>
+      <tr><td><span class="pill m-post">POST</span></td><td><code>/api/v1/auth/logout</code></td><td>Revoke a refresh token → <code>204</code>. Idempotent.</td></tr>
+      <tr><td><span class="pill m-post">POST</span></td><td><code>/api/v1/auth/password-reset</code></td><td>Phase-1 stub → always <code>202</code>, never leaks whether the email exists.</td></tr>
+      <tr><td><span class="pill m-get">GET</span></td><td><code>/api/v1/users/me</code></td><td>Current profile. Protected.</td></tr>
+      <tr><td><span class="pill m-put">PUT</span></td><td><code>/api/v1/users/me</code></td><td>Update name.</td></tr>
+      <tr><td><span class="pill m-get">GET</span></td><td><code>/api/v1/users/me/settings</code></td><td>Currency + timezone (defaults if never set).</td></tr>
+      <tr><td><span class="pill m-put">PUT</span></td><td><code>/api/v1/users/me/settings</code></td><td>Update currency (3-letter code) / timezone (valid IANA zone).</td></tr>
+    </tbody>
+  </table></div>
+  <p>Detailed flows: <a href="#f-register">Registration</a> · <a href="#f-login">Login</a> · <a href="#f-refresh">Refresh &amp; rotation</a> · <a href="#f-logout">Logout</a> · <a href="#f-settings">Profile &amp; settings</a>.</p>
+</section>
+
+<!-- ---------- 11 EXPENSE ---------- -->
+<section id="svc-expense">
+  <h2>11 · expense-service <span class="port" style="font-size:13px;color:var(--ink-muted);font-weight:400">:8082 · finora_expenses</span></h2>
+  <p>The record of money movement. Owns <code>accounts</code>, <code>transactions</code>, and <code>categories</code>. Every query is owner-scoped by <code>X-User-Id</code>.</p>
+  <div class="tbl-wrap"><table>
+    <tbody>
+      <tr><td><span class="pill m-get">GET</span> <span class="pill m-post">POST</span></td><td><code>/api/v1/accounts</code></td><td>List (unpaginated) / create. Types: checking, savings, credit, cash.</td></tr>
+      <tr><td><span class="pill m-get">GET</span> <span class="pill m-put">PUT</span> <span class="pill m-del">DEL</span></td><td><code>/api/v1/accounts/:id</code></td><td>Get / update / delete a single account.</td></tr>
+      <tr><td><span class="pill m-get">GET</span></td><td><code>/api/v1/transactions</code></td><td><strong>Paginated.</strong> Filters: <code>account_id, category, from, to, page, page_size</code>.</td></tr>
+      <tr><td><span class="pill m-post">POST</span> <span class="pill m-get">GET</span> <span class="pill m-put">PUT</span> <span class="pill m-del">DEL</span></td><td><code>/api/v1/transactions/:id</code></td><td>Full CRUD. Create/update verify the account belongs to the caller.</td></tr>
+      <tr><td><span class="pill m-get">GET</span> <span class="pill m-post">POST</span></td><td><code>/api/v1/categories</code></td><td>List / create (intentionally minimal — no update/delete).</td></tr>
+    </tbody>
+  </table></div>
+  <p>Detailed flows: <a href="#f-accounts">Accounts</a> · <a href="#f-transactions">Transactions</a> · <a href="#f-categories">Categories</a>.</p>
+</section>
+
+<!-- ---------- 12 BUDGET ---------- -->
+<section id="svc-budget">
+  <h2>12 · budget-service <span class="port" style="font-size:13px;color:var(--ink-muted);font-weight:400">:8083 · finora_budgets</span></h2>
+  <p>Budgets, savings goals, and reports. This is the <strong>only service that calls other services</strong> — it reaches into expense-service (for actual spend) and notification-service (for overspend alerts) over REST. It owns <code>budgets</code> and <code>goals</code>.</p>
+  <div class="tbl-wrap"><table>
+    <tbody>
+      <tr><td><span class="pill m-get">GET</span> <span class="pill m-post">POST</span> <span class="pill m-put">PUT</span> <span class="pill m-del">DEL</span></td><td><code>/api/v1/budgets</code>, <code>/budgets/:id</code></td><td>Full CRUD. A budget is <code>{category, amount, period}</code>.</td></tr>
+      <tr><td><span class="pill m-get">GET</span> <span class="pill m-post">POST</span> <span class="pill m-put">PUT</span> <span class="pill m-del">DEL</span></td><td><code>/api/v1/goals</code>, <code>/goals/:id</code></td><td>Full CRUD. <code>current_amount</code> is manual progress logging on <code>PUT</code>.</td></tr>
+      <tr><td><span class="pill m-get">GET</span></td><td><code>/api/v1/reports/summary</code></td><td>★ Computed budget-vs-actual across services. <code>from</code> &amp; <code>to</code> required.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Detailed flows: <a href="#f-budgets">Budgets</a> · <a href="#f-goals">Goals</a> · <a href="#f-reports">Reports (the crown jewel)</a>.</p>
+</section>
+
+<!-- ---------- 13 NOTIFICATION ---------- -->
+<section id="svc-notification">
+  <h2>13 · notification-service <span class="port" style="font-size:13px;color:var(--ink-muted);font-weight:400">:8084 · finora_notifications</span></h2>
+  <p>The in-app notification feed. Owns <code>notifications</code>. Email delivery sits behind an <code>EmailSender</code> interface with a structured-log implementation today (Phase 4 seam for real SMTP).</p>
+  <div class="tbl-wrap"><table>
+    <tbody>
+      <tr><td><span class="pill m-get">GET</span></td><td><code>/api/v1/notifications</code></td><td><strong>Paginated.</strong> <code>?unread_only=true</code> filter.</td></tr>
+      <tr><td><span class="pill m-post">POST</span></td><td><code>/api/v1/notifications</code></td><td>Create <code>{title, message, type}</code>. Owner is always <code>X-User-Id</code> — never a <code>user_id</code> in the body.</td></tr>
+      <tr><td><span class="pill m-patch">PATCH</span></td><td><code>/api/v1/notifications/:id/read</code></td><td>Mark one as read.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <span class="lbl">One ownership shape, two callers</span>
+    Notifications take the owner from <code>X-User-Id</code>, never from the request body. This keeps the ownership model identical whether the caller is a human (via the gateway) or budget-service's overspend trigger (which forwards the originating user's <code>X-User-Id</code>). See <a href="#f-reports">Reports</a> for that trigger.
+  </div>
+  <p>Detailed flow: <a href="#f-notifications">Notifications</a>.</p>
+</section>
+
+<!-- ---------- 14 SERVICE COMMUNICATION ---------- -->
+<section id="svc-comms">
+  <h2>14 · How the services talk to each other (and when)</h2>
+  <p>This is the question that trips up most people reading a microservice repo for the first time, so it gets its own section. The short version: <strong>there are only two kinds of traffic in Finora, both plain HTTP/JSON, and almost all of it is the gateway proxying.</strong> Actual service-to-service calls are rare, deliberate, and enumerated below — there is no hidden mesh of chatter.</p>
+
+  <h3>The two kinds of traffic</h3>
+  <div class="two-col">
+    <div class="card">
+      <h4>1 · Gateway → service (proxy)</h4>
+      <p>The dominant traffic. Every client request is validated and reverse-proxied to exactly <em>one</em> owning service by path prefix. The gateway never fans one request out to several services. This is the flow in <a href="#lifecycle">§3</a>.</p>
+    </div>
+    <div class="card">
+      <h4>2 · Service → service (REST)</h4>
+      <p>Rare and deliberate. Exactly <strong>one</strong> service (budget-service) calls others, and only for two features. Everything else owns its data and answers only the gateway.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="lbl">The governing rule</span>
+    A service may only reach another service's data through that service's <em>REST API</em> — never a shared Mongo connection, a borrowed collection, or a backdoor query. That's what keeps each service independently deployable and replaceable. If a feature seems to need an interaction that isn't in the table below, that's a change to service boundaries to be documented — not an ad-hoc shortcut.
+  </div>
+
+  <h3>The complete "who may call whom" matrix</h3>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Service</th><th>Owns (Mongo)</th><th>May call</th><th>May be called by</th></tr></thead>
+    <tbody>
+      <tr><td>gateway</td><td>—</td><td>all 4 services (proxy only)</td><td>client, frontend</td></tr>
+      <tr><td>user-service</td><td>finora_users</td><td><em>nothing</em></td><td>gateway</td></tr>
+      <tr><td>expense-service</td><td>finora_expenses</td><td><em>nothing</em></td><td>gateway; <strong>budget-service</strong> (reports)</td></tr>
+      <tr><td>budget-service</td><td>finora_budgets</td><td><strong>expense-service</strong> (reports), <strong>notification-service</strong> (overspend)</td><td>gateway</td></tr>
+      <tr><td>notification-service</td><td>finora_notifications</td><td><em>nothing</em></td><td>gateway; <strong>budget-service</strong> (overspend)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Read the two bold cells and you have the entire service-to-service surface of the system. Everything else is "gateway proxy in, own-database out."</p>
+
+  <h3>The two real calls — exactly when each fires</h3>
+
+  <h4>budget-service → expense-service &nbsp;<span style="font-weight:400;color:var(--ink-muted)">(when: a report is requested)</span></h4>
+  <ul>
+    <li><strong>Trigger:</strong> any <code>GET /api/v1/reports/summary</code>. To turn a budget's <em>budgeted</em> amount into <em>actual</em> spend, budget-service has no transaction data of its own — it must ask expense-service.</li>
+    <li><strong>Calls made:</strong> <code>GET /api/v1/categories</code> (to resolve the budget's category <em>name</em> → expense-service's category <em>id</em>), then <code>GET /api/v1/transactions?category=&lt;id&gt;&amp;from=&amp;to=&amp;page_size=100</code>, paged up to a 50-page safety cap, summing <code>expense</code> amounts.</li>
+    <li><strong>Code:</strong> <code>internal/client/expense_client.go</code>, behind the <code>domain.ExpenseClient</code> interface (so the report service is unit-testable with a fake — Dependency Inversion).</li>
+  </ul>
+
+  <h4>budget-service → notification-service &nbsp;<span style="font-weight:400;color:var(--ink-muted)">(when: a report finds a category over budget)</span></h4>
+  <ul>
+    <li><strong>Trigger:</strong> during that same <code>Summary()</code> computation, the moment a category's <code>remaining &lt; 0</code>. It is <em>not</em> triggered when a transaction is created (there's no event bus yet) — it's a side effect of the read.</li>
+    <li><strong>Call made:</strong> <code>POST /api/v1/notifications {title, message, type:"overspend"}</code>, deduplicated per reporting period so a dashboard reload doesn't spam the user.</li>
+    <li><strong>Code:</strong> <code>internal/client/notification_client.go</code>, behind the <code>domain.NotificationClient</code> interface. A failure here is logged and swallowed — it never fails the report.</li>
+  </ul>
+  <p>Both are walked step by step, with the diagram and the dedup rule, in <a href="#f-reports">the Reports feature ★</a>.</p>
+
+  <h3>How an internal call authenticates (there's no token)</h3>
+  <p>A service-to-service call does <strong>not</strong> carry a JWT. Instead budget-service forwards the originating user's <code>X-User-Id</code> header — exactly what the gateway would have injected — and expense-service / notification-service trust it via the same <code>middleware.RequireIdentity</code> they use for gateway traffic. From the callee's point of view an internal call is indistinguishable from a proxied one: same header, same ownership scoping. Each internal call also sets a <strong>3-second timeout</strong>, because it's an in-cluster hop that should either answer fast or fail fast.</p>
+
+  <div class="note warn">
+    <span class="lbl">Why so little service-to-service traffic — and what changes later</span>
+    Finora is deliberately <strong>REST-only and low-chatter</strong> today: synchronous calls are simple to reason about and debug, and the fewer of them there are, the more independently each service can be deployed and scaled. The overspend notification is the one place this pinches — a <code>GET</code> with a write side effect, which isn't clean REST. That exists <em>only</em> because there's no event bus yet. <strong>Phase 7</strong> introduces NATS: the overspend alert becomes a real event published when the triggering transaction is created and consumed by notification-service directly, replacing the read-triggered call. The REST calls for <em>queries</em> (reports reading expense data) stay. See <a href="#roadmap">the roadmap</a>.
+  </div>
+</section>
+
+<!-- ========================================================= FEATURE WALKTHROUGHS ========================================================= -->
+
+<!-- ---------- REGISTER ---------- -->
+<section id="f-register">
+  <h2>Feature · Registration</h2>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/auth/register</code> &nbsp;→&nbsp; <code>201 {user}</code>. Public route.</p>
+  <ol class="steps">
+    <li><span class="st"><b>Handler validates shape.</b> Gin binding enforces <code>email</code> (valid email), <code>password</code> (min 8 chars), <code>name</code> (required) before any logic runs.</span></li>
+    <li><span class="st"><b>Service normalizes &amp; checks uniqueness.</b> Email is lower-cased and trimmed. It looks up any existing user; a hit returns <code>ErrDuplicateEmail</code> → <code>409 CONFLICT</code>.</span></li>
+    <li><span class="st"><b>Password is hashed with bcrypt</b> (default cost). The plaintext is never stored or logged.</span></li>
+    <li><span class="st"><b>User + default settings are created.</b> A new <code>User</code> (UUID id) is inserted, then a default <code>Settings</code> doc (<code>USD</code>, <code>UTC</code>) is seeded so <code>GET /users/me/settings</code> never 404s for a fresh account.</span></li>
+    <li><span class="st"><b>Response.</b> The user is returned — with <code>PasswordHash</code> tagged <code>json:"-"</code>, so it can never leak into the response even if a handler serializes the struct directly. No tokens are issued on register; the client logs in next.</span></li>
+  </ol>
+</section>
+
+<!-- ---------- LOGIN ---------- -->
+<section id="f-login">
+  <h2>Feature · Login</h2>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/auth/login</code> &nbsp;→&nbsp; <code>200 {access_token, refresh_token, user}</code>. Public route.</p>
+  <ol class="steps">
+    <li><span class="st"><b>Look up by normalized email.</b> If not found, return the <em>same</em> <code>ErrInvalidCredentials</code> as a wrong password would — no user enumeration.</span></li>
+    <li><span class="st"><b>Verify password.</b> <code>bcrypt.CompareHashAndPassword</code> against the stored hash. Mismatch → <code>401</code>, again with the generic message.</span></li>
+    <li><span class="st"><b>Issue a token pair.</b> <code>issueTokenPair</code> mints an access token (15 min) and a refresh token (7 days) carrying a fresh <code>jti</code>.</span></li>
+    <li><span class="st"><b>Persist the refresh token, hashed.</b> A <code>refresh_tokens</code> record is written storing <em>only</em> <code>SHA-256(jti)</code>, the expiry, and <code>revoked: false</code> — this is what makes rotation and revocation possible.</span></li>
+    <li><span class="st"><b>Return both tokens + the user.</b> The frontend stores them and attaches the access token to every subsequent request.</span></li>
+  </ol>
+</section>
+
+<!-- ---------- PROTECTED ---------- -->
+<section id="f-protected">
+  <h2>Feature · Anatomy of a protected call</h2>
+  <p>Covered in depth in <a href="#lifecycle">§3 · Request Lifecycle</a> — this is the reference flow every read/write below inherits. The essence: <strong>gateway validates the token and injects <code>X-User-Id</code> → service requires that header → repository scopes the Mongo query to it.</strong> You literally cannot query across users; there is no endpoint in the entire system that lists across users.</p>
+</section>
+
+<!-- ---------- REFRESH ---------- -->
+<section id="f-refresh">
+  <h2>Feature · Token refresh &amp; rotation (with theft detection)</h2>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/auth/refresh</code> &nbsp;→&nbsp; <code>200 {access_token, refresh_token}</code>. This is the most security-critical flow in the app. When an access token expires, the client silently exchanges its refresh token for a brand-new pair.</p>
+  <ol class="steps">
+    <li><span class="st"><b>Parse &amp; type-check.</b> <code>jwtx.Parse(refreshSecret, token, "refresh")</code> validates signature, expiry, and that <code>type == refresh</code>.</span></li>
+    <li><span class="st"><b>Look up the stored record</b> by <code>SHA-256(jti)</code>. No record → invalid.</span></li>
+    <li><span class="st"><b>Theft detection ★.</b> If the record is <em>already revoked</em>, someone is replaying a rotated-away token — the legitimate client already moved on to the next token in the chain. The service <b>revokes every refresh token for that user</b> (<code>RevokeAllForUser</code>), forcing full re-authentication on all devices. The client just sees "invalid token."</span></li>
+    <li><span class="st"><b>Expiry check</b> against the stored <code>expires_at</code>.</span></li>
+    <li><span class="st"><b>Rotate.</b> The presented token is revoked <em>before</em> a new pair is issued — so a replayed old refresh token can never succeed twice.</span></li>
+    <li><span class="st"><b>Issue &amp; persist the new pair</b> (new <code>jti</code>, new hashed record) and return it.</span></li>
+  </ol>
+  <div class="note">
+    <span class="lbl">Why rotation + reuse-detection matters</span>
+    Rotation means a stolen refresh token is only useful until the real user next refreshes — at which point the thief's copy is revoked. Reuse-detection turns the theft into a tripwire: the moment <em>both</em> the thief and the victim have used the token, all sessions are killed. This was verified live against two real concurrent sessions, not just the in-memory fake.
+  </div>
+</section>
+
+<!-- ---------- LOGOUT ---------- -->
+<section id="f-logout">
+  <h2>Feature · Logout</h2>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/auth/logout</code> &nbsp;→&nbsp; <code>204</code>. Authenticated by the refresh token in the body (not <code>X-User-Id</code>), and <strong>idempotent</strong>: a malformed/expired/already-revoked token still returns <code>204</code> and never reveals whether the token was ever valid. On a valid, un-revoked token it revokes that one record. Any genuine internal error is the only thing that returns non-204.</p>
+</section>
+
+<!-- ---------- ACCOUNTS ---------- -->
+<section id="f-accounts">
+  <h2>Feature · Accounts</h2>
+  <p>Standard owner-scoped CRUD in expense-service. An account is <code>{name, type, currency}</code> where <code>type ∈ {checking, savings, credit, cash}</code>. Listing returns <em>everything</em> unpaginated — deliberately, because a real user has a handful of accounts, not pages of them (adding pagination there would be unjustified complexity). Every read/update/delete is filtered by <code>user_id</code>, so a cross-user id yields <code>404</code>.</p>
+  <div class="note">
+    <span class="lbl">A real bug this domain caught</span>
+    The frontend accounts page once offered <code>investment</code> and <code>other</code> types that expense-service's <code>ValidAccountType</code> rejects — guaranteed 400s. Trimmed to the real four. A good reminder that the backend's validation is the source of truth, not the UI's dropdown.
+  </div>
+</section>
+
+<!-- ---------- TRANSACTIONS ---------- -->
+<section id="f-transactions">
+  <h2>Feature · Transactions</h2>
+  <p>The highest-volume resource, and the first that <strong>paginates</strong>. A transaction is <code>{account_id, category_id?, type, amount, currency, date, note}</code>, <code>type ∈ {income, expense}</code>. Traced through the layers in <a href="#layers">§5</a>. Key behaviors:</p>
+  <ul>
+    <li><strong>Cross-tenant safety:</strong> on create/update, the service verifies the referenced <code>account_id</code> belongs to the caller before attaching the transaction — otherwise the body could reference someone else's account.</li>
+    <li><strong>Validation:</strong> <code>amount &gt; 0</code>, valid type, non-empty currency, a parseable date (RFC3339 <em>or</em> <code>YYYY-MM-DD</code>).</li>
+    <li><strong>Pagination contract:</strong> <code>page</code> (default 1), <code>page_size</code> (default 20, capped at 100 server-side). The response echoes the <em>resolved</em> <code>page</code>/<code>page_size</code> the service actually applied plus a <code>total</code> count — not the raw query input.</li>
+    <li><strong>Filtering &amp; sort:</strong> by <code>account_id</code>, <code>category</code> (a category id), and a <code>from</code>/<code>to</code> date range; sorted by date descending. Backed by a compound Mongo index <code>(user_id, account_id, date)</code>.</li>
+  </ul>
+  <div class="note warn">
+    <span class="lbl">The resolved-vs-requested pagination bug</span>
+    Originally the handler echoed the raw <code>?page=</code> straight back, so omitting it returned <code>page: 0</code>, and <code>page_size</code> wasn't returned at all. Fixed project-wide in Phase 6 by having the <em>service</em> stamp the values it actually applied. This is now the documented standard any future paginated endpoint must follow.
+  </div>
+</section>
+
+<!-- ---------- CATEGORIES ---------- -->
+<section id="f-categories">
+  <h2>Feature · Categories</h2>
+  <p>Intentionally minimal: create and list only (no update/delete), because that's all the product needs today — a good example of the "don't build what isn't needed yet" principle. A category is <code>{name, type}</code>, owner-scoped. Categories matter most as the join key for reports: budget-service resolves a budget's category <em>name</em> to expense-service's category <em>id</em> to sum spend. See <a href="#f-reports">Reports</a>.</p>
+</section>
+
+<!-- ---------- BUDGETS ---------- -->
+<section id="f-budgets">
+  <h2>Feature · Budgets</h2>
+  <p>Full CRUD in budget-service. A budget is <code>{category, amount, period}</code> (e.g. <code>{"groceries", 500, "monthly"}</code>). The <code>category</code> is a plain name string that matches expense-service's category naming — the two services are joined by name at report time, not by a shared foreign key (they can't share a database). Budgets also carry a hidden, non-API field <code>LastNotifiedAt</code> used by the overspend dedup logic (explained in Reports).</p>
+</section>
+
+<!-- ---------- GOALS ---------- -->
+<section id="f-goals">
+  <h2>Feature · Savings goals</h2>
+  <p>Full CRUD. A goal is <code>{name, target_amount, target_date, current_amount}</code>. Unlike reports, goals get <strong>no</strong> cross-service linkage — <code>current_amount</code> is <em>manual progress logging</em> the user updates via <code>PUT</code> ("I moved $500 into savings this month"). It's never derived from expense data.</p>
+  <div class="note warn">
+    <span class="lbl">A subtle bug worth learning from</span>
+    <code>PUT</code> is a full-replace and is also the only way to log progress. An early version re-validated "target_date must be in the future" against the resent date <em>even when the caller wasn't changing it</em> — so once a goal's due date passed, it was permanently locked out of all further updates (including logging progress). Fixed to only reject a target_date that's both <em>changed</em> and in the past.
+  </div>
+</section>
+
+<!-- ---------- REPORTS ---------- -->
+<section id="f-reports">
+  <h2>Feature · Reports ★ (the crown jewel)</h2>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/reports/summary?from=&amp;to=</code> (both required). This is the one place multiple services collaborate, and it exercises nearly every pattern in the codebase: a cross-service REST call, Dependency Inversion for testability, a computed-on-read result, <em>and</em> a deliberate side effect (the overspend notification). Walk this one slowly.</p>
+
+  <div class="flow">
+    <div class="flow-row"><span class="stepnum">1</span><div class="box brand">budget-service</div><span class="arrow">reads its own</span><div class="box data">budgets</div></div>
+    <div class="flow-row"><span class="stepnum">2</span><div class="box brand">budget-service</div><span class="arrow">→ REST (X-User-Id)</span><div class="box">expense-service</div><span class="arrow">GET /categories</span></div>
+    <div class="flow-row"><span class="stepnum">3</span><div class="box brand">budget-service</div><span class="arrow">→ REST (X-User-Id)</span><div class="box">expense-service</div><span class="arrow">GET /transactions?category=…</span></div>
+    <div class="flow-row"><span class="stepnum">4</span><div class="box">compute</div><span class="arrow">budgeted − actual =</span><div class="box good">remaining</div></div>
+    <div class="flow-row"><span class="stepnum">5</span><div class="box crit">if remaining &lt; 0</div><span class="arrow">→ REST (X-User-Id)</span><div class="box">notification-service</div><span class="arrow">POST /notifications</span></div>
+  </div>
+
+  <h4>The computation, step by step</h4>
+  <ol class="steps">
+    <li><span class="st"><b>List the caller's budgets</b> from budget-service's own Mongo.</span></li>
+    <li><span class="st"><b>Resolve category name → id.</b> For each budget, budget-service calls expense-service <code>GET /api/v1/categories</code> and matches the budget's <code>category</code> name case-insensitively. No match → <code>actual = 0</code> (not an error; the user just hasn't logged anything there yet).</span></li>
+    <li><span class="st"><b>Sum the actual spend.</b> It calls <code>GET /api/v1/transactions?category=&lt;id&gt;&amp;from=&amp;to=&amp;page_size=100</code>, paging up to a safety cap of 50 pages (5,000 tx), summing <code>amount</code> where <code>type == "expense"</code>. The <code>type</code> filter is done <em>client-side</em> in budget-service because expense-service has no server-side type filter — a known wrinkle worked around from the caller's side.</span></li>
+    <li><span class="st"><b>Build the row:</b> <code>{category, period, budgeted, actual, remaining: budgeted − actual}</code>, accumulating <code>total_budgeted</code> / <code>total_actual</code>.</span></li>
+    <li><span class="st"><b>If over budget, fire an overspend notification</b> (details below).</span></li>
+  </ol>
+
+  <h4>How the cross-service call is wired (and why it's testable)</h4>
+  <p>The HTTP call lives in <code>internal/client/expense_client.go</code>, which implements a <code>domain.ExpenseClient</code> interface. The report service depends only on that interface — <strong>Dependency Inversion</strong> — so unit tests inject a fake and never stand up a real expense-service. The call forwards the caller's <code>X-User-Id</code> exactly as the gateway would (no JWT — it's an internal-network call using the same trust model as <code>RequireIdentity</code>).</p>
+
+  <h4>The overspend notification — a documented trade-off</h4>
+  <p>When a category is over budget, budget-service calls notification-service to create a visible in-app alert. This means a <strong>GET request has a side effect</strong> (creating a notification, mutating a budget field) — which is <em>not</em> pure REST. It exists only because Finora has no event bus yet; Phase 7 replaces it with a real "overspend event" published when the triggering transaction is created.</p>
+  <ul>
+    <li><strong>Dedup rule:</strong> a hidden <code>LastNotifiedAt *time.Time</code> on the budget stores <em>the report period's <code>from</code> boundary</em> that was last notified for — not a wall-clock time. A budget notifies only if <code>LastNotifiedAt == nil</code> or it doesn't exactly equal the current <code>from</code>. So reloading the same range doesn't re-notify, but viewing a different period does.</li>
+    <li><strong>Why exact-match, not "notified after":</strong> an earlier version compared as a time ordering and broke for out-of-order queries — a user notified for the current month who then opened an <em>older</em>, never-viewed over-budget month had that legitimate first alert wrongly suppressed. Fixed to exact-period-match, with a regression test.</li>
+    <li><strong>Failure is swallowed:</strong> if notification-service is unreachable, the error is logged and the report still returns <code>200</code> — a notification hiccup must not break a working read.</li>
+    <li><strong>Known race (accepted):</strong> two concurrent first-time Summary calls for the same period could both notify once (no atomic check-and-set). Low consequence, narrow window, replaced wholesale by Phase 7 — not worth locking machinery today.</li>
+  </ul>
+
+  <h4>The shape it returns</h4>
+  <pre><code>{ "summary": {
+    "from": "2026-01-01T00:00:00Z", "to": "2026-01-31T00:00:00Z",
+    "categories": [
+      { "category": "groceries", "period": "monthly", "budgeted": 500, "actual": 320, "remaining": 180 }
+    ],
+    "total_budgeted": 500, "total_actual": 320
+} }</code></pre>
+</section>
+
+<!-- ---------- NOTIFICATIONS ---------- -->
+<section id="f-notifications">
+  <h2>Feature · Notifications</h2>
+  <p>A straightforward owner-scoped feed with two entry points that share one ownership model. A human lists/marks-read via the gateway; budget-service creates overspend alerts by forwarding the user's <code>X-User-Id</code>. The list <strong>paginates</strong> and supports <code>?unread_only=true</code>, backed by a compound <code>(user_id, read)</code> index. On create, the service also invokes <code>EmailSender.Send</code> as a best-effort side effect — today a structured-log stub, swappable for real SMTP behind the interface without touching callers. The frontend surfaces this as a Notifications page plus a sidebar unread-count badge — because "a visible notification" needed an actual UI surface, not just an endpoint.</p>
+</section>
+
+<!-- ---------- SETTINGS ---------- -->
+<section id="f-settings">
+  <h2>Feature · Profile &amp; settings</h2>
+  <p>In user-service. <strong>Profile:</strong> <code>GET/PUT /users/me</code> — you can edit your <code>name</code> (trimmed, 1–100 chars); email is read-only. <strong>Settings:</strong> <code>GET/PUT /users/me/settings</code> — <code>currency</code> (validated as a 3-letter uppercase code via a lightweight regex, deliberately not a full ISO-4217 table) and <code>timezone</code> (validated by actually calling <code>time.LoadLocation</code>).</p>
+  <div class="note warn">
+    <span class="lbl">A real production bug the settings page uncovered</span>
+    user-service's Alpine base image shipped without the <code>tzdata</code> package, so inside the container <code>time.LoadLocation</code> could only ever resolve <code>"UTC"</code> — every genuinely valid IANA zone (e.g. <code>Europe/London</code>) was rejected with the same 400 a garbage string gets. Invisible to <code>go test</code> because the host machine <em>has</em> tzdata. Fixed by adding <code>tzdata</code> in the Dockerfile. Lesson: validation that depends on OS data must be tested in the real runtime image, not just on a dev host.
+  </div>
+</section>
+
+<!-- ========================================================= DATA & PLATFORM ========================================================= -->
+
+<!-- ---------- 14 DATA ---------- -->
+<section id="data">
+  <h2>15 · The data model</h2>
+  <p>One MongoDB instance per service, never shared. Each service is only ever handed its own <code>*_MONGO_URI</code>. Isolation is physical, so a slow query or crash in one database can't touch another, and each maps 1:1 onto its own Kubernetes StatefulSet later.</p>
+
+  <h4>finora_users (user-service)</h4>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Collection</th><th>Key fields</th><th>Indexes</th></tr></thead>
+    <tbody>
+      <tr><td><code>users</code></td><td><code>_id, email, password_hash (bcrypt), name, created_at, updated_at</code></td><td>Unique on <code>email</code> (enforces one account per email at the DB layer).</td></tr>
+      <tr><td><code>refresh_tokens</code></td><td><code>_id, user_id, jti_hash (SHA-256), expires_at, revoked, created_at</code></td><td><code>jti_hash</code> (lookup); TTL on <code>expires_at</code> (auto-reap expired tokens); <code>user_id</code> (revoke-all-sessions).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>finora_expenses (expense-service)</h4>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Collection</th><th>Key fields</th><th>Indexes</th></tr></thead>
+    <tbody>
+      <tr><td><code>accounts</code></td><td><code>user_id, name, type, currency</code></td><td><code>user_id</code>.</td></tr>
+      <tr><td><code>transactions</code></td><td><code>user_id, account_id, category_id?, amount, type, date, note</code></td><td>Compound <code>(user_id, account_id, date)</code> for the list/paginate path; sparse <code>(user_id, category_id)</code> for category filtering.</td></tr>
+      <tr><td><code>categories</code></td><td><code>user_id, name, type</code></td><td><code>user_id</code>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>finora_budgets (budget-service)</h4>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Collection</th><th>Key fields</th><th>Indexes</th></tr></thead>
+    <tbody>
+      <tr><td><code>budgets</code></td><td><code>user_id, category, amount, period, last_notified_at</code></td><td><code>user_id</code>; compound <code>(user_id, period)</code>.</td></tr>
+      <tr><td><code>goals</code></td><td><code>user_id, name, target_amount, target_date, current_amount</code></td><td><code>user_id</code>. <em>(Collection is <code>goals</code>, not <code>savings_goals</code> — doc corrected to match code.)</em></td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>finora_notifications (notification-service)</h4>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Collection</th><th>Key fields</th><th>Indexes</th></tr></thead>
+    <tbody>
+      <tr><td><code>notifications</code></td><td><code>user_id, title, message, type, read, created_at</code></td><td>Compound <code>(user_id, read)</code> for the unread-feed query.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <span class="lbl">The one universal indexing principle</span>
+    Every collection indexes at minimum on <code>user_id</code>, because <em>every</em> query in the system is owner-scoped — there is no cross-user list anywhere. Extra compound indexes are added only where a documented query pattern (paginate, filter, sort) needs one — never speculatively. Each service runs an <code>EnsureIndexes</code> at boot, and the integration tests assert the indexes actually exist with the right shape (compound order, sparse flags, uniqueness).
+  </div>
+</section>
+
+<!-- ---------- 15 CROSSCUT ---------- -->
+<section id="crosscut">
+  <h2>16 · Cross-cutting concerns</h2>
+
+  <h3>Health probes (Kubernetes-shaped)</h3>
+  <p>Every service exposes three endpoints via <code>shared/health</code>, following K8s probe conventions:</p>
+  <div class="tbl-wrap"><table>
+    <tbody>
+      <tr><td><code>GET /live</code></td><td>Always <code>200</code> if the process is up. Liveness never depends on downstream state (a Mongo blip must not get the pod killed).</td></tr>
+      <tr><td><code>GET /ready</code></td><td><code>200</code> only if the Mongo ping succeeds, else <code>503</code>. Readiness gates traffic. (The gateway owns no data, so its <code>/ready</code> is liveness-only.)</td></tr>
+      <tr><td><code>GET /health</code></td><td>Richer human/dashboard aggregate of the checks.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Structured logging &amp; request tracing</h3>
+  <p><code>middleware.RequestID</code> ensures every request carries an <code>X-Request-Id</code> (generated if absent), echoed on the response and stamped into every log line. <code>middleware.Logging</code> emits one JSON line per request (<code>method, path, status, latency, request_id</code>), skipping the noisy health-probe paths. That single id ties a request together across all services — the foundation for the Phase-8 OpenTelemetry seam.</p>
+
+  <h3>Rate limiting (gateway only, Phase 6)</h3>
+  <p>A per-client-IP token bucket (<code>golang.org/x/time/rate</code>) in the gateway's chain after CORS, configured via <code>RATE_LIMIT_REQUESTS_PER_SECOND</code>/<code>RATE_LIMIT_BURST</code> (default 10/s, burst 20). Over-limit → <code>429 RATE_LIMITED</code>. Deliberately in-memory, not Redis (single gateway instance today; Redis is the right answer only once there are multiple replicas). It <strong>fails open</strong>: a zero/unset config disables limiting rather than rejecting 100% of traffic — an unconfigured limiter must never look like an outage.</p>
+
+  <h3>Configuration (12-factor)</h3>
+  <p>No service hardcodes config. Everything is read from env vars via <code>shared/config</code>, enumerated in <code>.env.example</code>. Secrets and Mongo URIs use <code>MustGetEnv</code> (fail-fast at boot). This env-var-only shape maps cleanly onto Kubernetes ConfigMaps (non-secret) and Secrets (JWT secrets, credentials).</p>
+
+  <h3>Graceful shutdown</h3>
+  <p><code>shared/server.Run</code> listens for SIGINT/SIGTERM and drains in-flight requests for up to <code>SHUTDOWN_TIMEOUT</code> before exiting — so a Kubernetes rollout/eviction doesn't drop live requests.</p>
+
+  <h3>OpenAPI served live (Phase 6)</h3>
+  <p>Every service serves its own spec at <code>GET /openapi.yaml</code> (read from disk at startup via <code>shared/openapidoc</code>; a missing file logs a warning and 404s rather than crashing). Each Dockerfile copies the spec into the final image.</p>
+</section>
+
+<!-- ---------- 16 FRONTEND ---------- -->
+<section id="frontend">
+  <h2>17 · The frontend</h2>
+  <p>Next.js (App Router, TypeScript). It talks <em>only</em> to the gateway, never to a service directly. Two files carry the whole integration story:</p>
+
+  <h4><code>lib/api.ts</code> — the fetch wrapper</h4>
+  <ul>
+    <li>Prefixes requests with <code>NEXT_PUBLIC_API_BASE_URL</code> and attaches <code>Authorization: Bearer &lt;access_token&gt;</code> from <code>localStorage</code>.</li>
+    <li>Unwraps the <code>{success, data, error, request_id}</code> envelope; throws a typed <code>ApiError</code> on failure.</li>
+    <li><strong>Silent refresh on 401:</strong> exactly one attempt — on a 401 it calls <code>/auth/refresh</code>, and if that succeeds retries the original request once; if it fails, clears tokens and hard-redirects to <code>/login</code>. Concurrent 401s are de-duplicated so only one refresh fires.</li>
+  </ul>
+
+  <h4><code>lib/auth-context.tsx</code> — client auth state</h4>
+  <p>A React context that tracks "is there a token" (checked post-mount to avoid SSR mismatch) and exposes <code>login</code>/<code>logout</code>. Route protection for <code>/dashboard/*</code> is a client-side effect today.</p>
+
+  <div class="note warn">
+    <span class="lbl">Known Phase-0 simplification</span>
+    Tokens live in <code>localStorage</code>, which is readable by any script on the page — so an XSS could exfiltrate the 7-day refresh token. This is acknowledged in-code with a plan to move to <code>httpOnly</code> cookies set by Next.js route handlers. See <a href="#security">§19</a>.
+  </div>
+
+  <h4>Design system (the visual constitution)</h4>
+  <p><code>architecture/frontend-design-system.md</code> plays the same role for the UI that <code>CLAUDE.md</code> plays for the backend: flat, one accent color (violet), status color (green/amber/red) used <em>only</em> for financial polarity and never as decoration. Deliberately <strong>no</strong> UI-kit, icon library, or charting library — hand-rolled Tailwind primitives, ~14 inline-SVG icons, and a hand-built bullet chart for budget-vs-actual — each rejected for the same reason: a dependency this app's surface area doesn't justify. Money is always rendered with <code>tabular-nums</code>.</p>
+</section>
+
+<!-- ---------- 17 DEPLOY ---------- -->
+<section id="deploy">
+  <h2>18 · Build &amp; deploy wiring</h2>
+
+  <h3>Go modules: <code>replace</code> today, <code>go.work</code> supersedes it</h3>
+  <p>Each service has its own <code>go.mod</code> with a <code>replace github.com/finora/shared =&gt; ../../shared</code> directive, so it builds standalone (critical for isolated Docker stages and single-service checkouts). A root <code>go.work</code> ties everything together for local dev (one <code>go build ./...</code>, consistent <code>gopls</code>, no version drift). The <code>replace</code> stays as the fallback because <code>go.work</code> is never used inside Docker builds.</p>
+
+  <h3>Docker build context is the repo root</h3>
+  <p>Every service's Dockerfile must <code>COPY</code> both <code>shared/</code> and its own directory, so the build context is the <em>repository root</em>, not the service folder:</p>
+  <pre><code>docker build -f services/user-service/Dockerfile .   # run from repo root</code></pre>
+  <p><code>docker-compose.yml</code> encodes this with <code>context: .</code> + a service-specific <code>dockerfile:</code> path. Images are multi-stage: a <code>golang:1.21-alpine</code> builder produces a static <code>CGO_ENABLED=0</code> binary, copied into a minimal <code>alpine</code> runtime that runs as a non-root user with a health check. (user-service additionally installs <code>tzdata</code> — see <a href="#f-settings">Profile &amp; settings</a>.)</p>
+
+  <h3>The local topology</h3>
+  <p><code>docker compose up</code> brings up 4 Mongo containers + 4 services + the gateway + the frontend, wired by health-check <code>depends_on</code> so nothing starts before its dependency is ready. Mongo log noise is redirected to a file inside the data volume (not stdout) so <code>docker compose logs</code> stays readable.</p>
+
+  <h3>CI (Phase 6)</h3>
+  <p><code>.github/workflows/ci.yml</code> runs three jobs: <code>go-unit</code> (gofmt + vet + build + test, matrixed per service, fakes only), <code>go-integration</code> (real <code>mongo:7</code> via testcontainers-go, build-tagged so it's opt-in), and <code>frontend</code> (build + lint). It's configured to run on PR-merge to <code>main</code>, not every push.</p>
+</section>
+
+<!-- ---------- 18 SECURITY ---------- -->
+<section id="security">
+  <h2>19 · Security posture (read before production)</h2>
+  <p>Finora was built for local development, and the <em>application</em> code shows real security discipline: bcrypt hashing, refresh-token rotation with theft detection, hashed token storage, strict per-user data scoping, no password-hash leakage, no injection surface, and enumeration-resistant auth. The gaps are in the <em>platform</em> posture. The full catalogue lives in <code>security/security_analysis.md</code>; the headline items:</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Severity</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td><span style="color:var(--crit);font-weight:700">Critical</span></td><td>Backend services trust <code>X-User-Id</code> with no auth, <em>and</em> their ports are published to the host → a forged header bypasses auth entirely if exposed.</td></tr>
+      <tr><td><span style="color:var(--crit);font-weight:700">Critical</span></td><td>JWT secrets default to committed placeholder strings (<code>dev-…-change-me</code>); since HS256 is symmetric, knowing the secret forges any user's token.</td></tr>
+      <tr><td><span style="color:var(--warn);font-weight:700">High</span></td><td>MongoDB runs with no authentication; no TLS anywhere; no rate-limit was present pre-Phase-6 and there's still no account lockout on login.</td></tr>
+      <tr><td><span style="color:var(--ink-2);font-weight:700">Medium</span></td><td>JWT algorithm not pinned; tokens in <code>localStorage</code>; no request body-size limits / server timeouts; Gin in debug mode; no security response headers.</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Verdict:</strong> the app logic would pass a review; the surrounding platform (network isolation, secrets, transport, DB auth) is at local-dev maturity. Network isolation and real secrets are hard blockers before any production exposure. See the full report for the prioritized remediation order.</p>
+</section>
+
+<!-- ---------- 19 ROADMAP ---------- -->
+<section id="roadmap">
+  <h2>20 · The roadmap — where the code is on its journey</h2>
+  <p>Finora is built in independently-shippable phases; every phase leaves <code>docker compose up</code> a working, healthy system. Phases 0–6 are application features; 7–9 deliberately introduce the infrastructure integrations earlier phases only left seams for.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Phase</th><th>Theme</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td>Foundation, shared lib, auth vertical slice, health/logging/shutdown</td><td>✅ Complete</td></tr>
+      <tr><td>1</td><td>Auth &amp; user hardening: profile/settings, refresh rotation + reuse detection, password-reset stub</td><td>✅ Complete</td></tr>
+      <tr><td>2</td><td>Expense depth: accounts/transactions/categories CRUD, pagination, filtering, indexes</td><td>✅ Complete</td></tr>
+      <tr><td>3</td><td>Budget depth: budgets, goals, and cross-service reports</td><td>✅ Complete</td></tr>
+      <tr><td>4</td><td>Notifications: feed + the overspend trigger + email interface</td><td>✅ Complete</td></tr>
+      <tr><td>5</td><td>Frontend depth: every screen wired to live APIs</td><td>✅ Complete</td></tr>
+      <tr><td>6</td><td>Hardening: integration tests, rate limiting, standardized pagination, live OpenAPI, green CI</td><td>🟡 In progress</td></tr>
+      <tr><td>7</td><td>Async messaging seam (NATS) — replaces the read-triggered overspend notification with a real event</td><td>⏳ Planned</td></tr>
+      <tr><td>8</td><td>Observability seam: OpenTelemetry tracing + Prometheus <code>/metrics</code> per service</td><td>⏳ Planned</td></tr>
+      <tr><td>9</td><td>Kubernetes readiness: image hardening, 12-factor polish, per-service JWKS validation</td><td>⏳ Planned</td></tr>
+    </tbody>
+  </table></div>
+  <p>Several security items in <a href="#security">§19</a> are exactly what Phases 8–9 (and the infra owner's work under <code>infrastructure/</code>) are meant to close.</p>
+</section>
+
+<!-- ---------- 20 FILEMAP ---------- -->
+<section id="filemap">
+  <h2>21 · Codebase map — where to look for what</h2>
+  <p>Every backend service has the identical layout, so this one map applies to all four data-owning services:</p>
+  <div class="flow"><div class="filemap">
+<span class="dir">services/&lt;name&gt;/</span><br>
+├── cmd/server/<span>main.go</span>        <span class="cm"># composition root: wires everything &amp; starts the server</span><br>
+├── openapi.yaml            <span class="cm"># the service's real HTTP surface</span><br>
+├── Dockerfile              <span class="cm"># multi-stage build, non-root runtime</span><br>
+└── <span class="dir">internal/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── config/     <span class="cm"># env loading + validation</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── domain/     <span class="cm"># ← START HERE: entities + repository/service INTERFACES</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── repository/ <span class="cm"># MongoDB implementations (the only Mongo-aware layer)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── service/    <span class="cm"># business logic (unit-tested against fakes)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── handler/    <span class="cm"># Gin handlers: parse, validate, call service, envelope</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── router/     <span class="cm"># routes + middleware chain + health</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── client/     <span class="cm"># (budget-service only) outbound REST to other services</span>
+  </div></div>
+  <p><strong>Reading order for any feature:</strong> start in <code>domain/</code> to see the entity and interfaces, then <code>service/</code> for the rules, then <code>repository/</code> for the query, then <code>handler/</code>+<code>router/</code> for the HTTP surface. The gateway swaps <code>domain/repository/service</code> for <code>proxy/</code> + <code>authmw/</code>.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>If you want to understand…</th><th>Read</th></tr></thead>
+    <tbody>
+      <tr><td>The whole design philosophy &amp; rules</td><td><code>CLAUDE.md</code></td></tr>
+      <tr><td>Why each choice was made / rejected alternatives</td><td><code>architecture/system-overview.md</code></td></tr>
+      <tr><td>Exact HTTP contracts &amp; auth-header rules</td><td><code>architecture/api-contracts.md</code></td></tr>
+      <tr><td>What each service may / may not do</td><td><code>architecture/service-boundaries.md</code></td></tr>
+      <tr><td>Collections, fields, indexes</td><td><code>architecture/database-design.md</code></td></tr>
+      <tr><td>The phased plan &amp; live progress log</td><td><code>architecture/development-roadmap.md</code>, <code>plan.md</code></td></tr>
+      <tr><td>Frontend visual/UX rules</td><td><code>architecture/frontend-design-system.md</code></td></tr>
+      <tr><td>Running the stack locally &amp; troubleshooting</td><td><code>docs/local-development.md</code></td></tr>
+      <tr><td>Security findings</td><td><code>security/security_analysis.md</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ---------- 21 GLOSSARY ---------- -->
+<section id="glossary">
+  <h2>22 · Glossary</h2>
+  <div class="tbl-wrap"><table>
+    <tbody>
+      <tr><td><strong>Envelope</strong></td><td>The uniform <code>{success, data, error, request_id}</code> JSON shape every response uses.</td></tr>
+      <tr><td><strong>X-User-Id</strong></td><td>The trusted identity header the gateway injects after validating a token; downstream services scope every query to it.</td></tr>
+      <tr><td><strong>X-Request-Id</strong></td><td>A correlation id carried through every service and log line for one request.</td></tr>
+      <tr><td><strong>Access token</strong></td><td>Short-lived (15 min) JWT sent on every protected call; validated only by the gateway.</td></tr>
+      <tr><td><strong>Refresh token</strong></td><td>Long-lived (7 day) JWT exchanged for a new pair; its <code>jti</code> is stored hashed for rotation/revocation.</td></tr>
+      <tr><td><strong>jti</strong></td><td>The unique id of a refresh token; only <code>SHA-256(jti)</code> is persisted.</td></tr>
+      <tr><td><strong>Rotation</strong></td><td>Every refresh issues a new token and revokes the old one, so a replayed token can't work twice.</td></tr>
+      <tr><td><strong>Reuse detection</strong></td><td>Presenting an already-revoked refresh token revokes <em>all</em> of that user's sessions (theft tripwire).</td></tr>
+      <tr><td><strong>Owner-scoped</strong></td><td>Every query is filtered by <code>user_id</code>; a cross-user id yields <code>404</code>, never <code>403</code>.</td></tr>
+      <tr><td><strong>Dependency Inversion</strong></td><td>Services depend on interfaces in <code>domain</code>, not concrete Mongo/HTTP types — the basis of the fake-based test strategy.</td></tr>
+      <tr><td><strong>Clean Architecture</strong></td><td>Layered design where dependencies point inward toward a framework-free <code>domain</code>.</td></tr>
+      <tr><td><strong>EnsureIndexes</strong></td><td>Each service creates its documented Mongo indexes at boot; integration tests assert their shape.</td></tr>
+      <tr><td><strong>Read-triggered notification</strong></td><td>The overspend alert fires from a GET (a documented non-REST trade-off), pending Phase-7 events.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="back-top" style="margin-top:30px"><a href="#intro">↑ Back to the top</a></p>
+</section>
+
+</main>
+</div>
+
+<script>
+  // Active-section highlighting in the sidebar as you scroll.
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+    var byId = {};
+    links.forEach(function (a) {
+      var id = a.getAttribute('href').slice(1);
+      byId[id] = a;
+    });
+    var sections = Array.prototype.slice.call(document.querySelectorAll('main section'));
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          links.forEach(function (l) { l.classList.remove('active'); });
+          var a = byId[e.target.id];
+          if (a) {
+            a.classList.add('active');
+            a.scrollIntoView({ block: 'nearest' });
+          }
+        }
+      });
+    }, { rootMargin: '0px 0px -75% 0px', threshold: 0 });
+    sections.forEach(function (s) { observer.observe(s); });
+
+    // Close the mobile drawer after picking a link.
+    links.forEach(function (a) {
+      a.addEventListener('click', function () {
+        document.querySelector('nav.toc').classList.remove('open');
+      });
+    });
+  })();
+</script>
+</body>
+</html>

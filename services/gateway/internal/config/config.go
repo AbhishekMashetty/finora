@@ -34,6 +34,15 @@ type Config struct {
 	// requests on load) while still meaningfully throttling abuse.
 	RateLimitRequestsPerSecond int
 	RateLimitBurst             int
+
+	// MaxRequestBodyBytes configures shared/middleware.BodyLimit — see that
+	// file's doc comment for why this lives only in the gateway. Default
+	// (1 MiB) is generous relative to every JSON body this app actually
+	// sends (the largest is a transaction/budget create, well under 1 KiB);
+	// it exists to cap the public, unauthenticated register/login bodies
+	// against a CPU/memory-exhaustion attack, not to accommodate legitimate
+	// large payloads.
+	MaxRequestBodyBytes int
 }
 
 // Load reads all gateway env vars, applying the exact names from
@@ -59,6 +68,8 @@ func Load() Config {
 
 		RateLimitRequestsPerSecond: config.GetEnvInt("RATE_LIMIT_REQUESTS_PER_SECOND", 10),
 		RateLimitBurst:             config.GetEnvInt("RATE_LIMIT_BURST", 20),
+
+		MaxRequestBodyBytes: config.GetEnvInt("MAX_REQUEST_BODY_BYTES", 1048576),
 	}
 }
 

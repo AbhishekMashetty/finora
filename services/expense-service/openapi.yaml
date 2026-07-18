@@ -470,12 +470,20 @@ components:
         type:
           type: string
           enum: [income, expense]
-        amount: { type: number, format: double }
+        amount:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 1000000000000
+          description: >
+            Ceiling is defense-in-depth against float64 garbage/overflow in
+            downstream aggregations, not a real-world spending limit.
         currency: { type: string, example: USD }
         date:
           type: string
           description: RFC3339 or YYYY-MM-DD
-        note: { type: string }
+        note: { type: string, maxLength: 1000 }
 
     Category:
       type: object

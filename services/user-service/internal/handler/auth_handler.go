@@ -23,9 +23,16 @@ func NewAuthHandler(svc domain.AuthService) *AuthHandler {
 }
 
 type registerRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-	Name     string `json:"name" binding:"required"`
+	Email string `json:"email" binding:"required,email"`
+	// max=72: bcrypt (see internal/service/auth_service.go) silently
+	// truncates/ignores any input past 72 bytes, so this cap isn't
+	// arbitrary — it matches the real limit of the hash function actually
+	// used, rather than leaving an unbounded field on a public,
+	// unauthenticated route.
+	Password string `json:"password" binding:"required,min=8,max=72"`
+	// max=100 matches maxNameLength in internal/service/user_service.go, so
+	// register and update-profile agree on what a valid name is.
+	Name string `json:"name" binding:"required,max=100"`
 }
 
 // Register handles POST /api/v1/auth/register.

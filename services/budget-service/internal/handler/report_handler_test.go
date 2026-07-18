@@ -120,6 +120,7 @@ func TestReportHandler_Summary_RequiresFromAndTo(t *testing.T) {
 		{name: "missing from", url: "/api/v1/reports/summary?to=2026-01-31"},
 		{name: "unparseable from", url: "/api/v1/reports/summary?from=not-a-date&to=2026-01-31"},
 		{name: "unparseable to", url: "/api/v1/reports/summary?from=2026-01-01&to=not-a-date"},
+		{name: "inverted range (to before from)", url: "/api/v1/reports/summary?from=2026-01-31&to=2026-01-01"},
 	}
 
 	svc := &fakeReportService{

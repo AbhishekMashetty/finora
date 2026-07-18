@@ -49,7 +49,7 @@ func main() {
 	categoryRepo := repository.NewCategoryRepository(db)
 
 	accountSvc := service.NewAccountService(accountRepo)
-	transactionSvc := service.NewTransactionService(transactionRepo, accountRepo)
+	transactionSvc := service.NewTransactionService(transactionRepo, accountRepo, categoryRepo)
 	categorySvc := service.NewCategoryService(categoryRepo)
 
 	accountHandler := handler.NewAccountHandler(accountSvc)

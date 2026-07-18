@@ -355,8 +355,17 @@ components:
       type: object
       properties:
         email: { type: string, format: email }
-        password: { type: string, minLength: 8 }
-        name: { type: string }
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: >
+            Capped at 72 bytes because bcrypt (used to hash it) silently
+            ignores input past that length — not an arbitrary limit.
+        name:
+          type: string
+          maxLength: 100
+          description: Same cap as UpdateProfileRequest.name, so register and profile updates agree.
       required: [email, password, name]
 
     LoginRequest:

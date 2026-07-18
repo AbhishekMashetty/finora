@@ -94,6 +94,11 @@ func TestGoalService_Create(t *testing.T) {
 			in:      domain.CreateGoalInput{Name: "Emergency fund", TargetAmount: 5000, TargetDate: past},
 			wantErr: domain.ErrValidation,
 		},
+		{
+			name:    "target amount above the ceiling is rejected",
+			in:      domain.CreateGoalInput{Name: "Emergency fund", TargetAmount: 1e13, TargetDate: future},
+			wantErr: domain.ErrValidation,
+		},
 	}
 
 	for _, tt := range tests {
@@ -227,6 +232,20 @@ func TestGoalService_Update(t *testing.T) {
 
 	t.Run("negative current_amount is rejected", func(t *testing.T) {
 		_, err := svc.Update(ctx, "owner", created.ID, domain.UpdateGoalInput{Name: "Trip2", TargetAmount: 2500, TargetDate: future, CurrentAmount: -1})
+		if !errors.Is(err, domain.ErrValidation) {
+			t.Fatalf("err = %v, want %v", err, domain.ErrValidation)
+		}
+	})
+
+	t.Run("target amount above the ceiling is rejected", func(t *testing.T) {
+		_, err := svc.Update(ctx, "owner", created.ID, domain.UpdateGoalInput{Name: "Trip2", TargetAmount: 1e13, TargetDate: future})
+		if !errors.Is(err, domain.ErrValidation) {
+			t.Fatalf("err = %v, want %v", err, domain.ErrValidation)
+		}
+	})
+
+	t.Run("current_amount above the ceiling is rejected", func(t *testing.T) {
+		_, err := svc.Update(ctx, "owner", created.ID, domain.UpdateGoalInput{Name: "Trip2", TargetAmount: 2500, TargetDate: future, CurrentAmount: 1e13})
 		if !errors.Is(err, domain.ErrValidation) {
 			t.Fatalf("err = %v, want %v", err, domain.ErrValidation)
 		}

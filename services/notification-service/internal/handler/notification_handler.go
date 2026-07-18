@@ -25,9 +25,9 @@ func NewNotificationHandler(svc domain.NotificationService) *NotificationHandler
 }
 
 type createNotificationRequest struct {
-	Title   string `json:"title" binding:"required"`
-	Message string `json:"message" binding:"required"`
-	Type    string `json:"type" binding:"required"`
+	Title   string `json:"title" binding:"required,max=200"`
+	Message string `json:"message" binding:"required,max=2000"`
+	Type    string `json:"type" binding:"required,max=50"`
 }
 
 // List handles GET /api/v1/notifications?unread_only=&page=&page_size=
@@ -77,6 +77,10 @@ func (h *NotificationHandler) Create(c *gin.Context) {
 
 	notification, err := h.svc.Create(c.Request.Context(), userID, req.Title, req.Message, req.Type)
 	if err != nil {
+		if errors.Is(err, domain.ErrValidation) {
+			httpx.Fail(c, http.StatusBadRequest, httpx.CodeValidation, err.Error(), nil)
+			return
+		}
 		httpx.Fail(c, http.StatusInternalServerError, httpx.CodeInternal, "failed to create notification", nil)
 		return
 	}

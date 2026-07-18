@@ -377,7 +377,15 @@ components:
       required: [category, amount, period]
       properties:
         category: { type: string }
-        amount: { type: number, format: double, minimum: 0, exclusiveMinimum: true }
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1000000000000
+          description: >
+            Ceiling is defense-in-depth against float64 garbage/overflow, not
+            a real-world budget limit.
         period:
           type: string
           enum: [weekly, monthly, yearly]
@@ -408,7 +416,15 @@ components:
       required: [name, target_amount, target_date]
       properties:
         name: { type: string }
-        target_amount: { type: number, format: double, minimum: 0, exclusiveMinimum: true }
+        target_amount:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1000000000000
+          description: >
+            Ceiling is defense-in-depth against float64 garbage/overflow, not
+            a real-world savings limit.
         target_date:
           type: string
           description: RFC3339 timestamp or YYYY-MM-DD date; must be in the future.
@@ -418,19 +434,29 @@ components:
       required: [name, target_amount, target_date]
       properties:
         name: { type: string }
-        target_amount: { type: number, format: double, minimum: 0, exclusiveMinimum: true }
+        target_amount:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1000000000000
+          description: >
+            Ceiling is defense-in-depth against float64 garbage/overflow, not
+            a real-world savings limit.
         target_date:
           type: string
           description: RFC3339 timestamp or YYYY-MM-DD date; must be in the future.
         current_amount:
           type: number
           format: double
+          maximum: 1000000000000
           description: >
             Manual progress update. Optional in the request body — omitting
             it is equivalent to sending 0, since 0 is a legitimate value
             (e.g. resetting progress), not a "leave unchanged" sentinel
             (this is a full-replace PUT, matching budgets' Update
-            convention).
+            convention). Ceiling is defense-in-depth against float64
+            garbage/overflow, not a real-world limit.
 
     CategorySummary:
       type: object

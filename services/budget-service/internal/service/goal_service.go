@@ -24,6 +24,9 @@ func (s *goalService) Create(ctx context.Context, userID string, in domain.Creat
 	if in.TargetAmount <= 0 {
 		return nil, wrapValidation("target_amount must be greater than zero")
 	}
+	if in.TargetAmount > maxAmount {
+		return nil, wrapValidation("target_amount exceeds the maximum allowed value")
+	}
 	if in.TargetDate.IsZero() {
 		return nil, wrapValidation("target_date is required")
 	}
@@ -58,11 +61,17 @@ func (s *goalService) Update(ctx context.Context, userID, id string, in domain.U
 	if in.TargetAmount <= 0 {
 		return nil, wrapValidation("target_amount must be greater than zero")
 	}
+	if in.TargetAmount > maxAmount {
+		return nil, wrapValidation("target_amount exceeds the maximum allowed value")
+	}
 	if in.TargetDate.IsZero() {
 		return nil, wrapValidation("target_date is required")
 	}
 	if in.CurrentAmount < 0 {
 		return nil, wrapValidation("current_amount must not be negative")
+	}
+	if in.CurrentAmount > maxAmount {
+		return nil, wrapValidation("current_amount exceeds the maximum allowed value")
 	}
 
 	existing, err := s.repo.GetByIDForUser(ctx, id, userID)

@@ -80,3 +80,20 @@ func (r *CategoryRepository) ListByUser(ctx context.Context, userID string) ([]d
 	}
 	return categories, nil
 }
+
+func (r *CategoryRepository) GetByIDForUser(ctx context.Context, id, userID string) (*domain.Category, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, domain.ErrNotFound
+	}
+	var doc categoryDoc
+	err = r.col.FindOne(ctx, bson.M{"_id": oid, "user_id": userID}).Decode(&doc)
+	if err == mongo.ErrNoDocuments {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	category := doc.toDomain()
+	return &category, nil
+}

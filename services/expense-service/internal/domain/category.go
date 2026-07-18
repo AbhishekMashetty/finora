@@ -21,6 +21,7 @@ type Category struct {
 type CategoryRepository interface {
 	Create(ctx context.Context, category *Category) error
 	ListByUser(ctx context.Context, userID string) ([]Category, error)
+	GetByIDForUser(ctx context.Context, id, userID string) (*Category, error)
 }
 
 // CategoryService is the business-logic surface handlers depend on.

@@ -99,6 +99,12 @@ Deliberately **in-memory, not Redis-backed**: Redis is explicitly on `plan.md`'s
 
 **Fails open on misconfiguration, not closed**: `requestsPerSecond <= 0` or `burst <= 0` disables rate limiting entirely rather than the literal token-bucket reading of "zero capacity" (which would silently reject 100% of traffic). Caught live during implementation — the gateway's pre-existing `router_test.go`, which never set these fields, started failing every single request with 429 the moment this middleware was wired in, before the fail-open guard was added. A rate limiter that isn't configured must never look like a full outage.
 
+## Request Body Size Limit (Gateway Only, Phase 6)
+
+Same "gateway is the one place" reasoning as CORS and rate limiting above. Implemented as `shared/middleware.BodyLimit(maxBytes)`, wired into the gateway's middleware chain right after `Recovery` — before CORS, rate limiting, or proxying do any work, so an oversized body is capped as early as possible. Configured via `MAX_REQUEST_BODY_BYTES` (default `1048576`, 1 MiB — every JSON body this app sends is small). Also fails open (`maxBytes <= 0` disables the limit), for the identical reason `RateLimit` does.
+
+A client exceeding the limit gets `400 VALIDATION_ERROR`, not a raw connection error or a `502`. This required a real fix, not just the middleware itself: `BodyLimit` wraps the request body in an `http.MaxBytesReader`, but the gateway forwards every request through `httputil.ReverseProxy` (`services/gateway/internal/proxy/proxy.go`) rather than ever calling `ShouldBindJSON` itself — so the "body too large" read error surfaces mid-proxy as an `*http.MaxBytesError`, which a naive `ErrorHandler` can't distinguish from a genuine backend-unreachable failure. `proxy.go`'s `ErrorHandler` special-cases `*http.MaxBytesError` via `errors.As` to report `400 VALIDATION_ERROR`/"request body too large" instead of falling through to the generic `502 INTERNAL_ERROR`/"upstream service unavailable" branch. This was caught by an independent closing review (a first draft's doc comment claimed the existing bind-error handling covered this case; it didn't, because the gateway never binds — verified live via a real oversized request through the gateway, which returned 502 before the fix and 400 after).
+
 ## JWT Contract (shared/jwtx)
 
 - **Access token:** `type=access`, claims `{sub, email, type, iat, exp}`, TTL 15m, signed HS256 with `JWT_ACCESS_SECRET`.

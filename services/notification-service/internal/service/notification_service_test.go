@@ -142,6 +142,49 @@ func TestNotificationService_Create(t *testing.T) {
 			notifType: "info",
 			wantErr:   false,
 		},
+		{
+			// "overspend" is the real production value sent by
+			// budget-service/internal/client/notification_client.go — a
+			// regression check that the format validation doesn't reject it.
+			name:      "overspend (the real production type) still succeeds",
+			userID:    "user-1",
+			title:     "Overspend",
+			message:   "You are over budget",
+			notifType: "overspend",
+			wantErr:   false,
+		},
+		{
+			name:      "uppercase type is rejected",
+			userID:    "user-1",
+			title:     "x",
+			message:   "y",
+			notifType: "Overspend",
+			wantErr:   true,
+		},
+		{
+			name:      "type containing whitespace is rejected",
+			userID:    "user-1",
+			title:     "x",
+			message:   "y",
+			notifType: "budget alert",
+			wantErr:   true,
+		},
+		{
+			name:      "type containing a script tag is rejected",
+			userID:    "user-1",
+			title:     "x",
+			message:   "y",
+			notifType: "<script>alert(1)</script>",
+			wantErr:   true,
+		},
+		{
+			name:      "empty type is rejected at the service layer too",
+			userID:    "user-1",
+			title:     "x",
+			message:   "y",
+			notifType: "",
+			wantErr:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -153,6 +196,12 @@ func TestNotificationService_Create(t *testing.T) {
 			got, err := svc.Create(context.Background(), tt.userID, tt.title, tt.message, tt.notifType)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("Create() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if !errors.Is(err, domain.ErrValidation) {
+					t.Fatalf("err = %v, want wrapping %v", err, domain.ErrValidation)
+				}
+				return
 			}
 			if err != nil {
 				return

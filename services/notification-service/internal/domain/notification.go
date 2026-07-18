@@ -16,6 +16,11 @@ import (
 // cross-user-access-returns-404 convention used across Finora services).
 var ErrNotFound = errors.New("notification not found")
 
+// ErrValidation is the sentinel wrapped by service-layer input validation
+// failures, so handlers can errors.Is against it regardless of which check
+// produced the error (same convention budget-service/expense-service use).
+var ErrValidation = errors.New("validation error")
+
 // Notification is a single in-app notification owned by exactly one user.
 type Notification struct {
 	ID        string    `json:"id"`

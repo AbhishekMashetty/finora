@@ -181,6 +181,15 @@ func (f *fakeCategoryRepository) ListByUser(_ context.Context, userID string) ([
 	return out, nil
 }
 
+func (f *fakeCategoryRepository) GetByIDForUser(_ context.Context, id, userID string) (*domain.Category, error) {
+	cat, ok := f.categories[id]
+	if !ok || cat.UserID != userID {
+		return nil, domain.ErrNotFound
+	}
+	cp := cat
+	return &cp, nil
+}
+
 func idFromInt(n int) string {
 	return fmt.Sprintf("id-%d", n)
 }

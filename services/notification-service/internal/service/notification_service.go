@@ -6,10 +6,19 @@ package service
 import (
 	"context"
 	"log/slog"
+	"regexp"
 	"time"
 
 	"github.com/finora/notification-service/internal/domain"
 )
+
+// validNotifType matches a safe identifier-shaped notification type: lowercase
+// ASCII letters, digits, and underscores only. This is intentionally a format
+// check, not a fixed enum — the "type" field is meant to stay open for future
+// notification producers (see architecture/development-roadmap.md), but
+// whatever gets stored still has to be safe to persist and eventually render
+// (no whitespace, no script tags, no unicode garbage).
+var validNotifType = regexp.MustCompile(`^[a-z0-9_]+$`)
 
 // Pagination defaults/cap — identical values to expense-service's
 // transaction_service.go, per architecture/api-contracts.md's standard
@@ -52,6 +61,10 @@ func NewNotificationService(repo domain.NotificationRepository, email domain.Ema
 // best-effort, and a delivery failure must never fail notification
 // creation, which already succeeded via repo.Create.
 func (s *notificationService) Create(ctx context.Context, userID, title, message, notifType string) (*domain.Notification, error) {
+	if !validNotifType.MatchString(notifType) {
+		return nil, wrapValidation("type must contain only lowercase letters, digits, and underscores")
+	}
+
 	n := &domain.Notification{
 		UserID:    userID,
 		Title:     title,
@@ -107,4 +120,19 @@ func (s *notificationService) List(ctx context.Context, userID string, filter do
 // MarkRead marks the given notification as read, scoped to userID.
 func (s *notificationService) MarkRead(ctx context.Context, userID, id string) (*domain.Notification, error) {
 	return s.repo.MarkRead(ctx, userID, id)
+}
+
+// validationError wraps domain.ErrValidation with a human-readable message so
+// errors.Is(err, domain.ErrValidation) still works while the handler can
+// surface err.Error() as the message — same pattern as budget-service's
+// internal/service/budget_service.go.
+type validationError struct {
+	msg string
+}
+
+func (e *validationError) Error() string { return e.msg }
+func (e *validationError) Unwrap() error { return domain.ErrValidation }
+
+func wrapValidation(msg string) error {
+	return &validationError{msg: msg}
 }

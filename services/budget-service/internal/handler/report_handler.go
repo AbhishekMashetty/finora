@@ -57,6 +57,10 @@ func (h *ReportHandler) Summary(c *gin.Context) {
 		httpx.Fail(c, http.StatusBadRequest, httpx.CodeValidation, "to must be an RFC3339 timestamp or YYYY-MM-DD date", gin.H{"field": "to"})
 		return
 	}
+	if to.Before(from) {
+		httpx.Fail(c, http.StatusBadRequest, httpx.CodeValidation, "to must not be before from", gin.H{"field": "to"})
+		return
+	}
 
 	summary, err := h.service.Summary(c.Request.Context(), userID, from, to)
 	if err != nil {

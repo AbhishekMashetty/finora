@@ -29,7 +29,7 @@ type transactionRequest struct {
 	Amount     float64 `json:"amount"`
 	Currency   string  `json:"currency"`
 	Date       string  `json:"date"`
-	Note       string  `json:"note"`
+	Note       string  `json:"note" binding:"max=1000"`
 }
 
 // parseDate parses a request date field as RFC3339, falling back to the

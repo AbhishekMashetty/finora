@@ -302,3 +302,81 @@ func TestGateway_RateLimitAppliesThroughRealConfig(t *testing.T) {
 		t.Errorf("429 response body doesn't carry the RATE_LIMITED code: %s", body)
 	}
 }
+
+// TestGateway_BodyLimitAppliesThroughRealConfig proves the full wiring —
+// gwconfig.Config's MaxRequestBodyBytes actually reaching
+// shared/middleware.BodyLimit through router.New — not just the middleware
+// in isolation (already covered by shared/middleware/bodylimit_test.go).
+// buildGatewayTestServer's shared cfg leaves this at its zero value (body
+// limit disabled, per BodyLimit's fail-open guard) so every other test in
+// this file is unaffected; this test builds its own minimal router with a
+// real, tiny limit instead, and posts an oversized body to the public
+// (unauthenticated) register route — exactly the attack surface this fix
+// targets.
+func TestGateway_BodyLimitAppliesThroughRealConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	log := logger.New("gateway-test", "error")
+
+	userSrv := newEchoServer(&echoBackend{})
+	defer userSrv.Close()
+	userProxy, err := proxy.New(userSrv.URL, log)
+	if err != nil {
+		t.Fatalf("failed building user proxy: %v", err)
+	}
+
+	cfg := gwconfig.Config{
+		GatewayPort:            "8080",
+		UserServiceURL:         userSrv.URL,
+		ExpenseServiceURL:      userSrv.URL,
+		BudgetServiceURL:       userSrv.URL,
+		NotificationServiceURL: userSrv.URL,
+		JWTAccessSecret:        testSecret,
+		LogLevel:               "error",
+		ShutdownTimeout:        5 * time.Second,
+		CORSAllowedOrigins:     []string{"http://localhost:3000"},
+		MaxRequestBodyBytes:    64,
+	}
+
+	engine := router.New(cfg, log, router.Backends{
+		User:         userProxy,
+		Expense:      userProxy,
+		Budget:       userProxy,
+		Notification: userProxy,
+	}, nil)
+	gwSrv := httptest.NewServer(engine)
+	defer gwSrv.Close()
+
+	oversized := strings.NewReader(strings.Repeat("a", 10_000))
+	req, err := http.NewRequest(http.MethodPost, gwSrv.URL+"/api/v1/auth/register", oversized)
+	if err != nil {
+		t.Fatalf("failed building request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+
+	// Asserts the exact envelope, not just "not 200" — proxy.go's
+	// ErrorHandler special-cases *http.MaxBytesError to report this
+	// precisely so an oversized body isn't misreported as a backend outage
+	// (502 INTERNAL_ERROR). A prior version of this test only checked
+	// StatusCode != 200, which passed even while the gateway was reporting
+	// the wrong error code entirely.
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d (body: %s)", resp.StatusCode, respBody)
+	}
+	var env struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(respBody, &env); err != nil {
+		t.Fatalf("failed to decode response body: %v (body: %s)", err, respBody)
+	}
+	if env.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected error code VALIDATION_ERROR, got %q", env.Error.Code)
+	}
+}

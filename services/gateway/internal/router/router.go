@@ -33,13 +33,17 @@ type Backends struct {
 func New(cfg gwconfig.Config, log *slog.Logger, b Backends, openapiSpec []byte) *gin.Engine {
 	r := gin.New()
 
-	// MIDDLEWARE ORDER: RequestID -> Logging -> Recovery -> CORS -> RateLimit.
-	// RateLimit sits last in the chain (Phase 6) and, like CORS, is
-	// deliberately gateway-only — see shared/middleware.RateLimit's doc
-	// comment for why backend services must never re-apply it themselves.
+	// MIDDLEWARE ORDER: RequestID -> Logging -> Recovery -> BodyLimit -> CORS -> RateLimit.
+	// BodyLimit sits right after Recovery and before everything else that
+	// might process the body, so an oversized request is capped as early as
+	// possible. RateLimit sits last in the chain (Phase 6). BodyLimit and
+	// RateLimit are both, like CORS, deliberately gateway-only — see
+	// shared/middleware.BodyLimit's and shared/middleware.RateLimit's doc
+	// comments for why backend services must never re-apply them themselves.
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Logging(log))
 	r.Use(middleware.Recovery(log))
+	r.Use(middleware.BodyLimit(int64(cfg.MaxRequestBodyBytes)))
 	r.Use(middleware.CORS(cfg.CORSAllowedOrigins))
 	r.Use(middleware.RateLimit(float64(cfg.RateLimitRequestsPerSecond), cfg.RateLimitBurst))
 

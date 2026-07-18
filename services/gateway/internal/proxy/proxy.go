@@ -7,6 +7,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
@@ -33,8 +34,46 @@ func New(rawTarget string, log *slog.Logger) (*httputil.ReverseProxy, error) {
 	// A downstream service being unreachable is not a gateway bug — but the
 	// client still needs the standard envelope shape rather than a raw
 	// connection-refused error leaking through.
+	//
+	// One error shape here is NOT a backend problem, though: every request
+	// this proxy forwards has its body wrapped in an http.MaxBytesReader by
+	// shared/middleware.BodyLimit, and when a client's body exceeds that
+	// limit, httputil.ReverseProxy fails mid-copy with an *http.MaxBytesError
+	// and lands here too — indistinguishable, to a naive handler, from a
+	// genuine downstream outage. Left unhandled, an oversized body from a
+	// public, unauthenticated route (e.g. register) would report 502
+	// INTERNAL_ERROR and log at ERROR level as if the backend were down,
+	// which is both the wrong client-facing error code for a client input
+	// problem (architecture/api-contracts.md's standard codes: this is a
+	// VALIDATION_ERROR/400) and noisy enough, under a client fuzzing the
+	// limit, to mask a real backend-unreachable incident during on-call
+	// triage. So that case is special-cased below rather than falling
+	// through to the generic backend-unavailable branch.
 	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		requestID := r.Header.Get("X-Request-Id")
+
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			log.Warn("request body exceeded the configured size limit",
+				slog.String("path", r.URL.Path),
+				slog.String("request_id", requestID),
+			)
+			env := httpx.Envelope{
+				Success: false,
+				Data:    nil,
+				Error: &httpx.ErrorBody{
+					Code:    httpx.CodeValidation,
+					Message: "request body too large",
+				},
+				RequestID: requestID,
+			}
+			body, _ := json.Marshal(env)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write(body)
+			return
+		}
+
 		log.Error("proxy request failed",
 			slog.String("target", rawTarget),
 			slog.String("path", r.URL.Path),

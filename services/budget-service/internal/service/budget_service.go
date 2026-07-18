@@ -9,6 +9,11 @@ import (
 	"github.com/finora/budget-service/internal/domain"
 )
 
+// maxAmount is a defense-in-depth ceiling against float64 garbage/overflow in
+// downstream aggregations (e.g. report_service.go's budget-vs-actual sums) —
+// it is not meant to model any real-world spending limit.
+const maxAmount = 1_000_000_000_000
+
 // budgetService implements domain.BudgetService.
 type budgetService struct {
 	repo domain.BudgetRepository
@@ -25,6 +30,9 @@ func (s *budgetService) Create(ctx context.Context, userID string, in domain.Cre
 	}
 	if in.Amount <= 0 {
 		return nil, wrapValidation("amount must be greater than zero")
+	}
+	if in.Amount > maxAmount {
+		return nil, wrapValidation("amount exceeds the maximum allowed value")
 	}
 	if !domain.ValidPeriod(in.Period) {
 		return nil, wrapValidation("period must be one of: weekly, monthly, yearly")
@@ -56,6 +64,9 @@ func (s *budgetService) Update(ctx context.Context, userID, id string, in domain
 	}
 	if in.Amount <= 0 {
 		return nil, wrapValidation("amount must be greater than zero")
+	}
+	if in.Amount > maxAmount {
+		return nil, wrapValidation("amount exceeds the maximum allowed value")
 	}
 	if !domain.ValidPeriod(in.Period) {
 		return nil, wrapValidation("period must be one of: weekly, monthly, yearly")
