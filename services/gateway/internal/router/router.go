@@ -11,6 +11,7 @@ import (
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/httpx"
 	"github.com/finora/shared/middleware"
+	"github.com/finora/shared/openapidoc"
 	"github.com/gin-gonic/gin"
 
 	"github.com/finora/gateway/internal/authmw"
@@ -29,19 +30,24 @@ type Backends struct {
 }
 
 // New builds the fully wired gin.Engine for the gateway.
-func New(cfg gwconfig.Config, log *slog.Logger, b Backends) *gin.Engine {
+func New(cfg gwconfig.Config, log *slog.Logger, b Backends, openapiSpec []byte) *gin.Engine {
 	r := gin.New()
 
-	// MIDDLEWARE ORDER: RequestID -> Logging -> Recovery -> CORS.
+	// MIDDLEWARE ORDER: RequestID -> Logging -> Recovery -> CORS -> RateLimit.
+	// RateLimit sits last in the chain (Phase 6) and, like CORS, is
+	// deliberately gateway-only — see shared/middleware.RateLimit's doc
+	// comment for why backend services must never re-apply it themselves.
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Logging(log))
 	r.Use(middleware.Recovery(log))
 	r.Use(middleware.CORS(cfg.CORSAllowedOrigins))
+	r.Use(middleware.RateLimit(float64(cfg.RateLimitRequestsPerSecond), cfg.RateLimitBurst))
 
 	// Health routes are public and mirror /live — the gateway owns no data,
 	// so it registers no checkers (its /ready is never more meaningful than
 	// /live, per architecture/api-contracts.md).
 	health.Register(r, "gateway")
+	r.GET("/openapi.yaml", openapidoc.Handler(openapiSpec))
 
 	// ---- Public routes (no JWT check): straight through to user-service ----
 	r.POST("/api/v1/auth/register", proxy.Handler(b.User))

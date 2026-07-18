@@ -9,6 +9,7 @@ import (
 	"github.com/finora/budget-service/internal/handler"
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/middleware"
+	"github.com/finora/shared/openapidoc"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,6 +26,7 @@ func New(
 	budgetHandler *handler.BudgetHandler,
 	goalHandler *handler.GoalHandler,
 	reportHandler *handler.ReportHandler,
+	openapiSpec []byte,
 	checkers ...health.Checker,
 ) *gin.Engine {
 	r := gin.New()
@@ -42,6 +44,7 @@ func New(
 	r.Use(middleware.Recovery(log))
 
 	health.Register(r, "budget-service", checkers...)
+	r.GET("/openapi.yaml", openapidoc.Handler(openapiSpec))
 
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.RequireIdentity())

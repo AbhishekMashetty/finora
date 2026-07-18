@@ -71,7 +71,14 @@ function useCurrentUser(): User | null {
  * makes, so the sidebar can show a badge without a new endpoint. Polls on
  * an interval rather than on every navigation, since the count can change
  * server-side (e.g. a new overspend notification) without the user
- * navigating anywhere. */
+ * navigating anywhere.
+ *
+ * Uses the response's `total` field, not `notifications.length` — since
+ * Phase 6 the endpoint is paginated (default page_size=20), so the
+ * returned array is capped even when the real unread count is higher;
+ * `total` reflects the true count regardless of page size. Doesn't matter
+ * much for the badge's own display (it caps at "9+" anyway), but a wrong
+ * number is still a wrong number. */
 function useUnreadNotificationCount(isAuthenticated: boolean): number {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -79,10 +86,10 @@ function useUnreadNotificationCount(isAuthenticated: boolean): number {
     let cancelled = false;
     async function poll() {
       try {
-        const data = await apiFetch<{ notifications: Notification[] }>(
-          "/api/v1/notifications?unread_only=true"
+        const data = await apiFetch<{ notifications: Notification[]; total: number }>(
+          "/api/v1/notifications?unread_only=true&page=1&page_size=1"
         );
-        if (!cancelled) setCount(data.notifications?.length ?? 0);
+        if (!cancelled) setCount(data.total ?? 0);
       } catch {
         // Non-critical UI chrome — leave the last known count on failure.
       }

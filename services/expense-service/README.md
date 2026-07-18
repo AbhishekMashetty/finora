@@ -22,7 +22,7 @@ never confirm the existence of another user's data.
 | GET    | `/api/v1/accounts/:id`    | -                                                            | `200 {account}`                             |
 | PUT    | `/api/v1/accounts/:id`    | `{name, type, currency, balance?}`                           | `200 {account}`                             |
 | DELETE | `/api/v1/accounts/:id`    | -                                                            | `204`                                        |
-| GET    | `/api/v1/transactions`    | query: `account_id, category, from, to, page, page_size`     | `200 {transactions: [], page, total}`       |
+| GET    | `/api/v1/transactions`    | query: `account_id, category, from, to, page, page_size`     | `200 {transactions: [], page, page_size, total}` |
 | POST   | `/api/v1/transactions`    | `{account_id, category_id?, type, amount, currency, date, note?}` | `201 {transaction}`                     |
 | GET    | `/api/v1/transactions/:id`| -                                                            | `200 {transaction}`                         |
 | PUT    | `/api/v1/transactions/:id`| `{account_id, category_id?, type, amount, currency, date, note?}` | `200 {transaction}`                    |
@@ -37,9 +37,14 @@ Account `type` is one of: `checking`, `savings`, `credit`, `cash`.
 Transaction/category `type` is one of: `income`, `expense`.
 
 `GET /transactions` pagination: `page` defaults to 1, `page_size` defaults to
-20 and is capped at 100. Optional filters: `account_id`, `category`, and a
-`from`/`to` date range applied to the transaction's `date` field (accepts
-RFC3339 or `YYYY-MM-DD`).
+20 and is capped at 100 — the standard contract every paginated Finora list
+endpoint follows, see `architecture/api-contracts.md`'s Pagination section.
+The response's `page`/`page_size` are the values actually resolved and
+applied server-side, not a raw echo of the query string (fixed in Phase 6 —
+previously `page` echoed back `0` whenever `?page=` was omitted, and
+`page_size` wasn't returned at all). Optional filters: `account_id`,
+`category`, and a `from`/`to` date range applied to the transaction's `date`
+field (accepts RFC3339 or `YYYY-MM-DD`).
 
 ## Health
 
@@ -50,6 +55,9 @@ GET /live    -> 200 always, if the process is up
 GET /ready   -> 200 only if MongoDB ping succeeds, else 503
 GET /health  -> aggregate, richer payload
 ```
+
+Also serves `GET /openapi.yaml` — this service's spec, live from disk (see
+`architecture/api-contracts.md`'s OpenAPI section).
 
 ## Environment variables
 

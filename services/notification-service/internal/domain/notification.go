@@ -27,19 +27,42 @@ type Notification struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// NotificationFilter narrows a ListByUser query. Page/PageSize follow the
+// same standard every paginated Finora list endpoint uses (see
+// architecture/api-contracts.md's Pagination section — 1-indexed page,
+// zero values mean "apply the service layer's defaults").
+type NotificationFilter struct {
+	UnreadOnly bool
+	Page       int
+	PageSize   int
+}
+
+// NotificationPage is one page of notifications plus the total matching
+// count (ignoring pagination), so callers can compute total pages — same
+// shape as expense-service's TransactionPage. Page/PageSize carry the
+// *resolved* values the service layer actually applied (after
+// defaulting/capping), not necessarily what the caller requested, so a
+// handler echoing them back reports what really happened.
+type NotificationPage struct {
+	Notifications []Notification
+	Page          int
+	PageSize      int
+	Total         int64
+}
+
 // NotificationRepository persists and queries notifications. Every method is
 // scoped by userID so ownership can never accidentally be bypassed by a
 // service-layer bug — the repository itself enforces the filter.
 type NotificationRepository interface {
 	Create(ctx context.Context, n *Notification) error
-	ListByUser(ctx context.Context, userID string, unreadOnly bool) ([]Notification, error)
+	ListByUser(ctx context.Context, userID string, filter NotificationFilter) (NotificationPage, error)
 	MarkRead(ctx context.Context, userID, id string) (*Notification, error)
 }
 
 // NotificationService is the business-logic surface consumed by handlers.
 type NotificationService interface {
 	Create(ctx context.Context, userID, title, message, notifType string) (*Notification, error)
-	List(ctx context.Context, userID string, unreadOnly bool) ([]Notification, error)
+	List(ctx context.Context, userID string, filter NotificationFilter) (NotificationPage, error)
 	MarkRead(ctx context.Context, userID, id string) (*Notification, error)
 }
 

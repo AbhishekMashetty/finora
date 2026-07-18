@@ -1,7 +1,7 @@
 # Phase 6's "green CI matrix" (architecture/development-roadmap.md).
 # Mirrors the local workflow exactly, so a red CI run always reproduces
 # locally with the same commands:
-#   - go-unit    ~= `make test`        (fast, fakes only, every push/PR)
+#   - go-unit    ~= `make test`        (fast, fakes only)
 #   - go-integration ~= `make test-integration` (real Mongo via
 #     testcontainers-go — see shared/mongotest's doc comment for why this
 #     is a separate tier from go-unit, not folded into it)
@@ -11,17 +11,30 @@
 # actual toolchain exactly — see docs/local-development.md's macOS-linker
 # note for why 1.21.3 specifically, and frontend/Dockerfile for the Node
 # version every build already uses.
+#
+# Trigger, by explicit request (2026-07-19): run only when a PR is actually
+# merged into main — not on every push to main, and not on every commit
+# pushed to an open PR while it's still under review. `pull_request` with
+# `types: [closed]` fires on both "merged" and "closed without merging," so
+# every job below is additionally gated with
+# `if: github.event.pull_request.merged == true` to skip the latter.
+# Deliberate trade-off, not an oversight: this means CI validates a change
+# *after* it lands on main, not before — there's no pre-merge gate here.
+# If that's ever a problem (e.g. branch protection wants a required check
+# before allow-merge), add a second, separate `pull_request` (without
+# `types: [closed]`) trigger for that purpose; don't repurpose this one.
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+    types: [closed]
+    branches: [main]
 
 jobs:
   go-unit:
     name: Go unit tests (${{ matrix.name }})
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     strategy:
       fail-fast: false
       matrix:
@@ -39,7 +52,12 @@ jobs:
           - name: notification-service
             dir: services/notification-service
     steps:
+      # actions/checkout's default ref for a `pull_request` event is an
+      # ephemeral merge-preview commit, not what actually landed on main —
+      # pin explicitly to the real merge commit this run is validating.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - uses: actions/setup-go@v5
         with:
@@ -70,6 +88,7 @@ jobs:
   go-integration:
     name: Go integration tests (${{ matrix.name }})
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     strategy:
       fail-fast: false
       matrix:
@@ -83,7 +102,12 @@ jobs:
           - name: notification-service
             dir: services/notification-service
     steps:
+      # actions/checkout's default ref for a `pull_request` event is an
+      # ephemeral merge-preview commit, not what actually landed on main —
+      # pin explicitly to the real merge commit this run is validating.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - uses: actions/setup-go@v5
         with:
@@ -98,8 +122,14 @@ jobs:
   frontend:
     name: Frontend build + lint
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     steps:
+      # actions/checkout's default ref for a `pull_request` event is an
+      # ephemeral merge-preview commit, not what actually landed on main —
+      # pin explicitly to the real merge commit this run is validating.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - uses: actions/setup-node@v4
         with:

@@ -9,11 +9,12 @@ import (
 	"github.com/finora/notification-service/internal/handler"
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/middleware"
+	"github.com/finora/shared/openapidoc"
 	"github.com/gin-gonic/gin"
 )
 
 // New builds the fully-wired gin.Engine.
-func New(log *slog.Logger, corsOrigins []string, notificationHandler *handler.NotificationHandler, checkers ...health.Checker) *gin.Engine {
+func New(log *slog.Logger, corsOrigins []string, notificationHandler *handler.NotificationHandler, openapiSpec []byte, checkers ...health.Checker) *gin.Engine {
 	r := gin.New()
 
 	// No CORS middleware here: this service is only ever called by the
@@ -29,6 +30,7 @@ func New(log *slog.Logger, corsOrigins []string, notificationHandler *handler.No
 	r.Use(middleware.Recovery(log))
 
 	health.Register(r, "notification-service", checkers...)
+	r.GET("/openapi.yaml", openapidoc.Handler(openapiSpec))
 
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.RequireIdentity())

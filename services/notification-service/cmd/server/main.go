@@ -15,6 +15,7 @@ import (
 	"github.com/finora/notification-service/internal/service"
 	"github.com/finora/shared/logger"
 	"github.com/finora/shared/mongox"
+	"github.com/finora/shared/openapidoc"
 	"github.com/finora/shared/server"
 )
 
@@ -46,8 +47,9 @@ func main() {
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 
 	mongoChecker := mongox.Checker{Client: mongoClient}
+	openapiSpec := openapidoc.Load("openapi.yaml", log)
 
-	r := router.New(log, cfg.CORSAllowedOrigins, notificationHandler, mongoChecker)
+	r := router.New(log, cfg.CORSAllowedOrigins, notificationHandler, openapiSpec, mongoChecker)
 
 	addr := "0.0.0.0:" + cfg.Port
 	if err := server.Run(addr, r, log, cfg.ShutdownTimeout); err != nil {

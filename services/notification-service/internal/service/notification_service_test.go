@@ -37,21 +37,40 @@ func (f *fakeRepository) Create(_ context.Context, n *domain.Notification) error
 	return nil
 }
 
-func (f *fakeRepository) ListByUser(_ context.Context, userID string, unreadOnly bool) ([]domain.Notification, error) {
+func (f *fakeRepository) ListByUser(_ context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
 	if f.listErr != nil {
-		return nil, f.listErr
+		return domain.NotificationPage{}, f.listErr
 	}
-	out := make([]domain.Notification, 0)
+	matches := make([]domain.Notification, 0)
 	for _, n := range f.notifications {
 		if n.UserID != userID {
 			continue
 		}
-		if unreadOnly && n.Read {
+		if filter.UnreadOnly && n.Read {
 			continue
 		}
-		out = append(out, n)
+		matches = append(matches, n)
 	}
-	return out, nil
+
+	total := int64(len(matches))
+	page := filter.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	start := (page - 1) * pageSize
+	if start > len(matches) {
+		start = len(matches)
+	}
+	end := start + pageSize
+	if end > len(matches) {
+		end = len(matches)
+	}
+
+	return domain.NotificationPage{Notifications: matches[start:end], Total: total}, nil
 }
 
 func (f *fakeRepository) MarkRead(_ context.Context, userID, id string) (*domain.Notification, error) {
@@ -248,15 +267,25 @@ func TestNotificationService_List(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := svc.List(ctx, tt.userID, tt.unreadOnly)
+			page, err := svc.List(ctx, tt.userID, domain.NotificationFilter{UnreadOnly: tt.unreadOnly})
 			if err != nil {
 				t.Fatalf("List() error = %v", err)
 			}
+			got := page.Notifications
 			if got == nil {
 				t.Errorf("List() returned nil, want a non-nil (possibly empty) slice")
 			}
 			if len(got) != tt.wantCount {
 				t.Fatalf("List() returned %d notifications, want %d", len(got), tt.wantCount)
+			}
+			if int(page.Total) != tt.wantCount {
+				t.Errorf("List() Total = %d, want %d", page.Total, tt.wantCount)
+			}
+			if page.Page != 1 {
+				t.Errorf("List() resolved Page = %d, want 1 (default)", page.Page)
+			}
+			if page.PageSize != 20 {
+				t.Errorf("List() resolved PageSize = %d, want 20 (default)", page.PageSize)
 			}
 			for i, title := range tt.wantTitles {
 				if got[i].Title != title {
@@ -287,18 +316,19 @@ func TestNotificationService_List_UnreadOnlyFilter(t *testing.T) {
 		t.Fatalf("MarkRead failed: %v", err)
 	}
 
-	all, err := svc.List(ctx, "user-1", false)
+	allPage, err := svc.List(ctx, "user-1", domain.NotificationFilter{UnreadOnly: false})
 	if err != nil {
 		t.Fatalf("List(unreadOnly=false) error = %v", err)
 	}
-	if len(all) != 2 {
-		t.Fatalf("List(unreadOnly=false) returned %d, want 2", len(all))
+	if len(allPage.Notifications) != 2 {
+		t.Fatalf("List(unreadOnly=false) returned %d, want 2", len(allPage.Notifications))
 	}
 
-	unread, err := svc.List(ctx, "user-1", true)
+	unreadPage, err := svc.List(ctx, "user-1", domain.NotificationFilter{UnreadOnly: true})
 	if err != nil {
 		t.Fatalf("List(unreadOnly=true) error = %v", err)
 	}
+	unread := unreadPage.Notifications
 	if len(unread) != 1 {
 		t.Fatalf("List(unreadOnly=true) returned %d, want 1", len(unread))
 	}
@@ -307,6 +337,45 @@ func TestNotificationService_List_UnreadOnlyFilter(t *testing.T) {
 	}
 	if unread[0].Read {
 		t.Errorf("unread[0].Read = true, want false")
+	}
+}
+
+func TestNotificationService_List_Pagination(t *testing.T) {
+	repo := &fakeRepository{}
+	svc := NewNotificationService(repo, &fakeEmailSender{}, discardLogger())
+	ctx := context.Background()
+
+	for i := 0; i < 25; i++ {
+		if _, err := svc.Create(ctx, "user-1", itoa(i), "msg", "info"); err != nil {
+			t.Fatalf("seed Create %d failed: %v", i, err)
+		}
+	}
+
+	page1, err := svc.List(ctx, "user-1", domain.NotificationFilter{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("List(page=1, page_size=10) error = %v", err)
+	}
+	if len(page1.Notifications) != 10 || page1.Total != 25 || page1.Page != 1 || page1.PageSize != 10 {
+		t.Errorf("page1 = %+v, want 10 notifications, Total=25, Page=1, PageSize=10", page1)
+	}
+
+	page3, err := svc.List(ctx, "user-1", domain.NotificationFilter{Page: 3, PageSize: 10})
+	if err != nil {
+		t.Fatalf("List(page=3, page_size=10) error = %v", err)
+	}
+	if len(page3.Notifications) != 5 {
+		t.Errorf("page3 = %d notifications, want 5 (the remainder)", len(page3.Notifications))
+	}
+
+	// A page_size beyond the service's cap must be clamped, not passed
+	// through as-is — the same maxPageSize convention transaction_service.go
+	// uses.
+	capped, err := svc.List(ctx, "user-1", domain.NotificationFilter{Page: 1, PageSize: 1000})
+	if err != nil {
+		t.Fatalf("List(page_size=1000) error = %v", err)
+	}
+	if capped.PageSize != maxPageSize {
+		t.Errorf("resolved PageSize = %d, want the cap of %d", capped.PageSize, maxPageSize)
 	}
 }
 

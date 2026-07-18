@@ -6,6 +6,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/finora/notification-service/internal/domain"
 	"github.com/finora/shared/httpx"
@@ -29,18 +30,39 @@ type createNotificationRequest struct {
 	Type    string `json:"type" binding:"required"`
 }
 
-// List handles GET /api/v1/notifications?unread_only=
+// List handles GET /api/v1/notifications?unread_only=&page=&page_size=
+// page/page_size follow the standard pagination contract (architecture/
+// api-contracts.md) — same query param names and response shape
+// (<resource>, page, page_size, total) as expense-service's transaction
+// list, added in Phase 6 since a long-lived user's notification history is
+// genuinely unbounded, unlike e.g. accounts/budgets/goals.
 func (h *NotificationHandler) List(c *gin.Context) {
 	userID := middleware.UserID(c)
-	unreadOnly := c.Query("unread_only") == "true"
 
-	notifications, err := h.svc.List(c.Request.Context(), userID, unreadOnly)
+	filter := domain.NotificationFilter{UnreadOnly: c.Query("unread_only") == "true"}
+	if pageStr := c.Query("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil {
+			filter.Page = p
+		}
+	}
+	if pageSizeStr := c.Query("page_size"); pageSizeStr != "" {
+		if ps, err := strconv.Atoi(pageSizeStr); err == nil {
+			filter.PageSize = ps
+		}
+	}
+
+	result, err := h.svc.List(c.Request.Context(), userID, filter)
 	if err != nil {
 		httpx.Fail(c, http.StatusInternalServerError, httpx.CodeInternal, "failed to list notifications", nil)
 		return
 	}
 
-	httpx.Success(c, http.StatusOK, gin.H{"notifications": notifications})
+	httpx.Success(c, http.StatusOK, gin.H{
+		"notifications": result.Notifications,
+		"page":          result.Page,
+		"page_size":     result.PageSize,
+		"total":         result.Total,
+	})
 }
 
 // Create handles POST /api/v1/notifications

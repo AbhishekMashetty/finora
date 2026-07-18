@@ -46,12 +46,20 @@ func TestNotificationRepository_Integration(t *testing.T) {
 			t.Fatal("Create did not populate an ID")
 		}
 
-		list, err := repo.ListByUser(ctx, userID, false)
+		// A generous, explicit PageSize — ListByUser assumes the service
+		// layer already resolved Page/PageSize (see its doc comment), so a
+		// direct repository call like this one supplies real values rather
+		// than relying on Mongo's own "limit: 0 means unlimited" quirk.
+		page, err := repo.ListByUser(ctx, userID, domain.NotificationFilter{Page: 1, PageSize: 100})
 		if err != nil {
 			t.Fatalf("ListByUser: %v", err)
 		}
+		list := page.Notifications
 		if len(list) < 2 {
 			t.Fatalf("ListByUser returned %d notifications, want at least 2", len(list))
+		}
+		if page.Total < 2 {
+			t.Errorf("ListByUser Total = %d, want at least 2", page.Total)
 		}
 		if list[0].Title != "Second" {
 			t.Errorf("list[0].Title = %q, want %q (newest first, per ListByUser's SetSort)", list[0].Title, "Second")
@@ -72,11 +80,11 @@ func TestNotificationRepository_Integration(t *testing.T) {
 			t.Fatalf("MarkRead: %v", err)
 		}
 
-		unreadOnly, err := repo.ListByUser(ctx, userID, true)
+		unreadPage, err := repo.ListByUser(ctx, userID, domain.NotificationFilter{UnreadOnly: true, Page: 1, PageSize: 100})
 		if err != nil {
 			t.Fatalf("ListByUser(unreadOnly=true): %v", err)
 		}
-		for _, n := range unreadOnly {
+		for _, n := range unreadPage.Notifications {
 			if n.Read {
 				t.Errorf("ListByUser(unreadOnly=true) returned a read notification: %+v", n)
 			}
@@ -85,12 +93,12 @@ func TestNotificationRepository_Integration(t *testing.T) {
 			}
 		}
 
-		all, err := repo.ListByUser(ctx, userID, false)
+		allPage, err := repo.ListByUser(ctx, userID, domain.NotificationFilter{UnreadOnly: false, Page: 1, PageSize: 100})
 		if err != nil {
 			t.Fatalf("ListByUser(unreadOnly=false): %v", err)
 		}
-		if len(all) != len(unreadOnly)+1 {
-			t.Errorf("ListByUser(false) returned %d, want %d (unread) + 1 (the read one)", len(all), len(unreadOnly))
+		if len(allPage.Notifications) != len(unreadPage.Notifications)+1 {
+			t.Errorf("ListByUser(false) returned %d, want %d (unread) + 1 (the read one)", len(allPage.Notifications), len(unreadPage.Notifications))
 		}
 	})
 
@@ -104,11 +112,11 @@ func TestNotificationRepository_Integration(t *testing.T) {
 			t.Errorf("cross-user MarkRead: err = %v, want ErrNotFound", err)
 		}
 
-		list, err := repo.ListByUser(ctx, "owner", false)
+		page, err := repo.ListByUser(ctx, "owner", domain.NotificationFilter{Page: 1, PageSize: 100})
 		if err != nil {
 			t.Fatalf("ListByUser: %v", err)
 		}
-		for _, x := range list {
+		for _, x := range page.Notifications {
 			if x.ID == n.ID && x.Read {
 				t.Error("cross-user MarkRead must not mutate the document, but it was marked read anyway")
 			}
@@ -129,14 +137,43 @@ func TestNotificationRepository_Integration(t *testing.T) {
 			t.Error("MarkRead's returned document has Read=false, want true")
 		}
 
-		list, err := repo.ListByUser(ctx, "user-3", true)
+		page, err := repo.ListByUser(ctx, "user-3", domain.NotificationFilter{UnreadOnly: true, Page: 1, PageSize: 100})
 		if err != nil {
 			t.Fatalf("ListByUser(unreadOnly=true): %v", err)
 		}
-		for _, x := range list {
+		for _, x := range page.Notifications {
 			if x.ID == n.ID {
 				t.Error("the just-marked-read notification still appears in the unread-only list")
 			}
+		}
+	})
+
+	t.Run("pagination limits results and reports the real total, at the real Mongo query level", func(t *testing.T) {
+		userID := "pagination-user"
+		for i := 0; i < 5; i++ {
+			n := &domain.Notification{UserID: userID, Title: "N", Message: "m", Type: "overspend", CreatedAt: time.Now().UTC().Add(time.Duration(i) * time.Second)}
+			if err := repo.Create(ctx, n); err != nil {
+				t.Fatalf("Create %d: %v", i, err)
+			}
+		}
+
+		page1, err := repo.ListByUser(ctx, userID, domain.NotificationFilter{Page: 1, PageSize: 2})
+		if err != nil {
+			t.Fatalf("ListByUser(page=1, page_size=2): %v", err)
+		}
+		if len(page1.Notifications) != 2 {
+			t.Errorf("page1 returned %d notifications, want 2", len(page1.Notifications))
+		}
+		if page1.Total != 5 {
+			t.Errorf("page1 Total = %d, want 5 (the full match count, not the page size)", page1.Total)
+		}
+
+		page3, err := repo.ListByUser(ctx, userID, domain.NotificationFilter{Page: 3, PageSize: 2})
+		if err != nil {
+			t.Fatalf("ListByUser(page=3, page_size=2): %v", err)
+		}
+		if len(page3.Notifications) != 1 {
+			t.Errorf("page3 returned %d notifications, want 1 (the remainder)", len(page3.Notifications))
 		}
 	})
 

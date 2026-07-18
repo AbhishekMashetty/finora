@@ -11,6 +11,7 @@ import (
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/logger"
 	"github.com/finora/shared/mongox"
+	"github.com/finora/shared/openapidoc"
 	"github.com/finora/shared/server"
 
 	appconfig "github.com/finora/user-service/internal/config"
@@ -57,8 +58,9 @@ func main() {
 	userHandler := handler.NewUserHandler(userSvc)
 
 	mongoChecker := mongox.Checker{Client: client}
+	openapiSpec := openapidoc.Load("openapi.yaml", log)
 
-	r := router.New(log, cfg.CORSAllowedOrigins, authHandler, userHandler, health.Checker(mongoChecker))
+	r := router.New(log, cfg.CORSAllowedOrigins, authHandler, userHandler, openapiSpec, health.Checker(mongoChecker))
 
 	addr := "0.0.0.0:" + cfg.Port
 	if err := server.Run(addr, r, log, cfg.ShutdownTimeout); err != nil {

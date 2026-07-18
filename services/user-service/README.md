@@ -24,7 +24,9 @@ have set `X-User-Id` (enforced here via `shared/middleware.RequireIdentity()`).
 \* `/auth/logout` authenticates via the refresh token in the body, not via
 `X-User-Id`, so it deliberately does **not** sit behind `RequireIdentity()`.
 
-Also exposes `GET /live`, `/ready`, `/health` (via `shared/health`).
+Also exposes `GET /live`, `/ready`, `/health` (via `shared/health`) and
+`GET /openapi.yaml` (this service's spec, served live from disk — see
+`architecture/api-contracts.md`'s OpenAPI section).
 
 Every response — success or error — uses the standard envelope from
 `shared/httpx` (`{success, data, error, request_id}`). See

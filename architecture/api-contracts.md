@@ -19,6 +19,19 @@ Only the **gateway** and **frontend** ports are meant to be called by clients. S
 
 All routes are prefixed `/api/v1`.
 
+## Pagination (standard contract, Phase 6)
+
+Not every list endpoint paginates — deliberately. `accounts`, `categories`, `budgets`, and `goals` return everything unpaginated, because a real user has a handful of each (dozens at most), not pages of them; adding pagination there would be exactly the kind of unjustified complexity `CLAUDE.md` §10/`plan.md` warn against. **`transactions` and `notifications` do paginate**, because both are genuinely unbounded per user over time — every logged expense, every alert, forever.
+
+Wherever pagination exists, it follows one shape, so a client never has to special-case which service it's talking to:
+
+- **Query params:** `page` (1-indexed, default `1`), `page_size` (default `20`, capped at `100` server-side regardless of what's requested).
+- **Response fields**, alongside the resource array (`transactions`, `notifications`, etc.): flat sibling fields `page`, `page_size`, `total` — never nested under a `pagination` object, so existing consumers reading `data.page` as a plain number never break if a future endpoint adopts this contract.
+- **The `page`/`page_size` echoed back are the *resolved* values the service actually applied** (after defaulting/capping) — never a raw, possibly-zero echo of what the caller passed in `?page=`. This was a real bug in `transactions`' original Phase 2 implementation (the handler echoed the unvalidated query param directly, so omitting `?page=` echoed back `0`, and `page_size` wasn't returned at all) — caught and fixed project-wide in Phase 6 while establishing this as the documented standard, not just for `transactions` alone.
+- `total` is the full matching count across all pages, not the current page's length — required for a client to compute total pages (`Math.ceil(total / page_size)`).
+
+If a currently-unpaginated collection ever needs pagination later (e.g. `accounts` for a power user with dozens of them), it must adopt this exact contract, not invent a new one.
+
 ## Response Envelope
 
 Every JSON response (success or error) uses this shape:
@@ -59,6 +72,7 @@ Implemented once in `shared/httpx` (`httpx.Success(c, status, data)`, `httpx.Fai
 | `NOT_FOUND`          | 404         | Resource does not exist / not owned by caller |
 | `CONFLICT`           | 409         | Duplicate resource (e.g. email already registered) |
 | `INTERNAL_ERROR`     | 500         | Unhandled server error |
+| `RATE_LIMITED`       | 429         | Too many requests from this client (gateway only, see Rate Limiting below) |
 
 ## Auth Header Contract (Gateway → Services)
 
@@ -74,6 +88,16 @@ Downstream services **trust these headers** on the internal docker/K8s network (
 ## CORS (Gateway Only)
 
 The gateway is also the only component that applies CORS middleware (`shared/middleware.CORS`). Backend services never do. This isn't just a style choice: `net/http/httputil.ReverseProxy` copies the backend's response headers onto the gateway's outgoing response with `Header().Add`, not `Set`. If a backend also set `Access-Control-Allow-Origin`, the browser would receive it twice as one comma-joined value — which every browser rejects as invalid, even though the underlying request succeeded end-to-end. This exact bug shipped during Phase 0 and was only caught by real browser-based verification (`curl` never enforces CORS, so it looked fine at the API-testing stage). Backend routers apply `RequestID → Logging → Recovery` only.
+
+## Rate Limiting (Gateway Only, Phase 6)
+
+Same reasoning as CORS above: the gateway is the single public entrypoint, so it's the one place a cross-cutting request-shaping concern belongs. Backend services never apply their own rate limiting — they trust the internal network already, and duplicating it per-service would be redundant defense CLAUDE.md's "avoid unnecessary complexity" already argues against.
+
+Implemented as `shared/middleware.RateLimit(requestsPerSecond, burst)`, a per-client-IP token bucket (`golang.org/x/time/rate` — the standard Go rate-limiting primitive, not a third-party dependency), wired into the gateway's middleware chain after CORS. Configured via `RATE_LIMIT_REQUESTS_PER_SECOND` / `RATE_LIMIT_BURST` (defaults 10/s, burst 20 — generous enough for the frontend's legitimate parallel fetches, e.g. the dashboard overview firing 5 concurrent requests on load). A client that exceeds the limit gets `429 RATE_LIMITED` via the standard envelope.
+
+Deliberately **in-memory, not Redis-backed**: Redis is explicitly on `plan.md`'s "Future Evolution — don't introduce before there's a legitimate reason" list, and today's deployment is a single gateway instance (Kubernetes HPA / multi-replica scaling is Phase 9, not built yet). Per-instance limits are exactly right for one instance; they'd under-enforce across multiple replicas (each with its own independent bucket), which is the legitimate reason to introduce Redis for this — not before.
+
+**Fails open on misconfiguration, not closed**: `requestsPerSecond <= 0` or `burst <= 0` disables rate limiting entirely rather than the literal token-bucket reading of "zero capacity" (which would silently reject 100% of traffic). Caught live during implementation — the gateway's pre-existing `router_test.go`, which never set these fields, started failing every single request with 429 the moment this middleware was wired in, before the fail-open guard was added. A rate limiter that isn't configured must never look like a full outage.
 
 ## JWT Contract (shared/jwtx)
 
@@ -110,7 +134,7 @@ GET    /api/v1/accounts/:id                                            -> 200 {a
 PUT    /api/v1/accounts/:id                                            -> 200 {account}
 DELETE /api/v1/accounts/:id                                            -> 204
 
-GET    /api/v1/transactions         ?account_id&category&from&to&page  -> 200 {transactions: [], page, total}
+GET    /api/v1/transactions         ?account_id&category&from&to&page&page_size -> 200 {transactions: [], page, page_size, total}
 POST   /api/v1/transactions         {account_id, category, amount, type, date, note} -> 201 {transaction}
 GET    /api/v1/transactions/:id                                        -> 200 {transaction}
 PUT    /api/v1/transactions/:id                                        -> 200 {transaction}
@@ -184,7 +208,7 @@ A `Notify` failure (e.g. notification-service unreachable) is logged and swallow
 
 ### notification-service (owns: notifications)
 ```
-GET    /api/v1/notifications        ?unread_only                       -> 200 {notifications: []}
+GET    /api/v1/notifications        ?unread_only&page&page_size        -> 200 {notifications: [], page, page_size, total}  (paginated, Phase 6 — see Pagination section above)
 POST   /api/v1/notifications        {title, message, type}              -> 201 {notification}  (owner = X-User-Id, same as every other route; budget-service's Phase 4 overspend trigger forwards the originating user's X-User-Id rather than passing user_id in the body, so the ownership model never has two shapes)
 PATCH  /api/v1/notifications/:id/read                                  -> 200 {notification}
 ```
@@ -204,3 +228,13 @@ GET /ready   -> 200 {"status":"ok"} | 503 {"status":"not_ready", "checks":[...]}
 GET /health  -> 200 aggregate of the above, richer payload for humans/dashboards
 ```
 Implemented once via `shared/health`; each service registers its Mongo client as a `Checker`.
+
+## OpenAPI Specs Served Live (Phase 6)
+
+```
+GET /openapi.yaml -> 200, Content-Type: application/yaml; charset=utf-8, raw spec bytes
+```
+
+Every service (including the gateway) exposes its own `openapi.yaml` at this path — not just as a static file in the repo, but as a real endpoint any of the 5 running containers answers. Implemented via `shared/openapidoc`: `Load(path, log)` reads the file from disk once at startup (a missing file logs a warning and leaves the route returning `404 NOT_FOUND` rather than crashing the process — a docs gap is not a reason to fail health checks), `Handler(spec)` serves the bytes with the right content type. Each service's `Dockerfile` copies its `openapi.yaml` into the final image alongside the binary.
+
+Deliberately **not** `go:embed`: every service's `openapi.yaml` lives at the service root (`services/<name>/openapi.yaml`), while the Go code that would embed it lives under `internal/` or `cmd/` — `go:embed` cannot reference a parent directory (`..`), and moving the spec into an embeddable location would break the per-service layout `CLAUDE.md` §4 documents. Disk-read-at-startup was chosen over the alternative of restructuring the repo around the tooling.

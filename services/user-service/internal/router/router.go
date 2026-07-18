@@ -7,6 +7,7 @@ import (
 
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/middleware"
+	"github.com/finora/shared/openapidoc"
 	"github.com/finora/user-service/internal/handler"
 	"github.com/gin-gonic/gin"
 )
@@ -15,12 +16,14 @@ import (
 // other Finora backend service: RequestID -> Logging -> Recovery (no CORS —
 // that's the gateway's job alone, see the comment below), then public
 // health routes, then the /api/v1 groups (auth is public, users requires
-// identity).
+// identity). openapiSpec is this service's openapi.yaml content (see
+// shared/openapidoc) — nil is fine, served publicly at GET /openapi.yaml.
 func New(
 	log *slog.Logger,
 	corsAllowedOrigins []string,
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
+	openapiSpec []byte,
 	checkers ...health.Checker,
 ) *gin.Engine {
 	r := gin.New()
@@ -39,6 +42,7 @@ func New(
 	// but intentionally unused.)
 
 	health.Register(r, "user-service", checkers...)
+	r.GET("/openapi.yaml", openapidoc.Handler(openapiSpec))
 
 	v1 := r.Group("/api/v1")
 

@@ -207,8 +207,9 @@ paths:
                           transactions:
                             type: array
                             items: { $ref: "#/components/schemas/Transaction" }
-                          page: { type: integer }
-                          total: { type: integer }
+                          page: { type: integer, description: "Resolved page actually applied (never 0, even if ?page= was omitted)" }
+                          page_size: { type: integer, description: "Resolved page size actually applied (default 20, capped at 100)" }
+                          total: { type: integer, description: "Total matching transactions across all pages, not just this page's length" }
         "400": { $ref: "#/components/responses/ValidationError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
     post:

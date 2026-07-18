@@ -49,9 +49,15 @@ type TransactionFilter struct {
 }
 
 // TransactionPage is one page of transactions plus the total matching count
-// (ignoring pagination), so callers can compute total pages.
+// (ignoring pagination), so callers can compute total pages. Page/PageSize
+// carry the *resolved* values the service layer actually applied (after
+// defaulting/capping) — not necessarily what the caller originally
+// requested — so a handler echoing them back in the response reports what
+// really happened, not an unvalidated echo of the raw query params.
 type TransactionPage struct {
 	Transactions []Transaction
+	Page         int
+	PageSize     int
 	Total        int64
 }
 

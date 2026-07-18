@@ -11,6 +11,15 @@ import (
 	"github.com/finora/notification-service/internal/domain"
 )
 
+// Pagination defaults/cap — identical values to expense-service's
+// transaction_service.go, per architecture/api-contracts.md's standard
+// pagination contract (Phase 6).
+const (
+	defaultPage     = 1
+	defaultPageSize = 20
+	maxPageSize     = 100
+)
+
 // notificationService is the concrete domain.NotificationService.
 type notificationService struct {
 	repo  domain.NotificationRepository
@@ -67,9 +76,32 @@ func (s *notificationService) Create(ctx context.Context, userID, title, message
 	return n, nil
 }
 
-// List returns userID's notifications, optionally filtered to unread only.
-func (s *notificationService) List(ctx context.Context, userID string, unreadOnly bool) ([]domain.Notification, error) {
-	return s.repo.ListByUser(ctx, userID, unreadOnly)
+// List returns one page of userID's notifications, optionally filtered to
+// unread only, applying the standard pagination defaults/cap.
+func (s *notificationService) List(ctx context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
+	page := filter.Page
+	if page < 1 {
+		page = defaultPage
+	}
+	pageSize := filter.PageSize
+	if pageSize < 1 {
+		pageSize = defaultPageSize
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+
+	result, err := s.repo.ListByUser(ctx, userID, domain.NotificationFilter{
+		UnreadOnly: filter.UnreadOnly,
+		Page:       page,
+		PageSize:   pageSize,
+	})
+	if err != nil {
+		return domain.NotificationPage{}, err
+	}
+	result.Page = page
+	result.PageSize = pageSize
+	return result, nil
 }
 
 // MarkRead marks the given notification as read, scoped to userID.

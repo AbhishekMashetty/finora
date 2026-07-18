@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/testcontainers/testcontainers-go/modules/mongodb v0.32.0
 	go.mongodb.org/mongo-driver v1.17.1
+	golang.org/x/time v0.10.0
 )
 
 require (

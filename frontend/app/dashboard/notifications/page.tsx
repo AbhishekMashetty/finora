@@ -28,9 +28,13 @@ function formatTimestamp(iso: string): string {
   });
 }
 
+const PAGE_SIZE = 20;
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
@@ -39,12 +43,16 @@ export default function NotificationsPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setIsLoading(true);
       try {
-        const data = await apiFetch<{ notifications: Notification[] }>(
-          `/api/v1/notifications${unreadOnly ? "?unread_only=true" : ""}`
+        const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+        if (unreadOnly) params.set("unread_only", "true");
+        const data = await apiFetch<{ notifications: Notification[]; page: number; total: number }>(
+          `/api/v1/notifications?${params.toString()}`
         );
         if (!cancelled) {
           setNotifications(data.notifications ?? []);
+          setTotal(data.total ?? 0);
           setLoadError(null);
         }
       } catch (err) {
@@ -58,7 +66,9 @@ export default function NotificationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [unreadOnly]);
+  }, [unreadOnly, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   async function handleMarkRead(id: string) {
     setRowError(null);
@@ -69,6 +79,7 @@ export default function NotificationsPage() {
       });
       if (unreadOnly) {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
+        setTotal((prev) => Math.max(0, prev - 1));
       } else {
         setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
       }
@@ -86,7 +97,10 @@ export default function NotificationsPage() {
         <Button
           size="sm"
           variant={unreadOnly ? "primary" : "secondary"}
-          onClick={() => setUnreadOnly((v) => !v)}
+          onClick={() => {
+            setUnreadOnly((v) => !v);
+            setPage(1);
+          }}
         >
           {unreadOnly ? "Showing unread only" : "Show unread only"}
         </Button>
@@ -148,6 +162,31 @@ export default function NotificationsPage() {
               </li>
             ))}
           </ul>
+        )}
+        {!isLoading && !loadError && total > 0 && (
+          <div className="flex items-center justify-between border-t border-hairline px-6 py-4">
+            <p className="text-sm text-ink-muted">
+              Page {page} of {totalPages} ({total} total)
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </Card>
     </div>

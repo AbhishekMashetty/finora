@@ -74,18 +74,31 @@ func (r *MongoNotificationRepository) Create(ctx context.Context, n *domain.Noti
 	return nil
 }
 
-// ListByUser returns every notification owned by userID, newest first,
-// optionally filtered to unread only.
-func (r *MongoNotificationRepository) ListByUser(ctx context.Context, userID string, unreadOnly bool) ([]domain.Notification, error) {
-	filter := bson.M{"user_id": userID}
-	if unreadOnly {
-		filter["read"] = false
+// ListByUser returns one page of notifications owned by userID, newest
+// first, optionally filtered to unread only. filter.Page/PageSize are
+// assumed already defaulted/capped by the service layer — this method
+// applies them as-is (skip/limit), matching expense-service's
+// TransactionRepository.ListByUser convention exactly.
+func (r *MongoNotificationRepository) ListByUser(ctx context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
+	q := bson.M{"user_id": userID}
+	if filter.UnreadOnly {
+		q["read"] = false
 	}
 
-	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
-	cursor, err := r.coll.Find(ctx, filter, opts)
+	total, err := r.coll.CountDocuments(ctx, q)
 	if err != nil {
-		return nil, err
+		return domain.NotificationPage{}, err
+	}
+
+	skip := int64(filter.Page-1) * int64(filter.PageSize)
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(skip).
+		SetLimit(int64(filter.PageSize))
+
+	cursor, err := r.coll.Find(ctx, q, opts)
+	if err != nil {
+		return domain.NotificationPage{}, err
 	}
 	defer cursor.Close(ctx)
 
@@ -93,14 +106,14 @@ func (r *MongoNotificationRepository) ListByUser(ctx context.Context, userID str
 	for cursor.Next(ctx) {
 		var doc notificationDoc
 		if err := cursor.Decode(&doc); err != nil {
-			return nil, err
+			return domain.NotificationPage{}, err
 		}
 		notifications = append(notifications, doc.toDomain())
 	}
 	if err := cursor.Err(); err != nil {
-		return nil, err
+		return domain.NotificationPage{}, err
 	}
-	return notifications, nil
+	return domain.NotificationPage{Notifications: notifications, Total: total}, nil
 }
 
 // MarkRead sets read=true on the notification identified by id, scoped to

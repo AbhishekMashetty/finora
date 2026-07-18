@@ -18,7 +18,7 @@ import (
 // handler layer can be tested without any real service/repository/Mongo.
 type fakeService struct {
 	createFn   func(ctx context.Context, userID, title, message, notifType string) (*domain.Notification, error)
-	listFn     func(ctx context.Context, userID string, unreadOnly bool) ([]domain.Notification, error)
+	listFn     func(ctx context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error)
 	markReadFn func(ctx context.Context, userID, id string) (*domain.Notification, error)
 }
 
@@ -26,8 +26,8 @@ func (f *fakeService) Create(ctx context.Context, userID, title, message, notifT
 	return f.createFn(ctx, userID, title, message, notifType)
 }
 
-func (f *fakeService) List(ctx context.Context, userID string, unreadOnly bool) ([]domain.Notification, error) {
-	return f.listFn(ctx, userID, unreadOnly)
+func (f *fakeService) List(ctx context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
+	return f.listFn(ctx, userID, filter)
 }
 
 func (f *fakeService) MarkRead(ctx context.Context, userID, id string) (*domain.Notification, error) {
@@ -136,18 +136,25 @@ func TestNotificationHandler_List(t *testing.T) {
 		name           string
 		userID         string
 		query          string
-		listFn         func(ctx context.Context, userID string, unreadOnly bool) ([]domain.Notification, error)
+		listFn         func(ctx context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error)
 		wantStatus     int
 		wantUnreadOnly bool
+		wantPage       int
+		wantPageSize   int
 	}{
 		{
 			name:   "lists notifications for the caller",
 			userID: "user-1",
 			query:  "",
-			listFn: func(_ context.Context, userID string, unreadOnly bool) ([]domain.Notification, error) {
-				return []domain.Notification{
-					{ID: "1", UserID: userID, Title: "A", Read: false},
-					{ID: "2", UserID: userID, Title: "B", Read: true},
+			listFn: func(_ context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
+				return domain.NotificationPage{
+					Notifications: []domain.Notification{
+						{ID: "1", UserID: userID, Title: "A", Read: false},
+						{ID: "2", UserID: userID, Title: "B", Read: true},
+					},
+					Page:     1,
+					PageSize: 20,
+					Total:    2,
 				}, nil
 			},
 			wantStatus:     http.StatusOK,
@@ -157,23 +164,39 @@ func TestNotificationHandler_List(t *testing.T) {
 			name:   "unread_only=true is forwarded to the service",
 			userID: "user-1",
 			query:  "?unread_only=true",
-			listFn: func(_ context.Context, userID string, unreadOnly bool) ([]domain.Notification, error) {
-				return []domain.Notification{{ID: "1", UserID: userID, Title: "A", Read: false}}, nil
+			listFn: func(_ context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
+				return domain.NotificationPage{
+					Notifications: []domain.Notification{{ID: "1", UserID: userID, Title: "A", Read: false}},
+					Page:          1,
+					PageSize:      20,
+					Total:         1,
+				}, nil
 			},
 			wantStatus:     http.StatusOK,
 			wantUnreadOnly: true,
+		},
+		{
+			name:   "page/page_size query params are forwarded to the service",
+			userID: "user-1",
+			query:  "?page=2&page_size=5",
+			listFn: func(_ context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
+				return domain.NotificationPage{Notifications: []domain.Notification{}, Page: 2, PageSize: 5, Total: 12}, nil
+			},
+			wantStatus:   http.StatusOK,
+			wantPage:     2,
+			wantPageSize: 5,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var gotUnreadOnly bool
+			var gotFilter domain.NotificationFilter
 			var called bool
 			svc := &fakeService{
-				listFn: func(ctx context.Context, userID string, unreadOnly bool) ([]domain.Notification, error) {
+				listFn: func(ctx context.Context, userID string, filter domain.NotificationFilter) (domain.NotificationPage, error) {
 					called = true
-					gotUnreadOnly = unreadOnly
-					return tt.listFn(ctx, userID, unreadOnly)
+					gotFilter = filter
+					return tt.listFn(ctx, userID, filter)
 				},
 			}
 			r := newTestRouter(svc)
@@ -190,8 +213,28 @@ func TestNotificationHandler_List(t *testing.T) {
 			if !called {
 				t.Fatalf("service.List was not called")
 			}
-			if gotUnreadOnly != tt.wantUnreadOnly {
-				t.Errorf("unreadOnly passed to service = %v, want %v", gotUnreadOnly, tt.wantUnreadOnly)
+			if gotFilter.UnreadOnly != tt.wantUnreadOnly {
+				t.Errorf("unreadOnly passed to service = %v, want %v", gotFilter.UnreadOnly, tt.wantUnreadOnly)
+			}
+			if tt.wantPage != 0 && gotFilter.Page != tt.wantPage {
+				t.Errorf("page passed to service = %d, want %d", gotFilter.Page, tt.wantPage)
+			}
+			if tt.wantPageSize != 0 && gotFilter.PageSize != tt.wantPageSize {
+				t.Errorf("page_size passed to service = %d, want %d", gotFilter.PageSize, tt.wantPageSize)
+			}
+
+			var body struct {
+				Data struct {
+					Page     int `json:"page"`
+					PageSize int `json:"page_size"`
+					Total    int `json:"total"`
+				} `json:"data"`
+			}
+			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+				t.Fatalf("decoding response body: %v", err)
+			}
+			if body.Data.Page == 0 && body.Data.PageSize == 0 {
+				t.Errorf("response envelope is missing page/page_size — got %+v", body.Data)
 			}
 		})
 	}

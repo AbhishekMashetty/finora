@@ -102,7 +102,19 @@ func (s *transactionService) List(ctx context.Context, userID string, in domain.
 		Page:      page,
 		PageSize:  pageSize,
 	}
-	return s.repo.ListByUser(ctx, userID, filter)
+	result, err := s.repo.ListByUser(ctx, userID, filter)
+	if err != nil {
+		return domain.TransactionPage{}, err
+	}
+	// The repository doesn't know about resolved-vs-requested pagination —
+	// stamp the values the service actually applied so the handler echoes
+	// back reality, not a possibly-zero raw query param (a real bug this
+	// fixes: previously the handler echoed in.Page directly, which was 0
+	// whenever the caller omitted ?page=, and page_size wasn't returned at
+	// all).
+	result.Page = page
+	result.PageSize = pageSize
+	return result, nil
 }
 
 func (s *transactionService) Get(ctx context.Context, userID, id string) (*domain.Transaction, error) {

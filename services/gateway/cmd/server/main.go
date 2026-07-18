@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/finora/shared/logger"
+	"github.com/finora/shared/openapidoc"
 	"github.com/finora/shared/server"
 
 	"github.com/finora/gateway/internal/config"
@@ -41,12 +42,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	openapiSpec := openapidoc.Load("openapi.yaml", log)
+
 	engine := router.New(cfg, log, router.Backends{
 		User:         userProxy,
 		Expense:      expenseProxy,
 		Budget:       budgetProxy,
 		Notification: notificationProxy,
-	})
+	}, openapiSpec)
 
 	addr := "0.0.0.0:" + cfg.GatewayPort
 	if err := server.Run(addr, engine, log, cfg.ShutdownTimeout); err != nil {

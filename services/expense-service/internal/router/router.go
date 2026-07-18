@@ -12,6 +12,7 @@ import (
 	"github.com/finora/expense-service/internal/handler"
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/middleware"
+	"github.com/finora/shared/openapidoc"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,6 +26,14 @@ type Deps struct {
 	AccountHandler     *handler.AccountHandler
 	TransactionHandler *handler.TransactionHandler
 	CategoryHandler    *handler.CategoryHandler
+
+	// OpenAPISpec is this service's openapi.yaml content (see
+	// shared/openapidoc), served publicly at GET /openapi.yaml — Phase 6's
+	// "OpenAPI specs served as docs". Nil is fine (openapidoc.Handler 404s
+	// gracefully); not proxied through the gateway, since it's a developer/
+	// operator convenience on the internal network, not end-user-facing
+	// API surface the way /api/v1/* is.
+	OpenAPISpec []byte
 }
 
 // New builds the fully-wired gin.Engine.
@@ -48,6 +57,9 @@ func New(d Deps) *gin.Engine {
 	// Health routes are public — no identity required, mirroring Kubernetes
 	// liveness/readiness probe conventions.
 	health.Register(r, d.ServiceName, d.HealthCheckers...)
+
+	// OpenAPI spec is also public — developer/operator docs, not user data.
+	r.GET("/openapi.yaml", openapidoc.Handler(d.OpenAPISpec))
 
 	api := r.Group("/api/v1")
 	api.Use(middleware.RequireIdentity())

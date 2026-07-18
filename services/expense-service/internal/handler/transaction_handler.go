@@ -91,7 +91,8 @@ func (h *TransactionHandler) List(c *gin.Context) {
 
 	httpx.Success(c, http.StatusOK, gin.H{
 		"transactions": result.Transactions,
-		"page":         in.Page,
+		"page":         result.Page,
+		"page_size":    result.PageSize,
 		"total":        result.Total,
 	})
 }

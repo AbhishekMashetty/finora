@@ -25,6 +25,15 @@ type Config struct {
 	LogLevel           string
 	ShutdownTimeout    time.Duration
 	CORSAllowedOrigins []string
+
+	// RateLimitRequestsPerSecond/RateLimitBurst configure
+	// shared/middleware.RateLimit — see that file's doc comment for why
+	// this lives only in the gateway. Defaults (10 req/s sustained, burst
+	// 20) are generous enough for legitimate parallel dashboard fetches
+	// (the frontend's overview/search pages fire up to 5 concurrent
+	// requests on load) while still meaningfully throttling abuse.
+	RateLimitRequestsPerSecond int
+	RateLimitBurst             int
 }
 
 // Load reads all gateway env vars, applying the exact names from
@@ -47,6 +56,9 @@ func Load() Config {
 		LogLevel:           config.GetEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout:    config.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 		CORSAllowedOrigins: splitAndTrim(origins),
+
+		RateLimitRequestsPerSecond: config.GetEnvInt("RATE_LIMIT_REQUESTS_PER_SECOND", 10),
+		RateLimitBurst:             config.GetEnvInt("RATE_LIMIT_BURST", 20),
 	}
 }
 

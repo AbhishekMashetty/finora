@@ -42,7 +42,8 @@ future. `current_amount` on goal update is manual progress logging — a value
 of exactly `0` is valid (e.g. resetting progress), not treated as "omitted".
 
 Also exposes the standard health trio (`GET /live`, `/ready`, `/health`) via
-`shared/health`, with MongoDB wired in as the readiness check.
+`shared/health`, with MongoDB wired in as the readiness check, and
+`GET /openapi.yaml` — this service's spec, served live from disk.
 
 See `openapi.yaml` for the full OpenAPI 3.0 spec, and
 `architecture/api-contracts.md` (repo root) for the cross-service contract

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,7 +95,7 @@ func buildGatewayTestServer(t *testing.T, user, expense, budget, notification *e
 		Expense:      expenseProxy,
 		Budget:       budgetProxy,
 		Notification: notificationProxy,
-	})
+	}, nil)
 
 	gwSrv := httptest.NewServer(engine)
 
@@ -239,5 +240,65 @@ func TestGateway_HealthEndpointsArePublic(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected 200 for %s, got %d", path, resp.StatusCode)
 		}
+	}
+}
+
+// TestGateway_RateLimitAppliesThroughRealConfig proves the full wiring —
+// gwconfig.Config's RateLimitRequestsPerSecond/RateLimitBurst actually
+// reaching shared/middleware.RateLimit through router.New — not just the
+// middleware in isolation (already covered by
+// shared/middleware/ratelimit_test.go). buildGatewayTestServer's shared cfg
+// leaves these at their zero value (rate limiting disabled, per
+// RateLimit's fail-open guard) so every other test in this file is
+// unaffected; this test builds its own minimal router with a real, tiny
+// limit instead.
+func TestGateway_RateLimitAppliesThroughRealConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	log := logger.New("gateway-test", "error")
+
+	userSrv := newEchoServer(&echoBackend{})
+	defer userSrv.Close()
+	userProxy, err := proxy.New(userSrv.URL, log)
+	if err != nil {
+		t.Fatalf("failed building user proxy: %v", err)
+	}
+
+	cfg := gwconfig.Config{
+		GatewayPort:                "8080",
+		UserServiceURL:             userSrv.URL,
+		ExpenseServiceURL:          userSrv.URL,
+		BudgetServiceURL:           userSrv.URL,
+		NotificationServiceURL:     userSrv.URL,
+		JWTAccessSecret:            testSecret,
+		LogLevel:                   "error",
+		ShutdownTimeout:            5 * time.Second,
+		CORSAllowedOrigins:         []string{"http://localhost:3000"},
+		RateLimitRequestsPerSecond: 1,
+		RateLimitBurst:             1,
+	}
+
+	engine := router.New(cfg, log, router.Backends{
+		User:         userProxy,
+		Expense:      userProxy,
+		Budget:       userProxy,
+		Notification: userProxy,
+	}, nil)
+	gwSrv := httptest.NewServer(engine)
+	defer gwSrv.Close()
+
+	first := doRequest(t, http.MethodGet, gwSrv.URL+"/live", "")
+	first.Body.Close()
+	if first.StatusCode != http.StatusOK {
+		t.Fatalf("first request: expected 200 (within burst of 1), got %d", first.StatusCode)
+	}
+
+	second := doRequest(t, http.MethodGet, gwSrv.URL+"/live", "")
+	defer second.Body.Close()
+	if second.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("second request: expected 429 (burst of 1 exhausted), got %d", second.StatusCode)
+	}
+	body, _ := io.ReadAll(second.Body)
+	if !strings.Contains(string(body), `"RATE_LIMITED"`) {
+		t.Errorf("429 response body doesn't carry the RATE_LIMITED code: %s", body)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/logger"
 	"github.com/finora/shared/mongox"
+	"github.com/finora/shared/openapidoc"
 	"github.com/finora/shared/server"
 )
 
@@ -55,6 +56,8 @@ func main() {
 	transactionHandler := handler.NewTransactionHandler(transactionSvc)
 	categoryHandler := handler.NewCategoryHandler(categorySvc)
 
+	openapiSpec := openapidoc.Load("openapi.yaml", log)
+
 	r := router.New(router.Deps{
 		Logger:             log,
 		ServiceName:        serviceName,
@@ -63,6 +66,7 @@ func main() {
 		AccountHandler:     accountHandler,
 		TransactionHandler: transactionHandler,
 		CategoryHandler:    categoryHandler,
+		OpenAPISpec:        openapiSpec,
 	})
 
 	if err := server.Run(cfg.Addr(), r, log, cfg.ShutdownTimeout); err != nil {

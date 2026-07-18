@@ -18,7 +18,7 @@ the ownership model never has two shapes.
 
 | Method | Path                              | Body                          | Response                    |
 |--------|-----------------------------------|--------------------------------|------------------------------|
-| GET    | `/api/v1/notifications`           | — (`?unread_only=true` filter) | `200 {notifications: []}`   |
+| GET    | `/api/v1/notifications`           | — (`?unread_only=true&page=&page_size=`) | `200 {notifications: [], page, page_size, total}` |
 | POST   | `/api/v1/notifications`           | `{title, message, type}`       | `201 {notification}`         |
 | PATCH  | `/api/v1/notifications/:id/read`  | —                              | `200 {notification}`         |
 
@@ -29,6 +29,7 @@ Health (public, no `X-User-Id` required):
 | GET    | `/live`   | Liveness — always ok if the process is up            |
 | GET    | `/ready`  | Readiness — ok only if the Mongo ping succeeds        |
 | GET    | `/health` | Aggregate health payload for humans/dashboards        |
+| GET    | `/openapi.yaml` | This service's spec, served live from disk      |
 
 See `openapi.yaml` for the full request/response schemas and
 `architecture/api-contracts.md` for the response envelope shape shared by
@@ -43,6 +44,13 @@ Notification{ ID, UserID, Title, Message, Type, Read bool, CreatedAt }
 Every query is filtered by `user_id == middleware.UserID(c)`. `GET
 /notifications` only ever returns the caller's own notifications;
 `?unread_only=true` additionally filters to `Read == false`.
+
+**Pagination (Phase 6):** `?page=` (default 1) / `?page_size=` (default 20,
+capped at 100) — the same standard contract every paginated Finora list
+endpoint follows, see `architecture/api-contracts.md`'s Pagination section.
+The response's `page`/`page_size` are the values the service actually
+resolved and applied, not a raw echo of the query string (so they're never
+0/0 just because the caller omitted them).
 
 ## Mongo indexes
 

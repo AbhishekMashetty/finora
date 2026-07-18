@@ -8,10 +8,15 @@ from outside the docker/Kubernetes network (see
 
 For each request the gateway:
 
-1. Runs the shared middleware chain: `RequestID -> Logging -> Recovery -> CORS`.
+1. Runs the shared middleware chain: `RequestID -> Logging -> Recovery -> CORS
+   -> RateLimit` (Phase 6; per-client-IP token bucket, configured via
+   `RATE_LIMIT_REQUESTS_PER_SECOND`/`RATE_LIMIT_BURST`, fails open if unset —
+   see `architecture/api-contracts.md`'s Rate Limiting section).
 2. Serves `/live`, `/ready`, `/health` directly (public, via `shared/health`;
    the gateway owns no data, so it registers no checkers — `/ready` always
-   mirrors `/live`).
+   mirrors `/live`) and `GET /openapi.yaml` (the gateway's own aggregate
+   OpenAPI spec, served live — see `architecture/api-contracts.md`'s OpenAPI
+   section).
 3. For the three public auth routes, proxies straight through with no JWT
    check.
 4. For every other `/api/v1/*` route, validates the `Authorization: Bearer

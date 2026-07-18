@@ -32,6 +32,21 @@ paths:
             type: boolean
             default: false
           description: If true, only notifications with read=false are returned.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 1-indexed page number (Phase 6 — see architecture/api-contracts.md's Pagination section).
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Capped at 100 server-side regardless of what's requested.
       responses:
         "200":
           description: OK
@@ -221,6 +236,15 @@ components:
                   type: array
                   items:
                     $ref: "#/components/schemas/Notification"
+                page:
+                  type: integer
+                  description: Resolved page actually applied (never 0, even if ?page= was omitted).
+                page_size:
+                  type: integer
+                  description: Resolved page size actually applied (default 20, capped at 100).
+                total:
+                  type: integer
+                  description: Total matching notifications across all pages, not just this page's length.
 
   responses:
     ValidationError:

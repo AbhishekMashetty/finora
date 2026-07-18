@@ -21,7 +21,13 @@ FROM alpine:3.19
 # data on disk, not because the input was actually invalid.
 RUN apk add --no-cache tzdata
 RUN adduser -D -u 10001 appuser
+WORKDIR /app
 COPY --from=builder /out/server /usr/local/bin/server
+# openapi.yaml is served live at GET /openapi.yaml (Phase 6) — see
+# shared/openapidoc's doc comment for why it's copied from disk rather than
+# go:embed'd, and why WORKDIR matches native `go run` from this directory.
+COPY --from=builder /app/services/user-service/openapi.yaml ./openapi.yaml
+RUN chown appuser:appuser /app/openapi.yaml
 USER appuser
 EXPOSE 8081
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD wget -qO- http://localhost:8081/live || exit 1

@@ -16,6 +16,7 @@ import (
 	"github.com/finora/budget-service/internal/service"
 	"github.com/finora/shared/logger"
 	"github.com/finora/shared/mongox"
+	"github.com/finora/shared/openapidoc"
 	"github.com/finora/shared/server"
 )
 
@@ -49,8 +50,9 @@ func main() {
 	reportHandler := handler.NewReportHandler(reportService)
 
 	mongoChecker := mongox.Checker{Client: mongoClient}
+	openapiSpec := openapidoc.Load("openapi.yaml", log)
 
-	r := router.New(log, cfg.CORSAllowedOrigins, budgetHandler, goalHandler, reportHandler, mongoChecker)
+	r := router.New(log, cfg.CORSAllowedOrigins, budgetHandler, goalHandler, reportHandler, openapiSpec, mongoChecker)
 
 	addr := "0.0.0.0:" + cfg.Port
 	if err := server.Run(addr, r, log, cfg.ShutdownTimeout); err != nil {

@@ -30,6 +30,9 @@ const (
 	CodeNotFound     = "NOT_FOUND"
 	CodeConflict     = "CONFLICT"
 	CodeInternal     = "INTERNAL_ERROR"
+	// CodeRateLimited is returned by shared/middleware.RateLimit (gateway
+	// only, added Phase 6 — see that middleware's doc comment) with HTTP 429.
+	CodeRateLimited = "RATE_LIMITED"
 )
 
 func requestID(c *gin.Context) string {
