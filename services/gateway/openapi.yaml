@@ -1,0 +1,340 @@
+openapi: 3.0.3
+info:
+  title: Finora Gateway API
+  description: >
+    Aggregate public API surface of Finora, as seen through the gateway.
+    The gateway is the only externally-callable entry point: it validates
+    JWTs and reverse-proxies every /api/v1/* request, unchanged, to the
+    owning backend (user-service, expense-service, budget-service,
+    notification-service). This spec combines the per-service contracts
+    documented in architecture/api-contracts.md into the single surface a
+    client actually sees. It documents the gateway's routing and auth
+    behavior, not each backend's internal implementation.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080
+    description: Gateway, local/docker-compose
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Access token (type=access) issued by POST /api/v1/auth/login or
+        /api/v1/auth/refresh. Not required for register/login/refresh.
+
+  schemas:
+    Envelope:
+      type: object
+      required: [success, data, error, request_id]
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          nullable: true
+          $ref: '#/components/schemas/ErrorBody'
+        request_id:
+          type: string
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+        message:
+          type: string
+        details:
+          nullable: true
+
+  responses:
+    Unauthorized:
+      description: >
+        Missing/malformed Authorization header, or an invalid/expired/
+        wrong-type token. Returned by the gateway itself before the request
+        ever reaches a backend.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+    NotFound:
+      description: No route matches this path, or (for owner-scoped resources) the resource is not owned by the caller.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+    BadGateway:
+      description: The owning backend service was unreachable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+
+paths:
+  # ---- Public: user-service, no auth ----
+  /api/v1/auth/register:
+    post:
+      summary: Register a new user
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: { type: string }
+                password: { type: string }
+                name: { type: string }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  /api/v1/auth/login:
+    post:
+      summary: Log in, receiving an access + refresh token pair
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Exchange a refresh token for a new access + refresh token pair
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  # ---- Protected: user-service ----
+  /api/v1/auth/logout:
+    post:
+      summary: Revoke a refresh token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/users/me:
+    get:
+      summary: Get the current user's profile
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      summary: Update the current user's profile
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/users/me/settings:
+    get:
+      summary: Get the current user's settings
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      summary: Update the current user's settings
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ---- Protected: expense-service ----
+  /api/v1/accounts:
+    get:
+      summary: List the current user's accounts
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create an account
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/accounts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get an account by id (404 if not owned by caller)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update an account
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    delete:
+      summary: Delete an account
+      responses:
+        '204': { description: No Content }
+
+  /api/v1/transactions:
+    get:
+      summary: List transactions (filterable by account_id, category, from, to, page)
+      parameters:
+        - { name: account_id, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    post:
+      summary: Create a transaction
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  /api/v1/transactions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get a transaction by id
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    put:
+      summary: Update a transaction
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    delete:
+      summary: Delete a transaction
+      responses:
+        '204': { description: No Content }
+
+  /api/v1/categories:
+    get:
+      summary: List categories (Phase 2)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    post:
+      summary: Create a category (Phase 2)
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  # ---- Protected: budget-service ----
+  /api/v1/budgets:
+    get:
+      summary: List budgets
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    post:
+      summary: Create a budget
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  /api/v1/budgets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get a budget by id
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    put:
+      summary: Update a budget
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    delete:
+      summary: Delete a budget
+      responses:
+        '204': { description: No Content }
+
+  /api/v1/goals:
+    get:
+      summary: List savings goals (stub, Phase 3)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    post:
+      summary: Create a savings goal (stub, Phase 3)
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  /api/v1/reports/summary:
+    get:
+      summary: Get a spending summary report (stub, Phase 3 — will call expense-service)
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  # ---- Protected: notification-service ----
+  /api/v1/notifications:
+    get:
+      summary: List notifications
+      parameters:
+        - { name: unread_only, in: query, schema: { type: boolean } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+    post:
+      summary: Create a notification (owner = X-User-Id, same as every other route)
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  /api/v1/notifications/{id}/read:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      summary: Mark a notification as read
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+
+  # ---- Gateway's own health endpoints ----
+  /live:
+    get:
+      summary: Liveness probe (always ok if the process is up)
+      security: []
+      responses:
+        '200': { description: OK }
+  /ready:
+    get:
+      summary: Readiness probe (gateway owns no data, so this always mirrors /live)
+      security: []
+      responses:
+        '200': { description: OK }
+  /health:
+    get:
+      summary: Aggregate health (human/dashboard friendly)
+      security: []
+      responses:
+        '200': { description: OK }
