@@ -62,3 +62,18 @@ body {
    * fallback the entire time). Reference the loaded font directly here. */
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Strip the native number-input spin button: it's extra browser-supplied
+ * chrome an amount field doesn't need, it isn't present on any other field
+ * type in the same row (select/date/text), and leaving it in made Amount
+ * fields look visually heavier than their neighbors — the same class of
+ * "native control chrome differs per field type" issue h-10 on
+ * components/ui/Input.tsx's fieldClasses fixes for height. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+}

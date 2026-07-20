@@ -106,10 +106,16 @@ async function rawFetch(
   options: ApiFetchOptions = {}
 ): Promise<Response> {
   const { skipAuth, headers, ...rest } = options;
-  const finalHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(headers as Record<string, string>),
-  };
+  // A FormData body (file uploads, e.g. CSV import) must NOT get a manual
+  // Content-Type — the browser sets its own `multipart/form-data;
+  // boundary=...` when it serializes a FormData body, and a fetch() call
+  // that already has a Content-Type header set is left alone rather than
+  // having its boundary appended, so the request would be sent without a
+  // boundary the server can parse. Every other call in this app sends a
+  // JSON string body, so that stays the default.
+  const finalHeaders: Record<string, string> = rest.body instanceof FormData
+    ? { ...(headers as Record<string, string>) }
+    : { "Content-Type": "application/json", ...(headers as Record<string, string>) };
   if (!skipAuth) {
     const token = getAccessToken();
     if (token) {

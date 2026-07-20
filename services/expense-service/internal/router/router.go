@@ -74,6 +74,7 @@ func New(d Deps) *gin.Engine {
 		transactions := api.Group("/transactions")
 		transactions.GET("", d.TransactionHandler.List)
 		transactions.POST("", d.TransactionHandler.Create)
+		transactions.POST("/import", d.TransactionHandler.ImportCSV)
 		transactions.GET("/:id", d.TransactionHandler.Get)
 		transactions.PUT("/:id", d.TransactionHandler.Update)
 		transactions.DELETE("/:id", d.TransactionHandler.Delete)

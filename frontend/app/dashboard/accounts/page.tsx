@@ -148,26 +148,23 @@ export default function AccountsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink-primary">Accounts</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-ink-primary">Accounts</h1>
+        <Button
+          type="button"
+          variant={showCreateForm ? "secondary" : "primary"}
+          size="sm"
+          onClick={() => setShowCreateForm((prev) => !prev)}
+        >
+          <PlusIcon size={16} />
+          {showCreateForm ? "Cancel" : "Add account"}
+        </Button>
+      </div>
 
-      <Card className="mt-6 max-w-xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            New account
-          </h2>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowCreateForm((prev) => !prev)}
-          >
-            <PlusIcon size={14} />
-            {showCreateForm ? "Cancel" : "Add"}
-          </Button>
-        </div>
-
-        {showCreateForm && (
-          <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+      {showCreateForm && (
+        <Card className="mt-6 max-w-xl">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">New account</h2>
+          <form onSubmit={handleCreate} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
               <Input
                 id="acc-name"
@@ -185,28 +182,27 @@ export default function AccountsPage() {
                 </option>
               ))}
             </Select>
-            <div className="w-24">
-              <Input
-                id="acc-currency"
-                label="Currency"
-                required
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                maxLength={3}
-              />
-            </div>
+            <Input
+              id="acc-currency"
+              label="Currency"
+              wrapperClassName="w-24"
+              required
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+              maxLength={3}
+            />
             <Button type="submit" disabled={isCreating}>
               {isCreating ? "Adding…" : "Add account"}
             </Button>
           </form>
-        )}
 
-        {createError && (
-          <p className="mt-3 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-            {createError}
-          </p>
-        )}
-      </Card>
+          {createError && (
+            <p className="mt-3 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
+              {createError}
+            </p>
+          )}
+        </Card>
+      )}
 
       <Card className="mt-6 p-0">
         {isLoading && <SkeletonRows rows={4} />}
@@ -227,7 +223,7 @@ export default function AccountsPage() {
                 {rowError}
               </p>
             )}
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-hairline text-xs uppercase text-ink-muted">
                 <tr>
                   <th className="px-6 py-3 font-medium">Name</th>

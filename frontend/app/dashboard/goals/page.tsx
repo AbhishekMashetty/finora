@@ -362,6 +362,7 @@ export default function GoalsPage() {
                         <Button
                           size="sm"
                           variant="secondary"
+                          className="h-10"
                           onClick={() => handleLogProgress(goal)}
                           disabled={savingProgressId === goal.id}
                         >

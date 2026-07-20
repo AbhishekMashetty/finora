@@ -68,6 +68,17 @@ export interface Transaction {
   updated_at: string;
 }
 
+export interface ImportRowError {
+  row: number;
+  message: string;
+}
+
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: ImportRowError[];
+}
+
 // budget-service domains (budgets, goals, reports)
 
 export interface Budget {

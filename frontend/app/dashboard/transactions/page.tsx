@@ -10,16 +10,16 @@
 // `category` but its value is a category **id**.
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
-import type { Account, Category, Transaction } from "@/lib/types";
+import type { Account, Category, ImportResult, Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { TransactionTypeBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { ListIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { ListIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from "@/components/icons";
 
 const PAGE_SIZE = 20;
 
@@ -80,6 +80,14 @@ export default function TransactionsPage() {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
+  // CSV import (e.g. a downloaded credit card statement)
+  const [showImportForm, setShowImportForm] = useState(false);
+  const [importAccountId, setImportAccountId] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
   // per-row edit
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<TxFormState>(emptyForm(""));
@@ -104,6 +112,7 @@ export default function TransactionsPage() {
             ...prev,
             accountId: prev.accountId || accountsData.accounts?.[0]?.id || "",
           }));
+          setImportAccountId((prev) => prev || accountsData.accounts?.[0]?.id || "");
         }
       } catch (err) {
         if (!cancelled) {
@@ -216,6 +225,41 @@ export default function TransactionsPage() {
     }
   }
 
+  function handleImportFileChange(event: ChangeEvent<HTMLInputElement>) {
+    setImportFile(event.target.files?.[0] ?? null);
+  }
+
+  async function handleImport(event: FormEvent) {
+    event.preventDefault();
+    setImportError(null);
+    setImportResult(null);
+    if (!importFile) {
+      setImportError("Choose a CSV file first.");
+      return;
+    }
+    setIsImporting(true);
+    try {
+      const body = new FormData();
+      body.append("account_id", importAccountId);
+      body.append("file", importFile);
+      const result = await apiFetch<ImportResult>("/api/v1/transactions/import", {
+        method: "POST",
+        body,
+      });
+      setImportResult(result);
+      setImportFile(null);
+      if (page !== 1) {
+        setPage(1);
+      } else {
+        await refreshCurrentPage();
+      }
+    } catch (err) {
+      setImportError(err instanceof ApiError ? err.message : "Could not import transactions.");
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   async function handleCreateCategory(event: FormEvent) {
     event.preventDefault();
     setCategoryError(null);
@@ -299,7 +343,37 @@ export default function TransactionsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink-primary">Transactions</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-ink-primary">Transactions</h1>
+        {refDataLoaded && hasAccounts && (
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowImportForm((prev) => !prev);
+                setShowCreateForm(false);
+              }}
+            >
+              <UploadIcon size={16} />
+              {showImportForm ? "Cancel" : "Import CSV"}
+            </Button>
+            <Button
+              type="button"
+              variant={showCreateForm ? "secondary" : "primary"}
+              size="sm"
+              onClick={() => {
+                setShowCreateForm((prev) => !prev);
+                setShowImportForm(false);
+              }}
+            >
+              <PlusIcon size={16} />
+              {showCreateForm ? "Cancel" : "Add transaction"}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Filters */}
       <Card className="mt-6">
@@ -385,51 +459,40 @@ export default function TransactionsPage() {
       </Card>
 
       {/* Create form */}
-      <Card className="mt-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            New transaction
-          </h2>
-          {refDataLoaded && hasAccounts && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowCreateForm((prev) => !prev)}
-            >
-              <PlusIcon size={14} />
-              {showCreateForm ? "Cancel" : "Add"}
-            </Button>
-          )}
-        </div>
-
-        {refDataLoaded && !hasAccounts && (
-          <p className="mt-3 text-sm text-ink-secondary">
+      {refDataLoaded && !hasAccounts && (
+        <Card className="mt-6">
+          <p className="text-sm text-ink-secondary">
             You need an account before you can log a transaction —{" "}
             <Link href="/dashboard/accounts" className="font-medium text-brand underline underline-offset-2">
               create an account first
             </Link>
             .
           </p>
-        )}
+        </Card>
+      )}
 
-        {refDataError && (
-          <p className="mt-3 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-            {refDataError}
-          </p>
-        )}
+      {refDataError && (
+        <Card className="mt-6">
+          <p className="text-sm text-status-critical">{refDataError}</p>
+        </Card>
+      )}
 
-        {refDataLoaded && hasAccounts && showCreateForm && (
-          <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-3">
-            {/* Same grid-not-flex fix as the filter row above: Account's
-                option text, a 2-letter Type, a number, a 3-letter currency
-                code, and a date all have wildly different intrinsic widths
-                — a fixed-span grid keeps every field's label and control
-                aligned instead of raggedly sized to its own content. */}
+      {refDataLoaded && hasAccounts && showCreateForm && (
+        <Card className="mt-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">New transaction</h2>
+          <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-4">
+            {/* A grid, not a flex-wrap row: Account's option text, a
+                2-letter Type, a number, a 3-letter currency code, and a
+                date all have wildly different intrinsic widths — a
+                fixed-span grid keeps every field's label and control
+                aligned instead of raggedly sized to its own content.
+                Column spans go on wrapperClassName, not className: the
+                Field wrapper div is the actual grid item, not the inner
+                <select>/<input> — see Input.tsx's doc comment. */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
               <Select
                 label="Account"
-                className="w-full lg:col-span-4"
+                wrapperClassName="lg:col-span-3"
                 value={form.accountId}
                 onChange={(e) => setForm({ ...form, accountId: e.target.value })}
                 required
@@ -442,7 +505,7 @@ export default function TransactionsPage() {
               </Select>
               <Select
                 label="Type"
-                className="w-full lg:col-span-2"
+                wrapperClassName="lg:col-span-2"
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value as "income" | "expense" })}
               >
@@ -454,14 +517,16 @@ export default function TransactionsPage() {
                 step="0.01"
                 min="0.01"
                 label="Amount"
-                className="w-full tabular-nums lg:col-span-2"
+                placeholder="0.00"
+                className="tabular-nums"
+                wrapperClassName="lg:col-span-2"
                 required
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
               />
               <Input
                 label="Currency"
-                className="w-full lg:col-span-1"
+                wrapperClassName="lg:col-span-2"
                 required
                 value={form.currency}
                 onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
@@ -470,7 +535,7 @@ export default function TransactionsPage() {
               <Input
                 type="date"
                 label="Date"
-                className="w-full lg:col-span-3"
+                wrapperClassName="lg:col-span-3"
                 required
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
@@ -480,6 +545,7 @@ export default function TransactionsPage() {
             <div className="flex flex-wrap items-end gap-3">
               <Select
                 label="Category"
+                wrapperClassName="w-48"
                 value={form.categoryId}
                 onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
               >
@@ -494,12 +560,13 @@ export default function TransactionsPage() {
                 type="button"
                 variant="secondary"
                 size="sm"
+                className="h-10"
                 onClick={() => setShowNewCategory((prev) => !prev)}
               >
                 <PlusIcon size={14} />
                 {showNewCategory ? "Cancel" : "New category"}
               </Button>
-              <div className="flex-1">
+              <div className="min-w-[200px] flex-1">
                 <Input
                   label="Note"
                   value={form.note}
@@ -513,6 +580,7 @@ export default function TransactionsPage() {
               <div className="flex flex-wrap items-end gap-3 rounded-md border border-dashed border-hairline p-3">
                 <Input
                   label="New category name"
+                  wrapperClassName="w-56"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   placeholder="Groceries"
@@ -528,6 +596,7 @@ export default function TransactionsPage() {
                 <Button
                   type="button"
                   size="sm"
+                  className="h-10"
                   onClick={handleCreateCategory}
                   disabled={isCreatingCategory || !newCategoryName}
                 >
@@ -537,20 +606,87 @@ export default function TransactionsPage() {
               </div>
             )}
 
-            <div>
+            <div className="flex items-center gap-3">
               <Button type="submit" disabled={isCreating}>
                 {isCreating ? "Adding…" : "Add transaction"}
               </Button>
+              {createError && <p className="text-sm text-status-critical">{createError}</p>}
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {/* CSV import */}
+      {refDataLoaded && hasAccounts && showImportForm && (
+        <Card className="mt-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Import from CSV
+          </h2>
+          <form onSubmit={handleImport} className="mt-4 flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+              <Select
+                label="Account"
+                wrapperClassName="lg:col-span-4"
+                value={importAccountId}
+                onChange={(e) => setImportAccountId(e.target.value)}
+                required
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </Select>
+              <div className="flex flex-col gap-1 lg:col-span-8">
+                <label htmlFor="import-file" className="text-xs font-medium text-ink-secondary">
+                  Statement CSV
+                </label>
+                <input
+                  id="import-file"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleImportFileChange}
+                  className="h-10 rounded-md border border-hairline bg-surface px-3 text-sm text-ink-primary outline-none file:mr-3 file:h-full file:rounded-md file:border-0 file:bg-plane file:px-3 file:text-xs file:font-medium file:text-ink-primary focus:border-brand"
+                />
+              </div>
             </div>
 
-            {createError && (
-              <p className="rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-                {createError}
-              </p>
-            )}
+            <p className="text-xs text-ink-muted">
+              Needs a Date column (e.g. &quot;Date&quot;/&quot;Transaction Date&quot;) and either an
+              &quot;Amount&quot; column (signed — negative for a charge) or separate
+              &quot;Debit&quot;/&quot;Credit&quot; columns (the shape most bank/card exports actually use).
+              Amounts accept &quot;$&quot;, thousands commas, and parenthesized negatives. Rows that
+              don&apos;t parse are skipped, not fatal to the rest of the file.
+            </p>
+
+            <div className="flex items-center gap-3">
+              <Button type="submit" disabled={isImporting || !importFile || !importAccountId}>
+                <UploadIcon size={16} />
+                {isImporting ? "Importing…" : "Import"}
+              </Button>
+              {importError && <p className="text-sm text-status-critical">{importError}</p>}
+            </div>
           </form>
-        )}
-      </Card>
+
+          {importResult && (
+            <div className="mt-4 rounded-md border border-hairline p-3">
+              <p className="text-sm text-ink-primary">
+                Imported <span className="tabular-nums font-medium">{importResult.imported}</span>,
+                skipped <span className="tabular-nums font-medium">{importResult.skipped}</span>.
+              </p>
+              {importResult.errors.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-status-critical">
+                  {importResult.errors.map((e, i) => (
+                    <li key={i}>
+                      Row {e.row}: {e.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* List */}
       <Card className="mt-6 p-0">
@@ -570,7 +706,7 @@ export default function TransactionsPage() {
                 {rowError}
               </p>
             )}
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-hairline text-xs uppercase text-ink-muted">
                 <tr>
                   <th className="px-6 py-3 font-medium">Date</th>

@@ -145,11 +145,24 @@ POST   /api/v1/transactions         {account_id, category, amount, type, date, n
 GET    /api/v1/transactions/:id                                        -> 200 {transaction}
 PUT    /api/v1/transactions/:id                                        -> 200 {transaction}
 DELETE /api/v1/transactions/:id                                        -> 204
+POST   /api/v1/transactions/import  multipart: account_id, file (CSV)  -> 200 {imported, skipped, errors}
 
 GET    /api/v1/categories                                              -> 200 {categories: []}  (Phase 2)
 POST   /api/v1/categories           {name, type}                       -> 201 {category}          (Phase 2)
 ```
 All resources are owner-scoped by `X-User-Id`; cross-user access returns `404 NOT_FOUND` (never `403`, to avoid confirming existence).
+
+### CSV transaction import
+
+`POST /api/v1/transactions/import` is the one endpoint in this fleet that takes `multipart/form-data` instead of JSON — a file upload has no natural JSON representation, and re-encoding a CSV as a JSON string field would just move the real parsing problem into the request body instead of solving it. Every imported row is attached to the `account_id` form field and inherits that account's `currency`; the CSV itself has no currency column, since a single statement is always in one currency.
+
+Column matching is case-insensitive against a small alias list (`date`/`transaction date`/`posted date`; `description`/`merchant`/`payee`/`note`; `type`), because real bank/card exports don't agree on header names and this app isn't trying to auto-detect every issuer's exact format — that's the explicit scope line: a documented, small alias list, not a general bank-format-sniffing engine.
+
+**The amount is carried one of two shapes, resolved in the service layer, not aliased into one column at parse time:** a single signed `amount` column (sign gives the direction — negative = expense, positive = income), or separate unsigned `debit`/`credit` columns (the standard bank-statement shape: exactly one populated per row, Debit = money out = expense, Credit = money in = income). `amount` wins if a row somehow has both. If a row's `type` column is absent, income/expense is inferred from whichever shape is present. **`debit` is deliberately not an alias of `amount`** — it was, in the first version of this feature, and it was a real, user-reported bug: Capital One's actual CSV export has separate Debit/Credit columns holding *unsigned* magnitudes, no signed Amount column at all, so treating a lone "Debit" header as a signed amount and sign-inferring the type meant every purchase (a positive Debit value) was mislabeled as income. Fixed by giving `domain.ImportRow` its own `Debit`/`Credit` fields and a dedicated `resolveImportAmount` step, with a regression test built directly from the real file's shape (a Debit-only purchase row, a Credit-only payment row) so this can't silently regress.
+
+**A bad row is skipped, never fatal to the rest of the file** — the response is always `200` (not `207` or a partial-failure status code; this repo's envelope has no multi-status convention, and inventing one for a single endpoint wasn't worth it) with `{imported, skipped, errors}`, where `errors` is capped at 20 entries but `skipped` always reports the true count. This is a deliberate divergence from every other write endpoint in the fleet, which either fully succeeds or fully fails — a CSV import treats "some rows in a large statement are garbage" as the expected case, not an error condition, since a user importing 200 real transactions shouldn't have the whole import rejected over 2 malformed rows.
+
+Capped at 5000 data rows per request (a defense-in-depth ceiling, not a real-world limit — no bulk-insert path exists, each row is its own `Create`-equivalent call) and subject to the gateway's `MAX_REQUEST_BODY_BYTES` limit like every other request (see the Request Body Size Limit section above) — no special-casing for this endpoint's larger-than-JSON payloads, since a real statement CSV is well under the 1 MiB default.
 
 ### budget-service (owns: budgets, savings goals, reports)
 ```

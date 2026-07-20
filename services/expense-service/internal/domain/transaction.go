@@ -78,6 +78,55 @@ type TransactionService interface {
 	Get(ctx context.Context, userID, id string) (*Transaction, error)
 	Update(ctx context.Context, userID, id string, in UpdateTransactionInput) (*Transaction, error)
 	Delete(ctx context.Context, userID, id string) error
+	Import(ctx context.Context, userID, accountID string, rows []ImportRow) (ImportResult, error)
+}
+
+// ImportRow is one CSV data row, still raw strings — column parsing
+// (encoding/csv, header aliasing) is the handler's job, same as JSON
+// binding is for Create/Update; turning those raw strings into a valid
+// Transaction (date formats, amount signs, income-vs-expense inference) is
+// business logic, so it happens in the service, not the handler.
+//
+// A CSV carries its amount one of two shapes, never both interpreted at
+// once (Amount wins if both happen to be present): a single signed
+// "Amount" column (sign gives the direction), or a separate "Debit"/
+// "Credit" pair — the standard bank-statement shape, where both columns
+// hold unsigned magnitudes and only one is populated per row. Capital
+// One's own real CSV export uses exactly the latter shape (Debit for
+// purchases, Credit for payments), which is what makes this a real
+// column shape to support, not a hypothetical one — a naive "Debit is
+// just another alias for Amount" treatment silently mislabeled every
+// purchase as income, since Debit values are always positive.
+type ImportRow struct {
+	Date        string
+	Description string
+	Amount      string
+	Debit       string
+	Credit      string
+	// Type is optional: an explicit "income"/"expense" override. Most
+	// credit card statement exports don't have this column at all — when
+	// empty, the type is inferred from whichever amount shape is present:
+	// Amount's sign (negative = expense, positive = income), or which of
+	// Debit/Credit is populated (Debit = expense, Credit = income).
+	Type string
+}
+
+// ImportRowError explains why one CSV row was skipped. Row is 1-indexed
+// against the uploaded file's own lines, with the header counted as row 1
+// (so the first data row is row 2) — matching what a user sees if they
+// open the CSV in a spreadsheet, not a 0-indexed slice position.
+type ImportRowError struct {
+	Row     int    `json:"row"`
+	Message string `json:"message"`
+}
+
+// ImportResult summarizes a CSV import. Errors is capped (see
+// service.maxImportErrors) so a garbage file with thousands of bad rows
+// doesn't blow up the response — Skipped still reports the true total.
+type ImportResult struct {
+	Imported int              `json:"imported"`
+	Skipped  int              `json:"skipped"`
+	Errors   []ImportRowError `json:"errors"`
 }
 
 // CreateTransactionInput carries validated fields for creating a Transaction.

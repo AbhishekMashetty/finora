@@ -237,6 +237,71 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /api/v1/transactions/import:
+    post:
+      tags: [transactions]
+      summary: Bulk-import transactions from a CSV (e.g. a credit card statement export)
+      description: >
+        Every imported row is attached to account_id and inherits that
+        account's currency — the CSV itself carries no currency column,
+        matching how a single statement is always in one currency. The CSV's
+        header row is matched case-insensitively against a small alias list
+        per column (Date: "date"/"transaction date"/"posted date";
+        Description: "description"/"merchant"/"payee"/"note"; Type: "type",
+        optional). The amount itself is carried one of two shapes — exactly
+        one must be present, Amount wins if both are: a single signed
+        "amount" column (sign gives the direction), or separate unsigned
+        "debit"/"credit" columns (the standard bank-statement shape — e.g.
+        Capital One's own export uses exactly this, with no signed Amount
+        column at all; Debit = expense, Credit = income). Amounts accept a
+        leading "$", thousands-separator commas, and parenthesized negatives
+        ("(45.00)"), on top of a plain signed number. If the Type column is
+        absent or blank for a row, income/expense is inferred from whichever
+        amount shape is present (Amount's sign, or which of Debit/Credit is
+        populated). A row that fails to parse (bad date, bad amount,
+        unrecognized type) is skipped, not fatal to the rest of the file —
+        see the response schema. At most 5000 data rows per request.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [account_id, file]
+              properties:
+                account_id:
+                  type: string
+                  description: The account every imported transaction is attached to.
+                file:
+                  type: string
+                  format: binary
+                  description: The CSV file (e.g. a downloaded credit card statement export).
+      responses:
+        "200":
+          description: OK — always 200 even if some rows were skipped; see skipped/errors.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          imported: { type: integer, description: "Rows successfully created as transactions" }
+                          skipped: { type: integer, description: "Rows that could not be parsed/saved (true count, even past the errors cap below)" }
+                          errors:
+                            type: array
+                            description: Capped at 20 entries even if more rows were skipped.
+                            items:
+                              type: object
+                              properties:
+                                row: { type: integer, description: "1-indexed against the uploaded file's own lines; the header is row 1, so the first data row is row 2" }
+                                message: { type: string }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /api/v1/transactions/{id}:
     parameters:
       - $ref: "#/components/parameters/TransactionId"

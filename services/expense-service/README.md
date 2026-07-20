@@ -27,6 +27,7 @@ never confirm the existence of another user's data.
 | GET    | `/api/v1/transactions/:id`| -                                                            | `200 {transaction}`                         |
 | PUT    | `/api/v1/transactions/:id`| `{account_id, category_id?, type, amount, currency, date, note?}` | `200 {transaction}`                    |
 | DELETE | `/api/v1/transactions/:id`| -                                                            | `204`                                        |
+| POST   | `/api/v1/transactions/import` | `multipart/form-data: account_id, file` (CSV)           | `200 {imported, skipped, errors: [{row, message}]}` |
 | GET    | `/api/v1/categories`      | -                                                            | `200 {categories: []}`                       |
 | POST   | `/api/v1/categories`      | `{name, type}`                                               | `201 {category}`                            |
 
@@ -45,6 +46,39 @@ previously `page` echoed back `0` whenever `?page=` was omitted, and
 `page_size` wasn't returned at all). Optional filters: `account_id`,
 `category`, and a `from`/`to` date range applied to the transaction's `date`
 field (accepts RFC3339 or `YYYY-MM-DD`).
+
+### CSV import
+
+`POST /transactions/import` bulk-creates transactions from an uploaded CSV
+(e.g. a downloaded credit card statement export), all attached to the
+`account_id` form field and inheriting that account's `currency` — the CSV
+itself carries no currency column. Header matching is case-insensitive
+against a small alias list, since real exports don't agree on column names:
+
+| Field | Recognized headers |
+|---|---|
+| Date (required) | `date`, `transaction date`, `posted date` |
+| Description (optional) | `description`, `merchant`, `payee`, `note` |
+| Type (optional) | `type` — `income` or `expense`; if absent, inferred from whichever amount shape is present (see below) |
+
+The amount itself is carried one of two shapes — **exactly one must be present** (Amount wins if a file somehow has both):
+
+- **`amount`** — a single signed column; sign gives the direction (negative = expense, positive = income).
+- **`debit` and/or `credit`** — the standard bank-statement shape, two separate *unsigned* columns, only one populated per row (Debit for money out = expense, Credit for money in = income). This is what real exports actually use — e.g. Capital One's own CSV export has exactly this shape, with no signed Amount column at all. `debit` is **not** an alias for `amount`: a lone Debit column holds unsigned magnitudes, so treating it as a signed amount and sign-inferring the type would label every purchase as income — a real bug this app shipped with once, fixed by treating Debit/Credit as their own concept.
+
+Amount/Debit/Credit all accept a leading `$`, thousands-separator commas, and
+parenthesized negatives (`(45.00)`), on top of a plain signed number. Date
+accepts RFC3339, `YYYY-MM-DD`, or `MM/DD/YYYY`.
+
+A row that fails to parse (bad date, bad amount, unrecognized explicit
+type) is **skipped, not fatal** — the rest of the file still imports. The
+response always returns `200` with `{imported, skipped, errors}`; `errors`
+is capped at 20 entries (`row` is 1-indexed against the file's own lines,
+header included, so the first data row is row 2), but `skipped` always
+reports the true total. At most 5000 data rows per request — see
+`architecture/api-contracts.md` for the full contract, including why this
+inherits the gateway's `MAX_REQUEST_BODY_BYTES` limit like every other
+request.
 
 ## Health
 
