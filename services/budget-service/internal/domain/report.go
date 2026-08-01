@@ -39,24 +39,14 @@ type ExpenseClient interface {
 	SumExpensesByCategory(ctx context.Context, userID, categoryName string, from, to time.Time) (float64, error)
 }
 
-// NotificationClient is the outbound interface report_service depends on to
-// create an in-app notification for a user when Summary finds a budget over
-// spend. Defined here in domain (not internal/client) so report_service
-// depends only on this interface, never the concrete HTTP implementation
-// (Dependency Inversion) — this keeps report_service unit-testable with a
-// fake, per CLAUDE.md §7.
-//
-// This is a deliberate, documented trade-off: Finora has no event bus yet
-// (Phase 7 introduces one), so a read endpoint (GET /reports/summary) is the
-// only place that currently computes "is this budget over spent," and it
-// triggers the notification as a side effect of being read rather than a
-// real domain event. See architecture/api-contracts.md's
-// budget-service -> notification-service subsection.
-type NotificationClient interface {
-	Notify(ctx context.Context, userID, title, message string) error
-}
-
 // ReportService is the business-logic surface the reports handler depends on.
+//
+// Phase 7 note: Summary is a pure read again — it used to also trigger an
+// overspend notification as a side effect (a documented, deliberate
+// trade-off from before this fleet had an event bus), which read-endpoint
+// side effect has now been removed entirely. Overspend detection moved to
+// overspendService, triggered by a real finora.transaction.created event
+// instead of a page load — see internal/service/overspend_service.go.
 type ReportService interface {
 	Summary(ctx context.Context, userID string, from, to time.Time) (*ReportSummary, error)
 }

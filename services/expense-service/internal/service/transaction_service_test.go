@@ -2,12 +2,18 @@ package service_test
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/finora/expense-service/internal/domain"
 	"github.com/finora/expense-service/internal/service"
 )
+
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
 
 func setupTransactionServiceWithAccount(t *testing.T, userID string) (domain.TransactionService, *fakeAccountRepository, string) {
 	t.Helper()
@@ -23,7 +29,7 @@ func setupTransactionServiceWithAccountAndCategory(t *testing.T, userID string) 
 	accountRepo := newFakeAccountRepository()
 	categoryRepo := newFakeCategoryRepository()
 	txRepo := newFakeTransactionRepository()
-	svc := service.NewTransactionService(txRepo, accountRepo, categoryRepo)
+	svc := service.NewTransactionService(txRepo, accountRepo, categoryRepo, newFakeEventPublisher(), discardLogger())
 
 	accountSvc := service.NewAccountService(accountRepo)
 	account, err := accountSvc.Create(context.Background(), userID, domain.CreateAccountInput{
@@ -327,7 +333,7 @@ func TestTransactionService_List_ScopedToUser(t *testing.T) {
 	accountRepo := newFakeAccountRepository()
 	categoryRepo := newFakeCategoryRepository()
 	txRepo := newFakeTransactionRepository()
-	svc := service.NewTransactionService(txRepo, accountRepo, categoryRepo)
+	svc := service.NewTransactionService(txRepo, accountRepo, categoryRepo, newFakeEventPublisher(), discardLogger())
 	accountSvc := service.NewAccountService(accountRepo)
 	ctx := context.Background()
 

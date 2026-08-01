@@ -106,6 +106,21 @@ Indexes:
 Indexes:
 - Index on `user_id`.
 
+**`outbox_events`** (Phase 7 — see `architecture/api-contracts.md`'s Async Events section)
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `subject` | string | NATS subject, e.g. `finora.transaction.created` |
+| `msg_id` | string | JetStream `Msg-Id` dedup key (this service uses the transaction's own `_id`) |
+| `payload` | bytes | the JSON-encoded event |
+| `created_at` | time | |
+| `published_at` | time, nullable | set once `shared/outbox.Relay` confirms the NATS publish succeeded; `nil` means still queued/retrying |
+
+Indexes:
+- Index on `published_at` — the relay's poll query is "unpublished events" (`published_at == nil`), on every poll tick.
+
+Written by `internal/events.OutboxPublisher` (expense-service's `domain.EventPublisher` implementation) in the same call path as a transaction insert — not atomically with it, since this service's Mongo runs standalone, not as a replica set (see the Async Events doc for the full trade-off). Drained by a background `shared/outbox.Relay` goroutine polling every `OUTBOX_RELAY_INTERVAL`.
+
 ### budget-service — `finora_budgets`
 
 **`budgets`**
@@ -139,6 +154,8 @@ Indexes:
 **Note on the collection name:** this table was originally sketched as `savings_goals`, but `services/budget-service/internal/repository/mongo_goal_repository.go` has always used `db.Collection("goals")` — verified directly against the code during Phase 3 rather than trusting this doc (the same kind of doc/code drift Phase 2 caught for expense-service's `category_id` field). The collection was **not** renamed to match the doc; the doc is corrected to match the code, since there's no compelling reason to churn a working collection name and no data yet to migrate.
 
 Reports (`/api/v1/reports/summary`) are computed on read from `budgets` plus a real REST call to expense-service (`GET /api/v1/categories` then `GET /api/v1/transactions?category=<id>&...`, see `architecture/api-contracts.md`'s budget-service → expense-service subsection) — not a persisted collection.
+
+**`outbox_events`** (Phase 7) — identical shape and purpose to expense-service's `outbox_events` above (same `shared/outbox.Store`/`Relay`), publishing `finora.budget.overspent` events. Written by `internal/events.OutboxPublisher` from `OverspendService.notifyIfOverspent`, keyed by `msg_id = budgetID + ":" + periodStart` for JetStream dedup. See `architecture/api-contracts.md`'s Async Events section.
 
 ### notification-service — `finora_notifications`
 

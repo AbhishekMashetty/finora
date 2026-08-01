@@ -38,6 +38,8 @@ flowchart TB
         DN[(finora_notifications)]
     end
 
+    NATS[["nats\nJetStream event bus"]]
+
     Browser --> FE
     Browser -. "direct API calls" .-> GW
     FE --> GW
@@ -52,7 +54,12 @@ flowchart TB
     BS --> DB
     NS --> DN
 
-    BS -. "future: Phase 3 reports\ncall via REST" .-> ES
+    BS -->|"REST: reports (query only)"| ES
+
+    ES -->|"publish finora.transaction.created\n(via outbox)"| NATS
+    NATS -->|"consume"| BS
+    BS -->|"publish finora.budget.overspent\n(via outbox)"| NATS
+    NATS -->|"consume"| NS
 ```
 
 **Request flow for a protected call** (e.g. `GET /api/v1/accounts`):
@@ -83,7 +90,7 @@ Per `plan.md`, the following are **explicitly not built yet** — today's archit
 | Future capability | How today's architecture makes room for it |
 |---|---|
 | **Redis** | Would sit behind a cache/rate-limit interface in `shared`; no service currently assumes an in-process cache, so nothing to unwind. |
-| **NATS / RabbitMQ** | REST-only today by design (`plan.md`: "do not introduce unnecessary complexity"). Phase 7 of `architecture/development-roadmap.md` introduces NATS for domain events (e.g. notifications), replacing specific synchronous calls, not the whole API. |
+| **NATS / RabbitMQ** | ✅ **Built, Phase 7.** NATS JetStream is now live: `finora.transaction.created` (expense-service → budget-service) and `finora.budget.overspent` (budget-service → notification-service), each backed by a Mongo transactional outbox (`shared/outbox`) for reliable delivery. See `architecture/api-contracts.md`'s Async Events section. REST remains the default for everything else, including the one remaining synchronous cross-service query (budget-service → expense-service, report actuals) — this replaced one specific synchronous call, not the whole API. |
 | **OpenTelemetry** | `X-Request-Id` is already propagated end-to-end (gateway → services) via `shared/middleware`; swapping that propagation for trace context is additive, not a redesign. Phase 8. |
 | **Prometheus** | Every service already has one HTTP entrypoint (`shared/server`) where a `/metrics` handler can be registered alongside `/health`. Phase 8. |
 | **Grafana / Loki / Tempo** | JSON structured logs to stdout today (`shared/logger`) are already log-shipper-ready; no app-side change needed to add a collector. |

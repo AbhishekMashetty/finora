@@ -89,11 +89,13 @@ A **full request-validation coverage audit** (read-only `finora-reviewer` pass o
 
 ---
 
-### Phase 7 — Async messaging seam
+### Phase 7 — Async messaging seam — ✅ COMPLETE (2026-07-31)
 
 **Goal:** introduce **NATS** for domain events, replacing synchronous REST notification calls with published events while keeping REST for queries. Outbox/idempotency patterns as needed to keep delivery reliable.
 
 **Done when:** notifications are event-driven and services are decoupled for those flows.
+
+**Verified:** `shared/eventbus` (NATS JetStream wrapper — chosen over core NATS pub/sub specifically for at-least-once delivery + durable consumers) and `shared/outbox` (Mongo-backed transactional outbox + polling relay, explicitly documented as non-atomic given this project's standalone, non-replica-set MongoDB) were built and integration-tested against real, disposable `nats:2-alpine`/`mongo:7` containers first, before touching any service. Then wired identically across the three affected services: expense-service publishes `finora.transaction.created` after every transaction insert (including each row of a CSV import); budget-service's new `OverspendService` consumes it, recomputes the current period's actual spend via the pre-existing `expenseClient.SumExpensesByCategory` REST call (kept as REST — a genuine query, not a notification), and publishes `finora.budget.overspent` using the same `LastNotifiedAt`-exact-period-match dedup rule Phase 4 established, now applied to an event trigger instead of a report read; notification-service's new `OverspendConsumer` formats and creates the same notification shape the old REST trigger produced. The entire Phase 4–6 synchronous `budget-service → notification-service` REST call (`domain.NotificationClient`, `internal/client/notification_client.go`) is deleted — `report_service.Summary()` is a pure read again. `docker-compose.yml` gained a `nats` service (JetStream enabled, explicit storage dir so durability survives container recreation, healthcheck via its monitoring endpoint) wired as a dependency into all three services. Full detail — including the nats.go/Go-1.21.3 toolchain-pinning bisection, the shared-package transitive-dependency ripple that broke `gateway`'s and `user-service`'s Docker builds even though neither service's code changed, and a live end-to-end verification through the real running stack (create a transaction over budget → real notification appears via `GET /api/v1/notifications`, with the full chain traced through both services' outbox collections and NATS's own JetStream monitoring API) — is in `plan.md`'s Phase 7 progress log.
 
 ---
 

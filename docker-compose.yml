@@ -51,6 +51,11 @@ services:
     command: *mongo-command
     volumes: ["mongo-user-data:/data/db"]
     healthcheck: *mongo-healthcheck
+    # Host-side port so MongoDB Compass (or any client on the host, outside
+    # the docker network) can connect directly — services inside the
+    # network still reach this container by name (mongo-user:27017)
+    # regardless of this mapping, per USER_SERVICE_MONGO_URI above.
+    ports: ["${MONGO_USER_PORT:-27017}:27017"]
 
   mongo-expense:
     image: mongo:7
@@ -58,6 +63,7 @@ services:
     command: *mongo-command
     volumes: ["mongo-expense-data:/data/db"]
     healthcheck: *mongo-healthcheck
+    ports: ["${MONGO_EXPENSE_PORT:-27018}:27017"]
 
   mongo-budget:
     image: mongo:7
@@ -65,6 +71,7 @@ services:
     command: *mongo-command
     volumes: ["mongo-budget-data:/data/db"]
     healthcheck: *mongo-healthcheck
+    ports: ["${MONGO_BUDGET_PORT:-27019}:27017"]
 
   mongo-notification:
     image: mongo:7
@@ -72,6 +79,34 @@ services:
     command: *mongo-command
     volumes: ["mongo-notification-data:/data/db"]
     healthcheck: *mongo-healthcheck
+    ports: ["${MONGO_NOTIFICATION_PORT:-27020}:27017"]
+
+  # -------------------------------------------------------------------- NATS
+  # Phase 7's event bus (JetStream, for at-least-once delivery + persistence
+  # — see shared/eventbus's doc comment for why core NATS pub/sub alone
+  # isn't enough). One shared instance for the whole fleet, same "one
+  # instance of shared infrastructure, not one per service" reasoning as
+  # this being a single container rather than N per-service brokers — unlike
+  # MongoDB, an event bus is inherently cross-service infrastructure, not
+  # data a single service owns.
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    # -js: enable JetStream. -sd /data: persist JetStream's stream/consumer
+    # state to the mounted volume — without an explicit store dir,
+    # JetStream defaults to a location that doesn't survive a container
+    # recreation, which would silently defeat the whole point of using
+    # JetStream (durable consumers resuming after a restart) the moment
+    # this container itself restarts, not just the services connecting to
+    # it. -m: expose the monitoring/healthz endpoint the healthcheck below uses.
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes: ["nats-data:/data"]
+    ports: ["${NATS_PORT:-4222}:4222"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # ---------------------------------------------------------------- Services
   user-service:
@@ -106,9 +141,12 @@ services:
       <<: *go-service-env
       EXPENSE_SERVICE_PORT: "8082"
       EXPENSE_SERVICE_MONGO_URI: mongodb://mongo-expense:27017/finora_expenses
+      NATS_URL: nats://nats:4222
     ports: ["8082:8082"]
     depends_on:
       mongo-expense:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8082/ready"]
@@ -125,9 +163,12 @@ services:
       <<: *go-service-env
       BUDGET_SERVICE_PORT: "8083"
       BUDGET_SERVICE_MONGO_URI: mongodb://mongo-budget:27017/finora_budgets
+      NATS_URL: nats://nats:4222
     ports: ["8083:8083"]
     depends_on:
       mongo-budget:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8083/ready"]
@@ -144,9 +185,12 @@ services:
       <<: *go-service-env
       NOTIFICATION_SERVICE_PORT: "8084"
       NOTIFICATION_SERVICE_MONGO_URI: mongodb://mongo-notification:27017/finora_notifications
+      NATS_URL: nats://nats:4222
     ports: ["8084:8084"]
     depends_on:
       mongo-notification:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8084/ready"]
@@ -201,3 +245,4 @@ volumes:
   mongo-expense-data:
   mongo-budget-data:
   mongo-notification-data:
+  nats-data:

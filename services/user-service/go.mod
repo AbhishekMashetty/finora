@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	go.mongodb.org/mongo-driver v1.17.1
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.31.0
 )
 
 require (
@@ -43,7 +43,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.4 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
@@ -83,9 +83,9 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.23.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/grpc v1.59.0 // indirect

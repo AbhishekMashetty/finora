@@ -80,6 +80,12 @@ reports the true total. At most 5000 data rows per request — see
 inherits the gateway's `MAX_REQUEST_BODY_BYTES` limit like every other
 request.
 
+## Async events (Phase 7)
+
+After every successful transaction write (`POST /transactions`, `PUT /transactions/:id`'s underlying `Create` path, and each row of a CSV import), this service publishes a `finora.transaction.created` event to NATS JetStream — consumed by budget-service to recompute overspend status. See `architecture/api-contracts.md`'s Async Events section for the full payload/contract.
+
+Publishing goes through a **Mongo-backed transactional outbox**, not a direct NATS publish: `transactionService.publishCreated` enqueues the event into this service's own `outbox_events` collection in the same call path as the transaction insert, and a background relay (`shared/outbox.Relay`, polling every `OUTBOX_RELAY_INTERVAL`) drains it to NATS with retry-on-failure. A publish failure (enqueue or relay) is logged and never fails the transaction write — the write already succeeded, and failing the caller would wrongly suggest a retry (which would create a duplicate transaction).
+
 ## Health
 
 Every service exposes the same trio (implemented once in `shared/health`):
@@ -102,6 +108,8 @@ Also serves `GET /openapi.yaml` — this service's spec, live from disk (see
 | `LOG_LEVEL`                   | `debug`, `info` (default), `warn`, `error`         | `info`                                             |
 | `SHUTDOWN_TIMEOUT`            | Graceful shutdown drain window                     | `10s`                                              |
 | `CORS_ALLOWED_ORIGINS`        | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |
+| `NATS_URL`                    | NATS JetStream connection string (Phase 7 — publishes `finora.transaction.created`) | `nats://nats:4222` |
+| `OUTBOX_RELAY_INTERVAL`       | How often the outbox relay polls for unpublished events and retries publishing them | `2s` |
 
 See the repo root `.env.example` for the exact names shared across services.
 
@@ -155,6 +163,7 @@ internal/config/       - env loading (wraps shared/config)
 internal/domain/       - plain structs + repository/service interfaces (no framework imports)
 internal/repository/   - MongoDB implementations of domain interfaces
 internal/service/      - business logic; depends only on domain interfaces (unit-testable with fakes)
+internal/events/       - domain.EventPublisher implementation (OutboxPublisher, wraps shared/outbox.Store) - Phase 7
 internal/handler/      - Gin handlers: bind/validate, call service, respond via shared/httpx
 internal/router/       - gin.Engine + middleware wiring
 ```

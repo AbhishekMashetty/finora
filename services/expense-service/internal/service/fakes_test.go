@@ -193,3 +193,23 @@ func (f *fakeCategoryRepository) GetByIDForUser(_ context.Context, id, userID st
 func idFromInt(n int) string {
 	return fmt.Sprintf("id-%d", n)
 }
+
+// fakeEventPublisher is a hand-written stand-in for domain.EventPublisher
+// (Phase 7), recording every published transaction so tests can assert on
+// what would have been published without a real outbox/NATS.
+type fakeEventPublisher struct {
+	published []domain.Transaction
+	err       error
+}
+
+func newFakeEventPublisher() *fakeEventPublisher {
+	return &fakeEventPublisher{}
+}
+
+func (f *fakeEventPublisher) PublishTransactionCreated(_ context.Context, tx *domain.Transaction) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.published = append(f.published, *tx)
+	return nil
+}

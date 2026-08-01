@@ -12,18 +12,25 @@ import (
 
 // Config is the fully-resolved configuration for one process lifetime.
 type Config struct {
-	Port                   string
-	MongoURI               string
-	LogLevel               string
-	ShutdownTimeout        time.Duration
-	CORSAllowedOrigins     []string
-	ExpenseServiceURL      string
-	NotificationServiceURL string
+	Port                string
+	MongoURI            string
+	LogLevel            string
+	ShutdownTimeout     time.Duration
+	CORSAllowedOrigins  []string
+	ExpenseServiceURL   string
+	NATSURL             string
+	OutboxRelayInterval time.Duration
 }
 
 // Load reads every env var budget-service consumes. The Mongo URI has no
 // sane default and uses MustGetEnv, so misconfiguration fails fast at boot
 // rather than surfacing as a confusing runtime error later.
+//
+// Phase 7 note: NotificationServiceURL (the Phase-4 REST call target for
+// the reports-triggered overspend notification) is gone — that synchronous
+// call has been replaced by a published finora.budget.overspent event (see
+// internal/service/overspend_service.go), so budget-service no longer
+// calls notification-service directly at all.
 func Load() Config {
 	return Config{
 		Port:               sharedconfig.GetEnv("BUDGET_SERVICE_PORT", "8083"),
@@ -32,16 +39,14 @@ func Load() Config {
 		ShutdownTimeout:    sharedconfig.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 		CORSAllowedOrigins: splitCSV(sharedconfig.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 		// ExpenseServiceURL is the Phase-3 cross-service call target for
-		// reports (budget-vs-actual). Same docker-compose network address
-		// the gateway uses to reach expense-service (see .env.example).
+		// reports (budget-vs-actual) AND (Phase 7) overspend recomputation.
+		// Same docker-compose network address the gateway uses to reach
+		// expense-service (see .env.example).
 		ExpenseServiceURL: sharedconfig.GetEnv("EXPENSE_SERVICE_URL", "http://expense-service:8082"),
-		// NotificationServiceURL is the Phase-4 cross-service call target
-		// for the reports-triggered overspend notification (see
-		// internal/service/report_service.go's Summary). Same
-		// docker-compose network address the gateway uses to reach
-		// notification-service (see .env.example) — the var itself already
-		// existed as a forward-looking seam before this phase wired it up.
-		NotificationServiceURL: sharedconfig.GetEnv("NOTIFICATION_SERVICE_URL", "http://notification-service:8084"),
+		// NATSURL defaults to the docker-compose service name, same
+		// reasoning as ExpenseServiceURL defaulting to expense-service's.
+		NATSURL:             sharedconfig.GetEnv("NATS_URL", "nats://nats:4222"),
+		OutboxRelayInterval: sharedconfig.GetEnvDuration("OUTBOX_RELAY_INTERVAL", 2*time.Second),
 	}
 }
 

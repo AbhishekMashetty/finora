@@ -207,23 +207,62 @@ To compute `actual` for a budget's category, budget-service calls **expense-serv
 
 Implemented in `services/budget-service/internal/client/expense_client.go` behind `domain.ExpenseClient`, so `internal/service/report_service.go` depends only on that interface (Dependency Inversion), never a concrete HTTP client — this keeps report_service unit-testable with a fake, per `CLAUDE.md` §7.
 
-#### budget-service → notification-service (Phase 4 — the overspend-notification trigger)
+#### budget-service → notification-service — SUPERSEDED by Phase 7's async event (see Async Events, below)
 
-`GET /api/v1/reports/summary`'s `Summary()` also triggers a real in-app notification when it finds a budget over spent for the requested range: immediately after computing a category's `actual`/`remaining`, if `remaining < 0`, budget-service calls **notification-service** directly over REST, forwarding the caller's `X-User-Id` header exactly as it does for expense-service (same internal-network trust mechanism, no JWT):
+Through Phase 4–6, `GET /api/v1/reports/summary`'s `Summary()` triggered a real in-app notification synchronously, over REST, as a side effect of a `GET` request — a documented, deliberate trade-off accepted only because Finora had no event bus yet. **Phase 7 removes this entirely.** `Summary()` is a pure read again (`domain.NotificationClient` and `internal/client/notification_client.go` are deleted; `NewReportService` is now 2-arg: `budgetRepo, expenseClient`). The overspend check and notification are now event-driven — see the Async Events section below for the replacement, including the equivalent dedup rule (now keyed the same way, `LastNotifiedAt`-exact-period-match, just triggered by a consumed event instead of a report read).
 
+#### budget-service → expense-service remains synchronous REST (unchanged by Phase 7)
+
+The cross-service call above (resolving a category name and summing expense transactions) is a genuine **query** — a client asking "what is the actual spend right now" — which is exactly the kind of interaction Phase 7 explicitly keeps as REST (`CLAUDE.md` §2: "REST for queries, async events for domain notifications"). It is reused as-is by the new event-driven overspend check (`OverspendService.HandleTransactionCreated`, see below) to recompute a budget's current-period actual whenever a `transaction.created` event arrives.
+
+## Async Events (Phase 7)
+
+Finora's one messaging exception to "REST only" (`CLAUDE.md` §2): **NATS JetStream**, chosen over core NATS pub/sub specifically for at-least-once delivery + message persistence + durable consumers — a subscriber that's down when an event is published still receives it once it comes back up, which core pub/sub cannot do. One shared JetStream-enabled NATS instance (`nats`, docker-compose) serves the whole fleet, on one stream:
+
+| | |
+|---|---|
+| **Stream** | `FINORA_EVENTS` (subjects: `finora.>`, retention: limits policy, 30-day max age) |
+| **Subjects** | `finora.transaction.created` (published by expense-service, consumed by budget-service), `finora.budget.overspent` (published by budget-service, consumed by notification-service) |
+
+Each subject's stream/subject-name constants and payload structs are **independently defined as matching literal values** in each service's own `internal/domain/event.go` — not shared via a `shared/` Go package — because every service is an independently buildable Go module (`CLAUDE.md` §10) and a `shared` type would violate that. This is a cross-service string contract, verified by convention and by the integration/E2E tests below, not by the compiler. Keep the three services' `event.go` files in sync by hand whenever a payload shape changes.
+
+### `finora.transaction.created`
+
+Published by expense-service immediately after a transaction is persisted (`transactionService.Create`, and once per row in the CSV import path), best-effort — a publish failure is logged and never fails the transaction write itself, since the write already succeeded and failing the caller would wrongly suggest a retry (which would create a duplicate transaction).
+
+```json
+{
+  "transaction_id": "...", "user_id": "...", "account_id": "...", "category_id": "...",
+  "type": "expense", "amount": 75, "currency": "USD", "date": "2026-07-31T00:00:00Z"
+}
 ```
-POST /api/v1/notifications   {title: "Budget exceeded", message: "You've spent {actual} of your {budgeted} {period} {category} budget.", type: "overspend"}
+
+Consumed by budget-service's durable consumer `budget-service-transaction-created`. On receipt, `OverspendService.HandleTransactionCreated(ctx, userID, now)` lists the user's budgets and, for each, recomputes the **current period's** actual spend via the existing synchronous `expenseClient.SumExpensesByCategory` REST call (see above) — it does not trust anything about the event payload beyond `user_id`, so a stale or partial event can't corrupt the check. Only the current period is evaluated (an event has no caller-supplied date range the way a report request does); a backdated transaction still correctly contributes to the current period's sum because `SumExpensesByCategory` sums by date range, not by "recently created." A per-budget expense-service error is logged and skipped, not fatal to checking the user's other budgets.
+
+### `finora.budget.overspent`
+
+Published by budget-service (`OverspendService.notifyIfOverspent`) when a budget's recomputed `actual` exceeds its `amount`, using the **same dedup rule** Phase 4–6 used for the REST version: `domain.Budget.LastNotifiedAt` stores the current period's `from` boundary, and a budget only publishes if that boundary hasn't already been notified for. Deduped again at the transport layer via JetStream's `Msg-Id` header (`jetstream.WithMsgID`, keyed on `budgetID + ":" + periodStart`) — if the outbox relay retries a publish (e.g. after a crash between enqueueing and the broker ack), the duplicate collapses into one delivered message within NATS's dedup window, rather than relying solely on the application-level check.
+
+```json
+{
+  "budget_id": "...", "user_id": "...", "category": "groceries", "period": "monthly",
+  "budgeted": 50, "actual": 75, "period_start": "2026-07-01T00:00:00Z"
+}
 ```
 
-Implemented in `services/budget-service/internal/client/notification_client.go` behind `domain.NotificationClient`, so `report_service.go` depends only on that interface, never a concrete HTTP client — same Dependency Inversion pattern as `ExpenseClient`, unit-testable with a fake.
+Consumed by notification-service's durable consumer `notification-service-budget-overspent`. `OverspendConsumer.HandleBudgetOverspent` formats `title: "Budget exceeded"` / `message: "You've spent {actual} of your {budgeted} {period} {category} budget."` and calls the existing `notificationService.Create` — the same notification shape the old REST trigger produced, so the frontend Notifications page needed zero changes.
 
-**Dedup rule (so a dashboard reload doesn't spam the user):** `domain.Budget` carries an internal, non-API-visible `LastNotifiedAt *time.Time` field (`json:"-"`). Despite the name, it stores the **period's `from` boundary** that was last notified for, not a wall-clock timestamp — a budget notifies only if `LastNotifiedAt == nil` or `!LastNotifiedAt.Equal(from)` (the report's requested `from`). Concretely: the first dashboard/report load that finds a category newly over budget notifies once for that exact `[from, to]`; reloading the same range doesn't re-notify; querying any *other* period (earlier or later, doesn't matter which) notifies again if that period is also over budget.
->
-> An earlier version of this rule compared `LastNotifiedAt` against `from` as a time *ordering* ("notified at-or-after the period start") rather than an exact match, using the real notify timestamp. That broke for out-of-order queries: a user notified today for the current month, who then loaded an older, never-before-viewed over-budget month, would have that legitimate first notification wrongly suppressed — "today" is after the older month's `from`, so the ordering check treated it as already-notified. Caught in review before shipping; fixed by keying dedup on exact-period-match instead of time ordering, and storing the period boundary itself rather than the notify time.
+### The outbox pattern (`shared/outbox`), and why it is not a true atomic outbox
 
-**This is a deliberate, documented trade-off**, not an accident of REST semantics: a `GET` request having a side effect (creating a notification, mutating `LastNotifiedAt`) isn't pure REST, and it exists only because Finora has no event bus yet (per `CLAUDE.md` §2/`plan.md`, async messaging is explicitly deferred to Phase 7). The alternative — a real overspend *event* published when a transaction is created, consumed by notification-service — is exactly what Phase 7 (async messaging seam, `architecture/development-roadmap.md`) replaces this with; this read-triggered version is the pragmatic stand-in until then, chosen over the alternative of building a bespoke polling/cron job (more moving parts, another scheduler to operate, for a problem a future event bus solves properly).
+Both expense-service and budget-service publish through a **transactional outbox**: a write to a new `outbox_events` Mongo collection (own database, per `CLAUDE.md` §2's one-DB-per-service rule) in the same call path as the triggering write (the transaction insert; the budget-overspent detection), plus a separate background `shared/outbox.Relay` goroutine that polls for unpublished events (`OUTBOX_RELAY_INTERVAL`, default `2s`) and publishes them to NATS, retrying indefinitely on failure (an event stays unpublished, and gets retried, until a publish succeeds).
 
-A `Notify` failure (e.g. notification-service unreachable) is logged and swallowed — it never fails the report response, since the report itself was already computed correctly and a transient notification-delivery hiccup shouldn't turn a working read endpoint into a `500`.
+**This is deliberately not a true atomic outbox.** The textbook pattern writes the business row and the outbox row in one atomic transaction (impossible to have one without the other). MongoDB multi-document ACID transactions require a replica set; this project's Mongo containers run standalone (`docker-compose.yml` has no `--replSet` flag, per the local-footprint trade-off `architecture/database-design.md` already documents). So `Enqueue` is a second, non-atomic insert immediately after the primary write — a narrow race window where the primary write succeeds but the process crashes before the outbox insert commits, silently losing that one event. This is accepted, not engineered around, for the same reason budget-service's pre-Phase-7 `notifyIfOverspent` race was documented rather than eliminated: a real fix (Mongo replica sets fleet-wide, just for this) is a materially bigger infrastructure change than the problem it solves for a local/learning-scale deployment. If replica sets are ever adopted for another reason, revisit making this a true atomic transaction at the same time.
+
+Idempotency on the delivery side is what actually keeps this reliable despite the above: JetStream's durable consumers (`AckExplicitPolicy`, `MaxDeliver: 10`) guarantee at-least-once delivery once an event *is* published, and `Msg-Id`-based dedup (see above) collapses producer-side publish retries into one delivered message — so the remaining risk is narrowed to "the process crashes in the few-millisecond window between the primary Mongo write committing and the outbox insert," not "any event can be silently duplicated or lost after that point."
+
+### Testing
+
+`shared/eventbus` and `shared/outbox` each carry a `//go:build integration` suite (`shared/natstest`/`shared/mongotest` spin up real, disposable `nats:2-alpine`/`mongo:7` containers via testcontainers-go) proving: publish/subscribe round-trips, that a durable consumer created *after* a publish still receives it (the whole point of JetStream over core pub/sub), `Msg-Id` dedup, and the outbox+relay+real-NATS path end-to-end. Each service's new business logic (`publishCreated`, `OverspendService`, `OverspendConsumer`) is unit-tested with fakes, no live infrastructure, per `CLAUDE.md` §7 — the event-publish call in `transactionService.Create`/`OverspendService.notifyIfOverspent` never fails the primary operation even if the fake publisher returns an error, mirroring the "errors are values, handled at the boundary" rule for this specific fail-open case.
 
 ### notification-service (owns: notifications)
 ```

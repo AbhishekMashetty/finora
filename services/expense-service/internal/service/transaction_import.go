@@ -88,6 +88,7 @@ func (s *transactionService) Import(ctx context.Context, userID, accountID strin
 			appendImportError(&result, rowNum, "failed to save: "+err.Error())
 			continue
 		}
+		s.publishCreated(ctx, tx)
 		result.Imported++
 	}
 

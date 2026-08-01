@@ -95,37 +95,49 @@ This was the only service-to-service REST call in the fleet through Phase 3
 the concrete HTTP client — unit-tested with a fake, no live HTTP calls in
 `go test`.
 
-### Reports — Phase 4 overspend-notification trigger
+### Reports is now a pure read (Phase 4's REST overspend trigger was removed in Phase 7)
 
-`Summary()` also triggers a real in-app notification the first time it
-finds a budget over spent for the requested `[from, to]` range: if a
-category's `remaining < 0`, budget-service calls **notification-service**
-over REST (`POST /api/v1/notifications`, forwarding the caller's
-`X-User-Id`), behind a new `domain.NotificationClient`
-(`internal/client/notification_client.go`) — same Dependency Inversion
-pattern as `ExpenseClient`.
+Through Phase 4–6, `Summary()` also triggered a real in-app notification as
+a side effect of this `GET` request, over REST, whenever it found a budget
+over spent. **That's gone as of Phase 7** — `domain.NotificationClient` and
+`internal/client/notification_client.go` are deleted, `NewReportService` is
+back to a 2-arg constructor (`budgetRepo, expenseClient`), and `Summary()`
+has no side effects. The overspend check moved to an event-driven path —
+see the next section.
 
-**Dedup**, so a dashboard/report reload doesn't spam the user: `Budget`
-carries an internal, non-API-visible `LastNotifiedAt *time.Time`
-(`json:"-"`) that — despite the name — stores the **period's `from`
-boundary** last notified for, not a real timestamp. A notification only
-fires if `LastNotifiedAt == nil` or it doesn't exactly match the requested
-`from`; after a successful notify, `LastNotifiedAt` is persisted as `from`
-itself via the existing `BudgetRepository.Update`. Reloading the same range
-doesn't re-notify; any *other* period (earlier or later) does, if it's also
-over budget — an earlier design compared `LastNotifiedAt` as a time
-ordering against `from` using the real notify timestamp, which wrongly
-suppressed a legitimate notification for an older period viewed after a
-more recent one; fixed to exact-period-match before shipping.
+### Async events (Phase 7) — event-driven overspend detection
 
-This makes `GET /api/v1/reports/summary` — a read endpoint — have a side
-effect, which is **not** pure REST semantics. That's a deliberate,
-documented trade-off, accepted only because Finora has no event bus yet
-(Phase 7 introduces one and replaces this with a real overspend event) — see
-`architecture/api-contracts.md`'s budget-service → notification-service
-subsection and `architecture/development-roadmap.md`'s Phase 4 entry for the
-full rationale. A `Notify` failure is logged and swallowed, never
-propagated — it never turns a working report read into a `500`.
+This service both **consumes** and **publishes** domain events over NATS
+JetStream (see `architecture/api-contracts.md`'s Async Events section for
+the full contract):
+
+- **Consumes** `finora.transaction.created` (published by expense-service
+  after every transaction write) via a durable consumer
+  (`budget-service-transaction-created`). On receipt,
+  `internal/service/overspend_service.go`'s `OverspendService.HandleTransactionCreated`
+  lists the event's user's budgets and, for each, recomputes the **current
+  period's** actual spend via the existing `expenseClient.SumExpensesByCategory`
+  REST call (the same synchronous query `Summary()` uses — kept as REST,
+  since it's a genuine query, not a notification). A per-budget
+  expense-service error is logged and skipped, not fatal to checking the
+  user's other budgets.
+- **Publishes** `finora.budget.overspent` (via `internal/events.OutboxPublisher`,
+  the same Mongo-backed outbox pattern expense-service uses) when a budget's
+  recomputed actual exceeds its amount, consumed in turn by
+  notification-service.
+
+**Dedup rule (unchanged behavior, new trigger):** `domain.Budget` still
+carries `LastNotifiedAt *time.Time` (`json:"-"`), storing the **period's
+`from` boundary** last notified for, not a real timestamp. A budget only
+publishes if `LastNotifiedAt == nil` or it doesn't exactly match the
+current period's `from`; after a successful publish, `LastNotifiedAt` is
+persisted via the existing `BudgetRepository.Update`. This is the identical
+rule Phase 4 established for the REST trigger — see
+`architecture/development-roadmap.md`'s Phase 4 entry for why exact-period-
+match was chosen over a time-ordering comparison — just evaluated once per
+`transaction.created` event instead of once per report read. A publish
+failure (enqueue or the outbox relay) is logged and swallowed, never
+propagated — the overspend check itself already completed correctly.
 
 ### Savings goals — full CRUD
 
@@ -145,8 +157,9 @@ cross-service aggregation.
 | `LOG_LEVEL`                   | `debug` / `info` / `warn` / `error`                | `info`                  |
 | `SHUTDOWN_TIMEOUT`            | Graceful-shutdown drain duration (Go duration)     | `10s`                   |
 | `CORS_ALLOWED_ORIGINS`        | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |
-| `EXPENSE_SERVICE_URL`         | Base URL for the outbound REST call to expense-service that powers `/api/v1/reports/summary` (see above). Same docker-compose network address the gateway uses. | `http://expense-service:8082` |
-| `NOTIFICATION_SERVICE_URL`    | Base URL for the outbound REST call to notification-service that powers the Phase 4 overspend-notification trigger (see above). Same docker-compose network address the gateway uses. | `http://notification-service:8084` |
+| `EXPENSE_SERVICE_URL`         | Base URL for the outbound REST call to expense-service that powers `/api/v1/reports/summary` and the event-driven overspend check (see above). Same docker-compose network address the gateway uses. | `http://expense-service:8082` |
+| `NATS_URL`                    | NATS JetStream connection string (Phase 7 — consumes `finora.transaction.created`, publishes `finora.budget.overspent`) | `nats://nats:4222` |
+| `OUTBOX_RELAY_INTERVAL`       | How often the outbox relay polls for unpublished `finora.budget.overspent` events and retries publishing them | `2s` |
 
 Exact names match `.env.example` at the repo root. No JWT secrets are read —
 this service only trusts the `X-User-Id` header forwarded by the gateway.
@@ -203,7 +216,8 @@ internal/config/       - env loading, wraps shared/config
 internal/domain/       - plain structs + repository/service interfaces (no gin/mongo-driver imports)
 internal/repository/   - MongoDB implementations of domain interfaces, plus EnsureIndexes
 internal/service/      - business logic; depends on domain interfaces only, so it's unit-testable with fakes
-internal/client/       - outbound REST adapters used only by report_service: expense_client.go (domain.ExpenseClient, actual spend) and notification_client.go (domain.NotificationClient, Phase 4 overspend trigger)
+internal/client/       - outbound REST adapter used by report_service and overspend_service: expense_client.go (domain.ExpenseClient, actual spend)
+internal/events/       - domain.EventPublisher implementation (OutboxPublisher, wraps shared/outbox.Store) - Phase 7
 internal/handler/      - Gin handlers: bind/validate, call service, respond via httpx.Success/Fail
 internal/router/       - gin.Engine assembly and middleware order
 ```
@@ -218,18 +232,23 @@ middleware here — CORS is applied only by the gateway; see
 
 `internal/service` is unit-tested with table-driven tests against
 hand-written fakes implementing the domain repository interfaces (including
-a `fakeExpenseClient` for `domain.ExpenseClient` and a
-`fakeNotificationClient` for `domain.NotificationClient`) — no live Mongo,
-no live HTTP. The overspend-notification trigger is covered by
-`TestReportService_Summary_OverspendNotification`: a newly-over-budget
-category notifies exactly once, a repeat `Summary()` call for the same
-period doesn't re-notify (dedup), a later period re-notifies if still over
-budget, and an under-budget category never notifies. `internal/handler` is
-tested with `httptest` + `gin.TestMode` against fake services, covering
-budget CRUD, goal CRUD (including the cross-user-is-404 rule for both), and
-the reports endpoint's required from/to validation plus its computed
-response shape. Integration testing against real MongoDB/expense-service/
-notification-service happens later (Phase 6), not here.
+a `fakeExpenseClient` for `domain.ExpenseClient` and a `fakeEventPublisher`
+for `domain.EventPublisher`) — no live Mongo, no live HTTP, no live NATS.
+The event-driven overspend check is covered by
+`overspend_service_test.go`'s `TestOverspendService_HandleTransactionCreated`
+(6 subtests: a newly-over-budget category publishes exactly once, a repeat
+event for the same period doesn't re-publish (dedup), a later period
+re-publishes if still over budget, an under-budget category never
+publishes, a per-budget expense-client error doesn't block checking the
+user's other budgets, and a budget-repo `List` error propagates) plus
+`TestCurrentPeriodStart` (monthly/yearly/weekly period-boundary logic).
+`internal/handler` is tested with `httptest` + `gin.TestMode` against fake
+services, covering budget CRUD, goal CRUD (including the cross-user-is-404
+rule for both), and the reports endpoint's required from/to validation plus
+its computed response shape. Integration testing against real
+MongoDB/NATS happens at the `shared/eventbus`/`shared/outbox` layer
+(`//go:build integration`, see `architecture/api-contracts.md`'s Async
+Events section), not here.
 
 ```sh
 go test ./...

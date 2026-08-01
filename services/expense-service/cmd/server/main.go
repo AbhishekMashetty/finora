@@ -9,14 +9,18 @@ import (
 	"os"
 
 	"github.com/finora/expense-service/internal/config"
+	"github.com/finora/expense-service/internal/domain"
+	"github.com/finora/expense-service/internal/events"
 	"github.com/finora/expense-service/internal/handler"
 	"github.com/finora/expense-service/internal/repository"
 	"github.com/finora/expense-service/internal/router"
 	"github.com/finora/expense-service/internal/service"
+	"github.com/finora/shared/eventbus"
 	"github.com/finora/shared/health"
 	"github.com/finora/shared/logger"
 	"github.com/finora/shared/mongox"
 	"github.com/finora/shared/openapidoc"
+	"github.com/finora/shared/outbox"
 	"github.com/finora/shared/server"
 )
 
@@ -44,12 +48,38 @@ func main() {
 		os.Exit(1)
 	}
 
+	outboxStore := outbox.NewStore(db)
+	if err := outboxStore.EnsureIndexes(context.Background()); err != nil {
+		log.Error("failed to ensure outbox indexes", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	bus, err := eventbus.Connect(cfg.NATSURL)
+	if err != nil {
+		log.Error("failed to connect to nats", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer bus.Close()
+	if err := bus.EnsureStream(context.Background(), domain.EventsStreamName, []string{"finora.>"}); err != nil {
+		log.Error("failed to ensure nats stream", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	// The outbox relay runs for the lifetime of the process; server.Run
+	// blocks until shutdown, so this context is cancelled (stopping the
+	// relay goroutine cleanly) only as part of process exit below.
+	relayCtx, cancelRelay := context.WithCancel(context.Background())
+	defer cancelRelay()
+	relay := outbox.NewRelay(outboxStore, bus, log)
+	go relay.Run(relayCtx, cfg.OutboxRelayInterval)
+
 	accountRepo := repository.NewAccountRepository(db)
 	transactionRepo := repository.NewTransactionRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
+	eventPublisher := events.NewOutboxPublisher(outboxStore)
 
 	accountSvc := service.NewAccountService(accountRepo)
-	transactionSvc := service.NewTransactionService(transactionRepo, accountRepo, categoryRepo)
+	transactionSvc := service.NewTransactionService(transactionRepo, accountRepo, categoryRepo, eventPublisher, log)
 	categorySvc := service.NewCategoryService(categoryRepo)
 
 	accountHandler := handler.NewAccountHandler(accountSvc)
@@ -62,7 +92,7 @@ func main() {
 		Logger:             log,
 		ServiceName:        serviceName,
 		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
-		HealthCheckers:     []health.Checker{mongox.Checker{Client: client}},
+		HealthCheckers:     []health.Checker{mongox.Checker{Client: client}, eventbus.Checker{Bus: bus}},
 		AccountHandler:     accountHandler,
 		TransactionHandler: transactionHandler,
 		CategoryHandler:    categoryHandler,

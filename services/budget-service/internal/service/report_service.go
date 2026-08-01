@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/finora/budget-service/internal/domain"
@@ -15,27 +13,24 @@ import (
 // actual spend per category. Depends only on domain interfaces, never a
 // concrete repository or HTTP client type, so it's unit-testable with fakes.
 //
-// Since Phase 4, Summary also triggers a best-effort overspend notification
-// (via domain.NotificationClient) the first time a budget is found over
-// spent for the requested report period — see the doc comment above the
-// notifyIfOverspent helper for the full dedup rule and the trade-off this
-// represents (a read endpoint with a side effect, in lieu of a real event
-// bus that doesn't exist until Phase 7).
+// Phase 7 note: through Phase 6, Summary also triggered a best-effort
+// overspend notification as a side effect of being read — a documented
+// trade-off accepted only because this fleet had no event bus yet. That
+// side effect has been removed entirely: Summary is a pure read again, per
+// normal REST/GET semantics. Overspend detection is now triggered by a real
+// finora.transaction.created event instead of a page load — see
+// overspend_service.go, which independently recomputes the same
+// budgeted/actual/remaining figures for exactly this purpose and publishes
+// finora.budget.overspent when appropriate.
 type reportService struct {
 	budgetRepo    domain.BudgetRepository
 	expenseClient domain.ExpenseClient
-	notifier      domain.NotificationClient
-	log           *slog.Logger
 }
 
 // NewReportService builds a ReportService backed by budgetRepo (for the
-// caller's budgets), expenseClient (for actual spend per category), and
-// notifier (for the Phase 4 overspend-notification trigger). log is used
-// only to record a notify failure — Notify errors never fail Summary's own
-// result, since the report itself computed successfully regardless (see
-// notifyIfOverspent).
-func NewReportService(budgetRepo domain.BudgetRepository, expenseClient domain.ExpenseClient, notifier domain.NotificationClient, log *slog.Logger) domain.ReportService {
-	return &reportService{budgetRepo: budgetRepo, expenseClient: expenseClient, notifier: notifier, log: log}
+// caller's budgets) and expenseClient (for actual spend per category).
+func NewReportService(budgetRepo domain.BudgetRepository, expenseClient domain.ExpenseClient) domain.ReportService {
+	return &reportService{budgetRepo: budgetRepo, expenseClient: expenseClient}
 }
 
 func (s *reportService) Summary(ctx context.Context, userID string, from, to time.Time) (*domain.ReportSummary, error) {
@@ -70,76 +65,7 @@ func (s *reportService) Summary(ctx context.Context, userID string, from, to tim
 		})
 		summary.TotalBudgeted += b.Amount
 		summary.TotalActual += actual
-
-		if remaining < 0 {
-			s.notifyIfOverspent(ctx, userID, b, actual, from)
-		}
 	}
 
 	return summary, nil
-}
-
-// notifyIfOverspent implements the Phase 4 overspend-notification trigger
-// and its dedup rule: this is a deliberate, documented trade-off (a read
-// endpoint — GET /reports/summary — having a side effect), accepted only
-// because Finora has no event bus yet (Phase 7 replaces this with a real
-// domain event). See architecture/api-contracts.md's
-// budget-service -> notification-service subsection.
-//
-// Dedup rule: a budget that's over-spent notifies once per distinct
-// reporting period. "Already notified for this period" means
-// b.LastNotifiedAt != nil && b.LastNotifiedAt.Equal(from) — i.e.
-// LastNotifiedAt stores the *period's `from` boundary* that was last
-// notified for, not the wall-clock time the notification fired. Comparing
-// by equality-with-the-period (rather than "was notified at-or-after some
-// timestamp") is deliberate: an earlier draft compared LastNotifiedAt
-// against `from` as a time ordering, which broke for out-of-order queries —
-// e.g. a user notified today for the current month, who then loads an
-// *older*, never-before-viewed over-budget month, would have that
-// legitimate first notification wrongly suppressed, since "today" is after
-// that older month's `from`. Keying on exact-period-match instead means
-// every distinct [from] a report is ever run for gets its own independent
-// notify-once behavior, regardless of the order periods are viewed in.
-//
-// A Notify failure (e.g. notification-service unreachable) is logged and
-// swallowed, never propagated to the caller — the report itself already
-// computed correctly, and a transient notification-delivery failure
-// shouldn't turn a working read endpoint into a 500.
-//
-// Known limitation (caught in review, not fixed here): this is a
-// read-then-write with no atomic check-and-set. Two concurrent Summary
-// calls for the same never-before-notified period could both observe
-// LastNotifiedAt == nil and both notify, producing a duplicate. Low
-// consequence (an extra notification, not data loss or a security issue)
-// and narrow (requires a genuine race on the very first notify for a given
-// period) — not worth a locking/optimistic-concurrency mechanism for a
-// side-effecting-GET workaround that Phase 7's real event bus replaces
-// entirely. Revisit only if it's ever observed in practice.
-func (s *reportService) notifyIfOverspent(ctx context.Context, userID string, b domain.Budget, actual float64, from time.Time) {
-	if b.LastNotifiedAt != nil && b.LastNotifiedAt.Equal(from) {
-		return // already notified for this exact reporting period
-	}
-
-	title := "Budget exceeded"
-	message := fmt.Sprintf("You've spent %.2f of your %.2f %s %s budget.", actual, b.Amount, b.Period, b.Category)
-
-	if err := s.notifier.Notify(ctx, userID, title, message); err != nil {
-		s.log.Error("failed to send overspend notification",
-			slog.String("user_id", userID),
-			slog.String("budget_id", b.ID),
-			slog.String("category", b.Category),
-			slog.String("error", err.Error()),
-		)
-		return
-	}
-
-	periodStart := from
-	b.LastNotifiedAt = &periodStart
-	if err := s.budgetRepo.Update(ctx, &b); err != nil {
-		s.log.Error("failed to persist last_notified_at after overspend notification",
-			slog.String("user_id", userID),
-			slog.String("budget_id", b.ID),
-			slog.String("error", err.Error()),
-		)
-	}
 }

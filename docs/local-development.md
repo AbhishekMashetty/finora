@@ -37,6 +37,19 @@ make run   # wraps `go run ./cmd/server`, reads .env from the repo root (or expo
 
 This is the simplest way to get a real, reachable MongoDB for a native run without standing up a separate local Mongo install — you still get isolation (only that one service's Mongo container needs to be up) while iterating on Go code with normal `go run`/`go build` speed instead of a Docker rebuild per change.
 
+### Connecting a GUI client (MongoDB Compass, etc.)
+
+Each Mongo container's port 27017 is published to the host, one per service so they don't collide (`MONGO_USER_PORT`/`MONGO_EXPENSE_PORT`/`MONGO_BUDGET_PORT`/`MONGO_NOTIFICATION_PORT` in `.env.example`, defaulting to `27017`/`27018`/`27019`/`27020`). Connect Compass (or `mongosh`, or any client) with a plain, no-auth URI — these containers have no auth configured, matching this repo's "dev-only, no external network exposure" posture:
+
+```
+mongodb://localhost:27017/finora_users          # mongo-user
+mongodb://localhost:27018/finora_expenses       # mongo-expense
+mongodb://localhost:27019/finora_budgets        # mongo-budget
+mongodb://localhost:27020/finora_notifications  # mongo-notification
+```
+
+This host port mapping is purely for local tooling — the services themselves never use `localhost`; they always talk to each other over the docker network by container name on the container-internal `27017` (`USER_SERVICE_MONGO_URI` etc. in `.env.example`), completely unaffected by which host port is mapped.
+
 The service's own `Makefile` also exposes `make build`, `make test`, and `make tidy` — see each service's `README.md` for specifics; they all follow the same target names per `CLAUDE.md`.
 
 ## Testing

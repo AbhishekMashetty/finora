@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -24,18 +25,46 @@ const (
 // interfaces) so it can verify the referenced account and category are owned
 // by the same caller before attaching a transaction to them — account_id and
 // category_id in the request body are otherwise unchecked cross-tenant
-// references.
+// references. eventPublisher (Phase 7) publishes a transaction.created event
+// after every successful create, for budget-service's overspend detection —
+// see publishCreated's doc comment for why a publish failure never fails the
+// create itself.
 type transactionService struct {
-	repo         domain.TransactionRepository
-	accountRepo  domain.AccountRepository
-	categoryRepo domain.CategoryRepository
+	repo           domain.TransactionRepository
+	accountRepo    domain.AccountRepository
+	categoryRepo   domain.CategoryRepository
+	eventPublisher domain.EventPublisher
+	log            *slog.Logger
 }
 
 // NewTransactionService builds a TransactionService backed by repo, using
-// accountRepo to verify account ownership and categoryRepo to verify
-// category ownership on create/update.
-func NewTransactionService(repo domain.TransactionRepository, accountRepo domain.AccountRepository, categoryRepo domain.CategoryRepository) domain.TransactionService {
-	return &transactionService{repo: repo, accountRepo: accountRepo, categoryRepo: categoryRepo}
+// accountRepo to verify account ownership, categoryRepo to verify category
+// ownership on create/update, and eventPublisher to publish a
+// transaction.created event after every successful create (Phase 7). log
+// records only a failed event publish — never anything that changes
+// Create/Import's own result.
+func NewTransactionService(repo domain.TransactionRepository, accountRepo domain.AccountRepository, categoryRepo domain.CategoryRepository, eventPublisher domain.EventPublisher, log *slog.Logger) domain.TransactionService {
+	return &transactionService{repo: repo, accountRepo: accountRepo, categoryRepo: categoryRepo, eventPublisher: eventPublisher, log: log}
+}
+
+// publishCreated enqueues a transaction.created event for tx, logging (not
+// returning) any failure. Deliberate: by the time this is called, tx is
+// already durably persisted in MongoDB — the create itself already
+// succeeded. Failing the whole Create/Import call at this point would be
+// actively misleading: a caller that sees an error and retries would
+// create a SECOND, duplicate transaction, since the first one already
+// exists. A lost event is a reliability gap (see shared/outbox's own doc
+// comment on the narrow, accepted crash-window race this shares the same
+// character as), not a reason to make a successful write look like a
+// failure.
+func (s *transactionService) publishCreated(ctx context.Context, tx *domain.Transaction) {
+	if err := s.eventPublisher.PublishTransactionCreated(ctx, tx); err != nil {
+		s.log.Error("failed to enqueue transaction.created event",
+			slog.String("transaction_id", tx.ID),
+			slog.String("user_id", tx.UserID),
+			slog.String("error", err.Error()),
+		)
+	}
 }
 
 var _ domain.TransactionService = (*transactionService)(nil)
@@ -97,6 +126,7 @@ func (s *transactionService) Create(ctx context.Context, userID string, in domai
 	if err := s.repo.Create(ctx, tx); err != nil {
 		return nil, err
 	}
+	s.publishCreated(ctx, tx)
 	return tx, nil
 }
 

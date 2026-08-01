@@ -10,11 +10,14 @@ This service never validates JWTs itself.
 All routes are prefixed `/api/v1` and require `X-User-Id` (enforced by
 `shared/middleware.RequireIdentity`). There is no separate "system" ownership
 model — even `POST` takes the owner from the header, not the request body.
-As of Phase 4, budget-service's overspend-notification trigger (see
-`architecture/api-contracts.md`'s budget-service → notification-service
-subsection) is exactly such a service-to-service caller: it forwards the
-originating user's `X-User-Id` rather than passing `user_id` in the body, so
-the ownership model never has two shapes.
+
+Through Phase 4–6, budget-service's overspend trigger created notifications
+via this same `POST /api/v1/notifications` REST route, forwarding the
+originating user's `X-User-Id`. **As of Phase 7, that REST call is gone** —
+the overspend trigger is now a consumed NATS event instead (see below), so
+this route is only ever called by the frontend/gateway's own request path
+today. It's left in place unchanged (not removed) since it's still this
+service's one legitimate write endpoint.
 
 | Method | Path                              | Body                          | Response                    |
 |--------|-----------------------------------|--------------------------------|------------------------------|
@@ -52,6 +55,20 @@ The response's `page`/`page_size` are the values the service actually
 resolved and applied, not a raw echo of the query string (so they're never
 0/0 just because the caller omitted them).
 
+## Async events (Phase 7)
+
+This service **consumes** `finora.budget.overspent` (published by
+budget-service after it detects an over-budget category) via a durable NATS
+JetStream consumer (`notification-service-budget-overspent`). On receipt,
+`internal/service/overspend_consumer.go`'s `OverspendConsumer.HandleBudgetOverspent`
+formats `title: "Budget exceeded"` / `message: "You've spent {actual} of
+your {budgeted} {period} {category} budget."` and calls the existing
+`notificationService.Create` — the exact same notification shape the old
+REST trigger produced, so nothing on the frontend needed to change. This
+service never publishes events; it has no outbox. See
+`architecture/api-contracts.md`'s Async Events section for the full
+contract.
+
 ## Mongo indexes
 
 `internal/repository/mongo.go`'s `EnsureIndexes` (wired into `cmd/server/main.go`
@@ -70,6 +87,7 @@ Safe to call on every boot — index creation is idempotent.
 | `LOG_LEVEL`                       | slog level (`debug`, `info`, `warn`, `error`)          | `info`                                            |
 | `SHUTDOWN_TIMEOUT`                | Graceful shutdown drain timeout                        | `10s`                                              |
 | `CORS_ALLOWED_ORIGINS`            | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |
+| `NATS_URL`                        | NATS JetStream connection string (Phase 7 — consumes `finora.budget.overspent`) | `nats://nats:4222` |
 
 No JWT secrets are needed — this service trusts `X-User-Id` from the gateway.
 
@@ -126,7 +144,11 @@ caller, the `unread_only` filter, mark-as-read (including the not-found and
 cross-user cases), that `Create` invokes the email seam with the expected
 `to`/`subject`/`body` (`TestNotificationService_Create`), and that a `Send`
 error never fails `Create`'s own result
-(`TestNotificationService_Create_EmailSendErrorDoesNotFailCreate`).
+(`TestNotificationService_Create_EmailSendErrorDoesNotFailCreate`). Phase
+7's `overspend_consumer_test.go` covers `OverspendConsumer.HandleBudgetOverspent`
+end to end at the fake level: the exact title/message format, and that a
+`Create` error propagates (so a bad consume can be Nak'd/retried rather than
+silently acked and lost).
 
 ```sh
 go test ./...
@@ -170,7 +192,7 @@ cmd/server/main.go     - wires config -> mongo -> EnsureIndexes -> repositories 
 internal/config/       - env loading, wraps shared/config
 internal/domain/       - plain structs + repository/service interfaces (no gin/mongo-driver imports)
 internal/repository/   - MongoDB implementation of domain.NotificationRepository, plus EnsureIndexes
-internal/service/      - business logic + the no-op LoggingEmailSender; depends only on domain interfaces
+internal/service/      - business logic + the no-op LoggingEmailSender + OverspendConsumer (Phase 7); depends only on domain interfaces
 internal/handler/      - Gin handlers: bind/validate, call service, respond via httpx
 internal/router/       - gin.Engine assembly, middleware order, route registration
 ```

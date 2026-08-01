@@ -30,28 +30,9 @@ func (f *fakeExpenseClient) SumExpensesByCategory(ctx context.Context, userID, c
 	return f.byCategory[categoryName], nil
 }
 
-// fakeNotificationClient is a hand-written fake of domain.NotificationClient,
-// mirroring fakeExpenseClient above, so the Phase 4 overspend-notification
-// trigger can be tested without any live HTTP call to notification-service.
-type fakeNotificationClient struct {
-	calls []notifyCall
-	err   error
-}
-
-type notifyCall struct {
-	userID, title, message string
-}
-
-func (f *fakeNotificationClient) Notify(ctx context.Context, userID, title, message string) error {
-	if f.err != nil {
-		return f.err
-	}
-	f.calls = append(f.calls, notifyCall{userID: userID, title: title, message: message})
-	return nil
-}
-
 // discardLogger is a *slog.Logger that writes nowhere, for tests that don't
-// care about log output but need a non-nil logger passed to NewReportService.
+// care about log output but need a non-nil logger (used by
+// overspend_service_test.go, in this same package).
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
@@ -80,7 +61,7 @@ func TestReportService_Summary(t *testing.T) {
 			"rent":      1000,
 		}}
 
-		svc := NewReportService(budgetRepo, expenseClient, &fakeNotificationClient{}, discardLogger())
+		svc := NewReportService(budgetRepo, expenseClient)
 		summary, err := svc.Summary(ctx, "user-1", from, to)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -134,7 +115,7 @@ func TestReportService_Summary(t *testing.T) {
 		// who has never logged a transaction under this category name.
 		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{}}
 
-		svc := NewReportService(budgetRepo, expenseClient, &fakeNotificationClient{}, discardLogger())
+		svc := NewReportService(budgetRepo, expenseClient)
 		summary, err := svc.Summary(ctx, "user-1", from, to)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -155,7 +136,7 @@ func TestReportService_Summary(t *testing.T) {
 		budgetRepo := newFakeBudgetRepository()
 		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{}}
 
-		svc := NewReportService(budgetRepo, expenseClient, &fakeNotificationClient{}, discardLogger())
+		svc := NewReportService(budgetRepo, expenseClient)
 		summary, err := svc.Summary(context.Background(), "user-with-no-budgets", from, to)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -179,173 +160,9 @@ func TestReportService_Summary(t *testing.T) {
 		wantErr := errors.New("expense-service unreachable")
 		expenseClient := &fakeExpenseClient{err: wantErr}
 
-		svc := NewReportService(budgetRepo, expenseClient, &fakeNotificationClient{}, discardLogger())
+		svc := NewReportService(budgetRepo, expenseClient)
 		if _, err := svc.Summary(ctx, "user-1", from, to); !errors.Is(err, wantErr) {
 			t.Fatalf("err = %v, want %v", err, wantErr)
-		}
-	})
-}
-
-// TestReportService_Summary_OverspendNotification covers the Phase 4
-// overspend-notification trigger and its dedup rule (see
-// notifyIfOverspent's doc comment in report_service.go): a newly-over-budget
-// category notifies exactly once per reporting period, an under-budget
-// category never notifies, and a later period past the stored
-// LastNotifiedAt re-notifies if still over budget.
-func TestReportService_Summary_OverspendNotification(t *testing.T) {
-	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	to := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
-
-	t.Run("a newly-over-budget category triggers exactly one notification", func(t *testing.T) {
-		budgetRepo := newFakeBudgetRepository()
-		ctx := context.Background()
-
-		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "groceries", Amount: 100, Period: domain.PeriodMonthly}); err != nil {
-			t.Fatalf("setup create failed: %v", err)
-		}
-
-		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{"groceries": 150}}
-		notifier := &fakeNotificationClient{}
-
-		svc := NewReportService(budgetRepo, expenseClient, notifier, discardLogger())
-		summary, err := svc.Summary(ctx, "user-1", from, to)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if summary.Categories[0].Remaining != -50 {
-			t.Fatalf("Remaining = %v, want -50", summary.Categories[0].Remaining)
-		}
-
-		if len(notifier.calls) != 1 {
-			t.Fatalf("notifier.calls = %d, want 1", len(notifier.calls))
-		}
-		if notifier.calls[0].userID != "user-1" {
-			t.Errorf("notify userID = %q, want %q", notifier.calls[0].userID, "user-1")
-		}
-		if notifier.calls[0].title != "Budget exceeded" {
-			t.Errorf("notify title = %q, want %q", notifier.calls[0].title, "Budget exceeded")
-		}
-	})
-
-	t.Run("a second Summary call for the same period does not re-notify (dedup)", func(t *testing.T) {
-		budgetRepo := newFakeBudgetRepository()
-		ctx := context.Background()
-
-		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "groceries", Amount: 100, Period: domain.PeriodMonthly}); err != nil {
-			t.Fatalf("setup create failed: %v", err)
-		}
-
-		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{"groceries": 150}}
-		notifier := &fakeNotificationClient{}
-		svc := NewReportService(budgetRepo, expenseClient, notifier, discardLogger())
-
-		if _, err := svc.Summary(ctx, "user-1", from, to); err != nil {
-			t.Fatalf("first Summary call failed: %v", err)
-		}
-		if _, err := svc.Summary(ctx, "user-1", from, to); err != nil {
-			t.Fatalf("second Summary call failed: %v", err)
-		}
-
-		if len(notifier.calls) != 1 {
-			t.Fatalf("notifier.calls = %d after two Summary calls for the same period, want 1 (dedup failed)", len(notifier.calls))
-		}
-	})
-
-	t.Run("a Summary call for a later period re-triggers if still over budget", func(t *testing.T) {
-		budgetRepo := newFakeBudgetRepository()
-		ctx := context.Background()
-
-		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "groceries", Amount: 100, Period: domain.PeriodMonthly}); err != nil {
-			t.Fatalf("setup create failed: %v", err)
-		}
-
-		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{"groceries": 150}}
-		notifier := &fakeNotificationClient{}
-		svc := NewReportService(budgetRepo, expenseClient, notifier, discardLogger())
-
-		if _, err := svc.Summary(ctx, "user-1", from, to); err != nil {
-			t.Fatalf("first Summary call failed: %v", err)
-		}
-		if len(notifier.calls) != 1 {
-			t.Fatalf("notifier.calls after first period = %d, want 1", len(notifier.calls))
-		}
-
-		// A later period: LastNotifiedAt (set to time.Now() during the first
-		// call, i.e. "today" in the test run) is before nextFrom, which is
-		// far enough in the future to always be past it.
-		nextFrom := time.Now().UTC().Add(24 * time.Hour)
-		nextTo := nextFrom.Add(30 * 24 * time.Hour)
-		if _, err := svc.Summary(ctx, "user-1", nextFrom, nextTo); err != nil {
-			t.Fatalf("second-period Summary call failed: %v", err)
-		}
-
-		if len(notifier.calls) != 2 {
-			t.Fatalf("notifier.calls after a later period = %d, want 2 (should re-notify)", len(notifier.calls))
-		}
-	})
-
-	t.Run("notifying for a recent period does not suppress a later, older-period notification", func(t *testing.T) {
-		// Regression for a real bug caught in review: dedup used to compare
-		// LastNotifiedAt (wall-clock notify time) against the queried
-		// `from` as a time ordering, which wrongly suppressed a legitimate
-		// first notification for an older period viewed *after* a more
-		// recent one already notified. Dedup now keys on exact-period-match
-		// (LastNotifiedAt stores the period's `from`, not real time), so
-		// notifying for January must not suppress a never-before-notified
-		// March that's queried afterward, even though "now" (when January
-		// notified) is after March's `from`.
-		budgetRepo := newFakeBudgetRepository()
-		ctx := context.Background()
-
-		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "groceries", Amount: 100, Period: domain.PeriodMonthly}); err != nil {
-			t.Fatalf("setup create failed: %v", err)
-		}
-
-		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{"groceries": 150}}
-		notifier := &fakeNotificationClient{}
-		svc := NewReportService(budgetRepo, expenseClient, notifier, discardLogger())
-
-		// Notify for a "current" period first (e.g. viewed today).
-		currentFrom := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-		currentTo := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
-		if _, err := svc.Summary(ctx, "user-1", currentFrom, currentTo); err != nil {
-			t.Fatalf("current-period Summary call failed: %v", err)
-		}
-		if len(notifier.calls) != 1 {
-			t.Fatalf("notifier.calls after current period = %d, want 1", len(notifier.calls))
-		}
-
-		// Now view an *older*, never-before-notified period — must still
-		// notify, even though it chronologically precedes the period just
-		// notified for.
-		olderFrom := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-		olderTo := time.Date(2026, 3, 31, 0, 0, 0, 0, time.UTC)
-		if _, err := svc.Summary(ctx, "user-1", olderFrom, olderTo); err != nil {
-			t.Fatalf("older-period Summary call failed: %v", err)
-		}
-		if len(notifier.calls) != 2 {
-			t.Fatalf("notifier.calls after older, never-notified period = %d, want 2 (bug: older-period notification was suppressed)", len(notifier.calls))
-		}
-	})
-
-	t.Run("an under-budget category never triggers a notification", func(t *testing.T) {
-		budgetRepo := newFakeBudgetRepository()
-		ctx := context.Background()
-
-		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "groceries", Amount: 500, Period: domain.PeriodMonthly}); err != nil {
-			t.Fatalf("setup create failed: %v", err)
-		}
-
-		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{"groceries": 100}}
-		notifier := &fakeNotificationClient{}
-		svc := NewReportService(budgetRepo, expenseClient, notifier, discardLogger())
-
-		if _, err := svc.Summary(ctx, "user-1", from, to); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if len(notifier.calls) != 0 {
-			t.Fatalf("notifier.calls = %d, want 0 for an under-budget category", len(notifier.calls))
 		}
 	})
 }

@@ -17,11 +17,14 @@ type Config struct {
 	LogLevel           string
 	ShutdownTimeout    time.Duration
 	CORSAllowedOrigins []string
+	NATSURL            string
 }
 
 // Load reads the service's env vars. Exact names come from the repo-root
 // .env.example: NOTIFICATION_SERVICE_PORT, NOTIFICATION_SERVICE_MONGO_URI,
-// LOG_LEVEL, SHUTDOWN_TIMEOUT, CORS_ALLOWED_ORIGINS.
+// LOG_LEVEL, SHUTDOWN_TIMEOUT, CORS_ALLOWED_ORIGINS, NATS_URL. NATS_URL
+// (Phase 7) defaults to the docker-compose service name, same reasoning as
+// every other cross-service URL defaulting to its compose service name.
 func Load() Config {
 	raw := strings.Split(config.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ",")
 	origins := make([]string, 0, len(raw))
@@ -37,5 +40,6 @@ func Load() Config {
 		LogLevel:           config.GetEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout:    config.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 		CORSAllowedOrigins: origins,
+		NATSURL:            config.GetEnv("NATS_URL", "nats://nats:4222"),
 	}
 }
