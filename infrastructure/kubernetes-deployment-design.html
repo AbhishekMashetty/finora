@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Finora — Kubernetes Deployment Design Document</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f6f7f9;
+    --ink: #1c2128;
+    --ink-secondary: #4b5563;
+    --ink-muted: #6b7280;
+    --border: #e2e5ea;
+    --accent: #1f5fbf;
+    --accent-soft: #eaf1fc;
+    --code-bg: #0f172a;
+    --code-ink: #e2e8f0;
+    --decision: #1f5fbf;
+    --why: #6b46c1;
+    --rejected: #b91c1c;
+    --gotcha: #c2790a;
+    --cost: #0f766e;
+    --checklist: #15803d;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117;
+    --bg-alt: #161b22;
+    --ink: #e6edf3;
+    --ink-secondary: #b6c0cc;
+    --ink-muted: #8b949e;
+    --border: #2a313c;
+    --accent: #6fa8f5;
+    --accent-soft: #16223a;
+    --code-bg: #0a0e14;
+    --code-ink: #d8e2ef;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117;
+      --bg-alt: #161b22;
+      --ink: #e6edf3;
+      --ink-secondary: #b6c0cc;
+      --ink-muted: #8b949e;
+      --border: #2a313c;
+      --accent: #6fa8f5;
+      --accent-soft: #16223a;
+      --code-bg: #0a0e14;
+      --code-ink: #d8e2ef;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 6rem;
+  }
+  h1, h2, h3, h4 { line-height: 1.25; scroll-margin-top: 1rem; }
+  h1 { font-size: 1.9rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--ink-secondary); font-size: 1.05rem; margin-top: 0; }
+  .byline { color: var(--ink-muted); font-size: 0.85rem; margin-bottom: 2rem; }
+  h2 {
+    font-size: 1.4rem;
+    margin-top: 3rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+  h3 { font-size: 1.12rem; margin-top: 2rem; color: var(--ink); }
+  h4 { font-size: 0.98rem; margin-top: 1.4rem; color: var(--ink-secondary); }
+  p { color: var(--ink-secondary); }
+  a { color: var(--accent); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    color: var(--ink);
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    font-size: 0.83rem;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: 1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--bg-alt); color: var(--ink); }
+  td { color: var(--ink-secondary); }
+  ul, ol { color: var(--ink-secondary); padding-left: 1.4rem; }
+  li { margin: 0.3rem 0; }
+  li::marker { color: var(--ink-muted); }
+
+  .callout {
+    border-left: 4px solid var(--border);
+    background: var(--bg-alt);
+    padding: 0.8rem 1rem;
+    margin: 1.1rem 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout .label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .decision  { border-left-color: var(--decision); }
+  .decision .label  { color: var(--decision); }
+  .why       { border-left-color: var(--why); }
+  .why .label       { color: var(--why); }
+  .rejected  { border-left-color: var(--rejected); }
+  .rejected .label  { color: var(--rejected); }
+  .gotcha    { border-left-color: var(--gotcha); }
+  .gotcha .label    { color: var(--gotcha); }
+  .cost      { border-left-color: var(--cost); }
+  .cost .label      { color: var(--cost); }
+  .checklist { border-left-color: var(--checklist); }
+  .checklist .label { color: var(--checklist); }
+
+  nav.toc {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.4rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  nav.toc h2 { border: none; margin-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+  nav.toc ol { columns: 2; column-gap: 2rem; }
+  nav.toc li { margin: 0.15rem 0; font-size: 0.92rem; }
+  nav.toc a { text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  .placeholder-table code { white-space: nowrap; }
+
+  .part-banner {
+    background: linear-gradient(135deg, var(--accent-soft), transparent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.4rem 1.6rem;
+    margin: 2.5rem 0 1.5rem;
+  }
+  .part-banner h2 { border: none; margin: 0 0 0.3rem; font-size: 1.6rem; }
+  .part-banner p { margin: 0; color: var(--ink-secondary); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+  .tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.1em 0.55em;
+    border-radius: 4px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    margin-right: 0.4rem;
+  }
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--ink-muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<h1>Finora — Kubernetes Deployment Design Document</h1>
+<p class="subtitle">From <code>kind</code> on your MacBook to a self-managed Kubernetes cluster on EC2, reachable at a real domain.</p>
+<p class="byline">Written as a design reference for you to implement yourself, one module at a time. Treat it the way <code>CLAUDE.md</code> treats itself: a living record — when reality and this document disagree, fix whichever one is wrong, deliberately, rather than letting them drift apart.</p>
+
+<nav class="toc">
+<h2>Contents</h2>
+<ol>
+  <li><a href="#purpose">Purpose &amp; how to use this document</a></li>
+  <li><a href="#principles">Shared design principles</a></li>
+  <li><a href="#placeholders">Placeholders used in this document</a></li>
+  <li><a href="#p1-target">1.1 Target end state (Mac)</a></li>
+  <li><a href="#p1-cluster">1.2 Cluster topology</a></li>
+  <li><a href="#p1-images">1.3 Images</a></li>
+  <li><a href="#p1-config">1.4 Configuration &amp; secrets</a></li>
+  <li><a href="#p1-probes">1.5 Health probes</a></li>
+  <li><a href="#p1-workloads">1.6 Workloads</a></li>
+  <li><a href="#p1-storage">1.7 Storage</a></li>
+  <li><a href="#p1-network">1.8 Networking &amp; Ingress</a></li>
+  <li><a href="#p1-helm">1.9 Packaging as Helm</a></li>
+  <li><a href="#p1-runbook">1.10 Runbook</a></li>
+  <li><a href="#p1-verify">1.11 Verification checklist</a></li>
+  <li><a href="#p1-teardown">1.12 Teardown</a></li>
+  <li><a href="#p2-target">2.1 Target end state (AWS)</a></li>
+  <li><a href="#p2-network">2.2 Network &amp; compute architecture</a></li>
+  <li><a href="#p2-bootstrap">2.3 Bootstrapping with kubeadm</a></li>
+  <li><a href="#p2-addons">2.4 Cluster add-ons</a></li>
+  <li><a href="#p2-registry">2.5 Registry &amp; image pull auth</a></li>
+  <li><a href="#p2-config">2.6 Configuration &amp; secrets</a></li>
+  <li><a href="#p2-storage">2.7 Storage (EBS)</a></li>
+  <li><a href="#p2-dns">2.8 DNS &amp; TLS</a></li>
+  <li><a href="#p2-helm">2.9 Helm values overlay</a></li>
+  <li><a href="#p2-runbook">2.10 Runbook</a></li>
+  <li><a href="#p2-verify">2.11 Verification checklist</a></li>
+  <li><a href="#p2-cost">2.12 Cost &amp; teardown</a></li>
+  <li><a href="#p2-deferred">2.13 Deliberately deferred</a></li>
+  <li><a href="#cheatsheet">Appendix: command cheat sheet</a></li>
+  <li><a href="#glossary">Appendix: glossary</a></li>
+</ol>
+</nav>
+
+<h2 id="purpose"><span class="num"></span>Purpose &amp; how to use this document</h2>
+<p>
+This is the master design reference for putting all of Finora — five Go services, four MongoDBs,
+NATS, and the frontend — onto Kubernetes. It has two parts: get it working correctly on a local
+<code>kind</code> cluster on your MacBook first, then take the exact same application (repackaged
+for a different environment, not redesigned) onto a self-managed Kubernetes cluster you bootstrap
+yourself on EC2 instances, reachable at a real domain over HTTPS.
+</p>
+<p>
+Read this like a design doc, not a copy-paste script. Each section states a decision, why it was
+made, and — where it matters — what was rejected and why. The actual manifests get built up
+incrementally, hands-on, service by service, in your own working sessions; this document is the
+map you're building toward, so you always know why the next step is the next step.
+</p>
+<div class="callout decision">
+  <span class="label">Scope decision</span>
+  <p>
+  This document assumes: (1) storage for MongoDB is self-hosted inside the cluster in both
+  environments — a <code>StatefulSet</code> + <code>PersistentVolumeClaim</code> per database,
+  same "one Mongo per service" model you already have, just on real disks instead of Docker
+  volumes; (2) deploys are driven directly by <code>helm install</code> / <code>helm upgrade</code>
+  you run yourself — no GitOps/Argo CD yet, that's a deliberate later module once manual
+  deploys are second nature; (3) the AWS phase is a <strong>self-managed</strong> cluster
+  (<code>kubeadm</code> on plain EC2 instances) rather than EKS, so the control plane itself —
+  etcd, the API server, the scheduler — is something you stand up and operate, not something AWS
+  hands you.
+  </p>
+</div>
+
+<h2 id="principles"><span class="num"></span>Shared design principles</h2>
+<p>These apply in both environments. Everything below is in service of one of these.</p>
+<ul>
+  <li><strong>One Helm chart, two values files.</strong> <code>infrastructure/helm/finora/</code> is
+  the single source of truth for what "Finora on Kubernetes" means. <code>values-local.yaml</code>
+  and <code>values-aws.yaml</code> capture only what actually differs between environments (image
+  registry, storage class, replica counts, ingress host, resource sizing) — not two parallel copies
+  of the same manifests.</li>
+  <li><strong>Config already thinks in these terms.</strong> Your services already read every
+  setting from environment variables (<code>shared/config</code>, no hardcoded values) — that
+  12-factor discipline is exactly what makes a <code>ConfigMap</code>/<code>Secret</code> split a
+  translation, not a redesign. <code>.env.example</code> is close to a literal index of what goes
+  into each.</li>
+  <li><strong>Service discovery doesn't change.</strong> Docker Compose gave you DNS-by-service-name
+  (<code>http://user-service:8081</code>); Kubernetes <code>Service</code> objects give you the exact
+  same thing inside a namespace. If you name every <code>Service</code> after its Compose service
+  name, most of your existing env var <em>values</em> (<code>USER_SERVICE_URL</code>,
+  <code>NATS_URL</code>, every <code>*_MONGO_URI</code>) don't need to change at all.</li>
+  <li><strong>Secrets are never in a values file, committed or not.</strong> The Helm chart
+  references an existing <code>Secret</code> object by name for anything sensitive
+  (<code>JWT_ACCESS_SECRET</code>, <code>JWT_REFRESH_SECRET</code>); that Secret is created once,
+  imperatively, outside of Helm's management, in every environment. Helm owns the shape of the
+  deployment; it never owns the secret material.</li>
+  <li><strong>Probes are not optional.</strong> Every Deployment/StatefulSet gets a liveness and
+  readiness probe wired to the <code>/live</code> and <code>/ready</code> endpoints
+  <code>shared/health</code> already gives you. A Pod with no readiness probe is "ready" the instant
+  its process starts, whether or not it can actually reach Mongo — that's the exact gap
+  <code>/ready</code> exists to close.</li>
+  <li><strong>The same object model, different scale.</strong> Nothing about the Kubernetes objects
+  changes between Mac and AWS. What changes is what's <em>underneath</em> them — a laptop's
+  <code>local-path-provisioner</code> vs. real EBS volumes; <code>kind</code>'s Docker-in-Docker
+  networking vs. a real VPC. Learn the objects once on Mac; AWS is mostly learning what's underneath.</li>
+</ul>
+
+<h2 id="placeholders"><span class="num"></span>Placeholders used in this document</h2>
+<p>These appear in angle brackets throughout. Swap in real values when you actually run a command.</p>
+<table class="placeholder-table">
+<tr><th>Placeholder</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><code>&lt;YOUR_DOMAIN&gt;</code></td><td>The real domain you eventually register</td><td><code>finora.dev</code></td></tr>
+<tr><td><code>&lt;K8S_VERSION&gt;</code></td><td>The Kubernetes minor version you standardize on across kubeadm, kubelet, and kubectl on every node</td><td><code>1.31</code></td></tr>
+<tr><td><code>&lt;AWS_REGION&gt;</code></td><td>The AWS region you deploy into</td><td><code>us-east-1</code></td></tr>
+<tr><td><code>&lt;AWS_ACCOUNT_ID&gt;</code></td><td>Your AWS account ID, used in ECR image URIs and IAM ARNs</td><td><code>123456789012</code></td></tr>
+<tr><td><code>&lt;ECR_REGISTRY&gt;</code></td><td>Your account's ECR registry host</td><td><code>&lt;AWS_ACCOUNT_ID&gt;.dkr.ecr.&lt;AWS_REGION&gt;.amazonaws.com</code></td></tr>
+</table>
+
+<hr>
+
+<div class="part-banner">
+<h2 id="p1-target">Part 1 — MacBook (<code>kind</code>)</h2>
+<p>Get the entire fleet running correctly and reachable at a fake local domain before AWS enters the picture at all.</p>
+</div>
+
+<h3 id="p1-target-2">1.1 Target end state</h3>
+<p>
+"Done" for Part 1 looks like: <code>helm install finora infrastructure/helm/finora -f values-local.yaml</code>
+brings up all 4 Mongos, NATS, all 5 Go services, and the frontend, every Pod passes its readiness
+probe, and you can open <code>http://finora.local</code> in a browser and use the app exactly the
+way you can today at <code>http://localhost:3000</code> with <code>docker compose up</code>. This
+is functional parity with Compose, not a new feature.
+</p>
+
+<h3 id="p1-cluster">1.2 Cluster topology</h3>
+<p>
+Single control-plane node is correct for this phase — <code>kind</code>'s default. A multi-node
+<code>kind</code> config (one control-plane + two workers) is worth doing later purely to practice
+scheduling, node affinity, and pod topology spread — it's a good <em>separate</em> exercise, not a
+requirement for getting the app running.
+</p>
+<div class="callout gotcha">
+<span class="label">Gotcha — recreate the cluster before Ingress</span>
+<p>
+The <code>finora</code> kind cluster already created in an earlier session was created with
+<code>kind create cluster --name finora</code> and no extra config — it has <strong>no host port
+mapping</strong>, so an Ingress controller inside it is unreachable from your Mac's browser no
+matter what you install. Before doing Ingress work (§1.8), delete and recreate it with:
+</p>
+<pre><code>kind delete cluster --name finora
+
+cat &lt;&lt;'EOF' &gt; kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+EOF
+
+kind create cluster --name finora --config kind-config.yaml
+</code></pre>
+<p>
+Everything already built (namespace, <code>mongo-user</code> Deployment/Service) is one <code>kubectl
+apply -f infrastructure/kubernetes/</code> away from being back — nothing from those lessons is
+wasted, it folds directly into the Helm templates in §1.9.
+</p>
+</div>
+
+<h3 id="p1-images">1.3 Images</h3>
+<p>
+<code>kind</code> runs nodes as Docker containers with their own isolated image store — it does not
+see images sitting in your Mac's regular Docker Desktop image cache. Build, then explicitly load:
+</p>
+<pre><code># from the repo root, one per service — build context MUST be repo root
+# (every Dockerfile also COPYs shared/)
+docker build -f services/user-service/Dockerfile -t finora/user-service:local .
+docker build -f services/expense-service/Dockerfile -t finora/expense-service:local .
+docker build -f services/budget-service/Dockerfile -t finora/budget-service:local .
+docker build -f services/notification-service/Dockerfile -t finora/notification-service:local .
+docker build -f services/gateway/Dockerfile -t finora/gateway:local .
+docker build -f frontend/Dockerfile -t finora/frontend:local \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=http://finora.local/api ./frontend
+
+kind load docker-image finora/user-service:local finora/expense-service:local \
+  finora/budget-service:local finora/notification-service:local \
+  finora/gateway:local finora/frontend:local --name finora
+</code></pre>
+<div class="callout gotcha">
+<span class="label">Gotcha — the frontend image bakes in its API URL</span>
+<p>
+<code>NEXT_PUBLIC_API_BASE_URL</code> is a Next.js build-time arg, not a runtime env var — it gets
+compiled into the static JS bundle. That means the frontend image is <strong>environment-specific</strong>:
+a <code>finora/frontend:local</code> image built for <code>http://finora.local/api</code> cannot be
+reused as-is against the AWS domain in Part 2. Rebuild (or better, build once per environment in CI
+later) with the right <code>--build-arg</code> for wherever it's actually going to run.
+</p>
+</div>
+<p>
+Every Deployment's <code>imagePullPolicy</code> should be <code>IfNotPresent</code> locally — with
+<code>Never</code> or the default (<code>Always</code>) you'll either force a registry pull that
+doesn't exist, or silently ignore a freshly rebuilt local image. This is exactly the kind of knob
+<code>values-local.yaml</code> exists for.
+</p>
+
+<h3 id="p1-config">1.4 Configuration &amp; secrets</h3>
+<p>
+Split <code>.env.example</code> into a <code>ConfigMap</code> for cross-cutting, non-sensitive
+values shared by every service, small per-service <code>ConfigMap</code>s for anything specific to
+one service (its own port, its own Mongo URI, any downstream service URL it calls directly), and one
+<code>Secret</code> for the two JWT signing keys.
+</p>
+<pre><code># finora-shared-config (ConfigMap) — applies to every Go service
+LOG_LEVEL: info
+SHUTDOWN_TIMEOUT: 10s
+CORS_ALLOWED_ORIGINS: http://finora.local
+RATE_LIMIT_REQUESTS_PER_SECOND: "10"
+RATE_LIMIT_BURST: "20"
+MAX_REQUEST_BODY_BYTES: "1048576"
+OUTBOX_RELAY_INTERVAL: 2s
+NATS_URL: nats://nats:4222
+
+# user-service-config (ConfigMap) — this service only
+USER_SERVICE_PORT: "8081"
+USER_SERVICE_MONGO_URI: mongodb://mongo-user:27017/finora_users
+JWT_ACCESS_TTL: 15m
+JWT_REFRESH_TTL: 168h
+</code></pre>
+<p>
+Notice <code>USER_SERVICE_MONGO_URI</code> is unchanged from <code>.env.example</code> — it was
+already addressed by Compose service name, and a Kubernetes <code>Service</code> named
+<code>mongo-user</code> resolves exactly the same way.
+</p>
+<pre><code># created once, imperatively, per environment — never templated by Helm,
+# never committed to git
+kubectl create secret generic finora-secrets \
+  --namespace finora \
+  --from-literal=JWT_ACCESS_SECRET='&lt;a-real-random-secret&gt;' \
+  --from-literal=JWT_REFRESH_SECRET='&lt;a-different-real-random-secret&gt;'
+</code></pre>
+<div class="callout why">
+<span class="label">Why not put secrets in <code>values.yaml</code> at all, even gitignored?</span>
+<p>
+Because the moment a secret lives in a values file, it's one careless <code>git add -A</code> or one
+copy-pasted Helm <code>--values</code> flag away from landing in a commit or a Slack message. Making
+the Secret an object Helm <em>references</em> rather than <em>creates</em> means there is no path
+by which the JWT keys ever pass through a YAML file on disk that Helm reads. This is also exactly
+the seam a future External Secrets Operator / Sealed Secrets upgrade would slot into without
+changing anything else about the chart.
+</p>
+</div>
+
+<h3 id="p1-probes">1.5 Health probes</h3>
+<p>
+Every Go service already exposes <code>/live</code>, <code>/ready</code>, and <code>/health</code>
+via <code>shared/health</code>. The translation to Kubernetes is direct:
+</p>
+<pre><code>livenessProbe:
+  httpGet:
+    path: /live
+    port: 8081
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8081
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+</code></pre>
+<div class="callout why">
+<span class="label">Why two separate probes instead of one</span>
+<p>
+They answer different questions and a failure means a different action. <strong>Liveness</strong>
+failing means "this process is wedged, kill and restart the container" — reserve it for true
+deadlock/hang detection. <strong>Readiness</strong> failing means "this Pod is alive but shouldn't
+receive traffic right now" (e.g. Mongo connection dropped) — the Pod stays running and gets a
+chance to recover, it's just pulled out of the Service's routable endpoints in the meantime. Wiring
+both to the same endpoint means a transient dependency hiccup restarts your container instead of
+just quietly taking it out of rotation — a self-inflicted crash loop.
+</p>
+</div>
+
+<h3 id="p1-workloads">1.6 Workloads</h3>
+<table>
+<tr><th>Workload</th><th>Kind</th><th>Replicas (local)</th><th>Notes</th></tr>
+<tr><td><code>mongo-user</code>, <code>mongo-expense</code>, <code>mongo-budget</code>, <code>mongo-notification</code></td><td>StatefulSet</td><td>1 each</td><td>One <code>volumeClaimTemplates</code> entry each — see §1.7</td></tr>
+<tr><td><code>nats</code></td><td>StatefulSet</td><td>1</td><td>JetStream needs a PVC too — its whole value proposition is durable delivery across restarts</td></tr>
+<tr><td><code>user-service</code>, <code>expense-service</code>, <code>budget-service</code>, <code>notification-service</code>, <code>gateway</code></td><td>Deployment</td><td>1 each</td><td>Stateless — safe to scale up any time, no coordination needed</td></tr>
+<tr><td><code>frontend</code></td><td>Deployment</td><td>1</td><td>Stateless</td></tr>
+</table>
+<div class="callout decision">
+<span class="label">Decision — StatefulSet, not Deployment, for Mongo and NATS</span>
+<p>
+A <code>StatefulSet</code> gives each replica a stable, predictable name
+(<code>mongo-user-0</code>, not a random suffix) and its <em>own</em> PVC that follows that specific
+Pod identity across restarts — a Deployment's Pods are interchangeable by design, which is wrong for
+anything holding its own disk state. You're running one replica each today, so this matters less
+right now than it will the moment you consider a Mongo replica set — but the object choice should
+match what the workload <em>is</em>, not just what today's replica count happens to be.
+</p>
+</div>
+
+<h3 id="p1-storage">1.7 Storage</h3>
+<p>
+<code>kind</code> ships a default <code>StorageClass</code> named <code>standard</code>, backed by
+<code>local-path-provisioner</code> — a <code>PersistentVolumeClaim</code> against it gets you a
+real, working volume with zero extra setup, living on the kind node's own container filesystem.
+</p>
+<pre><code>volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 1Gi
+</code></pre>
+<p>
+1Gi per Mongo and NATS instance is plenty for local testing/dummy data. This is also the first knob
+that's genuinely different in Part 2 — AWS has no <code>local-path-provisioner</code>, so
+<code>values-aws.yaml</code> points <code>storageClassName</code> at a real EBS-backed class instead
+(§2.7). Nothing else about the StatefulSet changes.
+</p>
+
+<h3 id="p1-network">1.8 Networking &amp; Ingress</h3>
+<p>
+Install <code>ingress-nginx</code>'s kind-specific manifest (it already targets nodes labeled
+<code>ingress-ready=true</code>, which the recreated cluster config in §1.2 sets):
+</p>
+<pre><code>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+kubectl wait --namespace ingress-nginx --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller --timeout=90s
+</code></pre>
+<p>One <code>Ingress</code> object, one domain, path-based routing to the two things that actually receive external traffic:</p>
+<pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: finora
+  namespace: finora
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: finora.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: gateway, port: { number: 8080 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: frontend, port: { number: 3000 } }
+</code></pre>
+<p>
+No path-rewrite annotation needed: the gateway's own routes already start with <code>/api/v1/...</code>,
+so the original request path can pass straight through unmodified. Add the fake local domain to
+your Mac's hosts file so the browser resolves it:
+</p>
+<pre><code>echo "127.0.0.1 finora.local" | sudo tee -a /etc/hosts</code></pre>
+<div class="callout rejected">
+<span class="label">Rejected — separate hostnames instead of one domain with path routing</span>
+<p>
+Docker Compose exposes the frontend and gateway on two different <em>ports</em> of the same host;
+the Kubernetes-native equivalent of "two different ports" would be two different hostnames
+(<code>app.finora.local</code> / <code>api.finora.local</code>). Path-based routing under one host
+was chosen instead because it's what the real domain in Part 2 will actually do (nobody wants
+<code>api.finora.com</code> as a separate DNS record and cert to manage if a single
+<code>Ingress</code> with two path rules does the same job with one hostname, one cert, and simpler
+CORS — same-origin from the browser's perspective, since <code>/</code> and <code>/api</code> share
+a host). No TLS locally — cert-manager's Let's Encrypt integration (§2.8) requires a real,
+internet-reachable domain to complete an HTTP-01 challenge, so there's nothing to gain by fighting
+with self-signed certs on a laptop-only cluster.
+</p>
+</div>
+
+<h3 id="p1-helm">1.9 Packaging as Helm</h3>
+<p>Recommended chart layout:</p>
+<pre><code>infrastructure/helm/finora/
+├── Chart.yaml
+├── values.yaml              # shared defaults across every environment
+├── values-local.yaml        # kind overrides
+├── values-aws.yaml          # kubeadm/EC2 overrides
+└── templates/
+    ├── _helpers.tpl          # common labels, name helpers
+    ├── configmap-shared.yaml
+    ├── ingress.yaml
+    ├── mongo/
+    │   └── statefulset.yaml  # ranges over values.mongo[] — one file, four instances
+    ├── nats/
+    │   ├── statefulset.yaml
+    │   └── service.yaml
+    └── services/
+        ├── deployment.yaml   # ranges over values.services[] — one file, five services
+        └── service.yaml
+</code></pre>
+<div class="callout decision">
+<span class="label">Decision — one templated file per resource <em>type</em>, not per service</span>
+<p>
+The five Go services are structurally identical (one container, one port, the same probe shape,
+similar env layout) — that similarity is exactly what a Helm <code>range</code> over a list in
+<code>values.yaml</code> is for:
+</p>
+<pre><code># values.yaml (excerpt)
+services:
+  - name: user-service
+    port: 8081
+  - name: expense-service
+    port: 8082
+  - name: budget-service
+    port: 8083
+  - name: notification-service
+    port: 8084
+  - name: gateway
+    port: 8080
+</code></pre>
+<pre><code># templates/services/deployment.yaml (excerpt)
+{{- range .Values.services }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: {{ $.Values.replicaCount | default 1 }}
+  selector:
+    matchLabels: { app: {{ .name }} }
+  template:
+    metadata:
+      labels: { app: {{ .name }} }
+    spec:
+      containers:
+        - name: {{ .name }}
+          image: "{{ $.Values.imageRegistry }}/{{ .name }}:{{ $.Values.imageTag }}"
+          ports: [{ containerPort: {{ .port }} }]
+          livenessProbe: { httpGet: { path: /live, port: {{ .port }} } }
+          readinessProbe: { httpGet: { path: /ready, port: {{ .port }} } }
+---
+{{- end }}
+</code></pre>
+<p>
+Adding a sixth service later is a two-line addition to <code>values.yaml</code>, not a new template
+file. The trade-off, honestly: the actual rendered object for any one service only exists after
+<code>helm template</code> runs — slightly harder to eyeball than five separate files when
+something's wrong. <code>helm template infrastructure/helm/finora -f values-local.yaml</code> (no
+cluster contact, pure rendering) is the command that closes that gap when you need to see the real
+YAML.
+</p>
+</div>
+
+<h3 id="p1-runbook">1.10 Runbook</h3>
+<ol>
+  <li>Recreate the cluster with the Ingress-ready config (§1.2).</li>
+  <li><code>kubectl apply -f infrastructure/kubernetes/namespace/</code></li>
+  <li>Install <code>ingress-nginx</code> (§1.8) and wait for it to be ready.</li>
+  <li>Build and <code>kind load</code> all six images (§1.3).</li>
+  <li><code>kubectl create secret generic finora-secrets ...</code> (§1.4) — once.</li>
+  <li>Add <code>finora.local</code> to <code>/etc/hosts</code>.</li>
+  <li><code>helm install finora infrastructure/helm/finora -f infrastructure/helm/finora/values-local.yaml</code></li>
+  <li><code>kubectl get pods -w</code> until every Pod is <code>Running</code>/<code>Ready</code>.</li>
+  <li>Open <code>http://finora.local</code>.</li>
+</ol>
+
+<h3 id="p1-verify">1.11 Verification checklist</h3>
+<div class="callout checklist">
+<span class="label">Verify, don't assume</span>
+<ul>
+  <li><code>kubectl get pods -A</code> — everything <code>Running</code>, 0 unexpected restarts</li>
+  <li><code>kubectl get ingress -n finora</code> — address populated, both paths present</li>
+  <li>Register a user, log in, create an account/transaction/budget through the actual browser UI</li>
+  <li>Deliberately delete a service Pod (<code>kubectl delete pod &lt;name&gt;</code>) mid-session — confirm the app recovers within a few seconds and the frontend doesn't need a hard refresh to keep working</li>
+  <li>Check an async event still completes end to end: create an over-budget transaction, confirm a notification eventually appears (same <code>finora.transaction.created</code> → ... → <code>finora.budget.overspent</code> chain as Compose, just running on different infrastructure underneath)</li>
+</ul>
+</div>
+
+<h3 id="p1-teardown">1.12 Teardown</h3>
+<pre><code>kind delete cluster --name finora</code></pre>
+<p>Free, instant, and safe — nothing here costs money or touches anything outside your Mac.</p>
+
+<hr>
+
+<div class="part-banner">
+<h2 id="p2-target">Part 2 — AWS (self-managed Kubernetes on EC2)</h2>
+<p>Bootstrap a real cluster's control plane yourself with <code>kubeadm</code>, then run the same Helm chart against it.</p>
+</div>
+
+<h3 id="p2-target-2">2.1 Target end state</h3>
+<p>
+"Done" for Part 2: a <code>kubeadm</code>-bootstrapped cluster on your own EC2 instances, the same
+Helm chart deployed with <code>values-aws.yaml</code>, reachable at
+<code>https://&lt;YOUR_DOMAIN&gt;</code> with a valid Let's Encrypt certificate. This is explicitly a
+<strong>test cluster</strong> — single control-plane node, no HA, no autoscaling, no GitOps. The
+point is proving the deployment shape works on real cloud infrastructure you fully understand,
+not standing up something production-grade on the first attempt.
+</p>
+<div class="callout why">
+<span class="label">Why self-managed instead of EKS</span>
+<p>
+EKS hands you a working control plane; the explicit goal here is understanding what's inside one.
+Everything in §2.3–§2.4 — <code>kubeadm init</code>, CNI installation, and every one of the
+add-ons EKS would otherwise have silently included — is exactly the part of Kubernetes internals
+that a managed offering exists specifically to hide from you. It's genuinely more work and more
+ways to get stuck, and it teaches things that don't come up day-to-day operating a managed
+cluster — that's the trade being made on purpose here, consistent with this project's stated goal
+of practicing the full platform-engineering skill set, not just the application layer.
+</p>
+</div>
+
+<h3 id="p2-network">2.2 Network &amp; compute architecture</h3>
+<table>
+<tr><th>Component</th><th>Choice</th><th>Why</th></tr>
+<tr><td>VPC</td><td><code>10.0.0.0/16</code>, one public subnet <code>10.0.0.0/24</code> in one AZ</td><td>Single-subnet keeps this a one-NAT-Gateway-cheaper cluster; see cost callout below</td></tr>
+<tr><td>Control plane</td><td>1× <code>t3.medium</code> (2 vCPU / 4 GiB), 30GiB gp3 root volume</td><td>Comfortable headroom for etcd + API server + scheduler + controller-manager at this scale</td></tr>
+<tr><td>Workers</td><td>2× <code>t3.medium</code> to start</td><td>~13–14 small Pods total (4 Mongo + NATS + 5 Go services + frontend + ingress-nginx + cert-manager + metrics-server); resize to <code>t3.large</code> if <code>kubectl top nodes</code> shows sustained pressure</td></tr>
+<tr><td>CNI</td><td>Calico</td><td>NetworkPolicy support (Flannel has none) — worth having even unused today, for a later hardening pass</td></tr>
+</table>
+<div class="callout cost">
+<span class="label">Cost — the single-public-subnet trade-off</span>
+<p>
+Putting workers in a private subnet (the "more correct" production pattern) requires a NAT Gateway
+for their outbound internet access (image pulls, package installs) — and a NAT Gateway bills
+~$0.045/hr <em>plus</em> ~$0.045/GB processed, which quietly becomes the single largest line item
+on a small test cluster's bill. Everything in one public subnet with tight security groups (SSH and
+the API server open only to your own IP) is the pragmatic choice for a test cluster; graduate to
+private workers + NAT once this is a cluster you intend to leave running.
+</p>
+</div>
+<div class="callout gotcha">
+<span class="label">Gotcha — security groups need to allow Calico's overlay traffic</span>
+<p>
+Calico's default networking mode encapsulates cross-node pod traffic in IP-in-IP (protocol number
+4, not TCP or UDP). If your security group only opens TCP/UDP ports between nodes, pods on
+different EC2 instances will fail to reach each other with no obvious error at the Kubernetes
+layer — it looks like a DNS or service-mesh problem until you check the security group. Allow all
+traffic (or at minimum protocol 4) between the nodes' own security group and itself.
+</p>
+</div>
+
+<h3 id="p2-bootstrap">2.3 Bootstrapping with kubeadm</h3>
+<ol>
+  <li>Launch the EC2 instances, attach an IAM instance profile to <strong>every</strong> node (control plane and workers both need it — the cloud-controller-manager and EBS CSI driver run as Pods that could land on any node).</li>
+  <li>On every node: install <code>containerd</code>, then <code>kubeadm</code>/<code>kubelet</code>/<code>kubectl</code> at the same <code>&lt;K8S_VERSION&gt;</code>.</li>
+  <li>On the control-plane node: <code>kubeadm init --pod-network-cidr=192.168.0.0/16</code> (Calico's expected default) — save the printed <code>kubeadm join</code> command, it contains the bootstrap token and CA hash workers need.</li>
+  <li>Install Calico's manifest against the fresh control plane.</li>
+  <li>On every worker node, run the saved <code>kubeadm join</code> command.</li>
+  <li><code>kubectl get nodes</code> from the control plane — all nodes <code>Ready</code> once Calico's Pods finish starting.</li>
+</ol>
+
+<h3 id="p2-addons">2.4 Cluster add-ons</h3>
+<p>
+This is the actual heart of "what EKS would have given you for free." A <code>kubeadm</code>
+cluster has <strong>no cloud provider integration at all</strong> out of the box — install these
+in order:
+</p>
+<table>
+<tr><th>Add-on</th><th>Why it's needed</th></tr>
+<tr><td><strong>AWS cloud-controller-manager</strong></td><td>Without it, a <code>Service</code> of <code>type: LoadBalancer</code> just sits in <code>Pending</code> forever — nothing in the cluster knows how to call the AWS API to provision an NLB. It's also what populates each Node object with its correct AWS instance type/AZ/region labels.</td></tr>
+<tr><td><strong>AWS EBS CSI driver</strong></td><td>Same gap for storage — without it there is no controller that can call <code>CreateVolume</code>/<code>AttachVolume</code> on AWS's behalf when a PVC is created.</td></tr>
+<tr><td><strong>metrics-server</strong></td><td>Powers <code>kubectl top nodes/pods</code>, which is how you'll actually notice a worker needs resizing (§2.2) instead of finding out via an OOMKilled Pod.</td></tr>
+<tr><td><strong>ingress-nginx</strong></td><td>Same Ingress object and rules as Part 1 — install it with its <code>Service</code> as <code>type: LoadBalancer</code> this time, which the cloud-controller-manager turns into a real NLB.</td></tr>
+<tr><td><strong>cert-manager</strong></td><td>Automates requesting and renewing the Let's Encrypt certificate — see §2.8.</td></tr>
+</table>
+<div class="callout rejected">
+<span class="label">Rejected (for now) — AWS Load Balancer Controller instead of ingress-nginx</span>
+<p>
+The ALB-based controller is more "AWS-native" (a real Application Load Balancer with target groups
+instead of an NLB fronting the ingress-nginx Pods) and is the more common pairing with EKS
+specifically. It also needs more IAM permissions and its own webhook setup. <code>ingress-nginx</code>
++ NLB was chosen because it's the exact same Ingress object and controller as Part 1 — nothing about
+the actual routing rules needs to change moving from Mac to AWS, only what's provisioning the load
+balancer underneath. Worth revisiting once comfortable, not a wrong choice, just more surface area
+for a first cloud pass.
+</p>
+</div>
+
+<h3 id="p2-registry">2.5 Registry &amp; image pull auth</h3>
+<pre><code>aws ecr create-repository --repository-name finora/user-service --region &lt;AWS_REGION&gt;
+# ...one per service...
+
+docker tag finora/user-service:local &lt;ECR_REGISTRY&gt;/finora/user-service:v1
+docker push &lt;ECR_REGISTRY&gt;/finora/user-service:v1
+</code></pre>
+<div class="callout gotcha">
+<span class="label">Gotcha — ECR auth tokens expire every 12 hours</span>
+<p>
+EKS-optimized AMIs ship with <code>docker-credential-ecr-login</code> pre-wired so kubelet image
+pulls always have a fresh token. Plain EC2 instances running your own <code>kubeadm</code> bootstrap
+do not have this by default — an <code>imagePullSecret</code> created once will silently start
+failing pulls (not existing running Pods — new ones, e.g. after a scale-up or node replacement)
+once that token expires. Fix it once, at node bootstrap time, by installing
+<code>amazon-ecr-credential-helper</code> and configuring <code>containerd</code>'s registry config
+to use it — this gets a fresh token per-pull automatically, the same guarantee the EKS-optimized AMI
+gives you, without depending on an in-cluster CronJob to refresh a Secret.
+</p>
+</div>
+
+<h3 id="p2-config">2.6 Configuration &amp; secrets</h3>
+<p>
+Identical mechanism to §1.4 — a shared <code>ConfigMap</code>, per-service <code>ConfigMap</code>s,
+one imperatively-created <code>Secret</code>. The only content change: <code>CORS_ALLOWED_ORIGINS</code>
+and the frontend's baked-in <code>NEXT_PUBLIC_API_BASE_URL</code> both become
+<code>https://&lt;YOUR_DOMAIN&gt;</code> instead of <code>http://finora.local</code>. Generate a
+genuinely different <code>JWT_ACCESS_SECRET</code>/<code>JWT_REFRESH_SECRET</code> for this
+environment — never reuse the local dev values here.
+</p>
+
+<h3 id="p2-storage">2.7 Storage (EBS)</h3>
+<pre><code>apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: gp3
+</code></pre>
+<p>
+<code>values-aws.yaml</code> sets <code>storageClassName: ebs-sc</code> instead of <code>standard</code> —
+the <em>only</em> change to every Mongo/NATS StatefulSet between environments.
+</p>
+<div class="callout why">
+<span class="label">Why <code>WaitForFirstConsumer</code></span>
+<p>
+The default immediate-binding mode can provision an EBS volume in an AZ that doesn't match where
+the Pod actually gets scheduled, leaving it permanently unschedulable. <code>WaitForFirstConsumer</code>
+delays volume creation until a Pod claiming it is actually scheduled, so the volume is always
+created in the right AZ. With a single-AZ subnet (§2.2) this specific failure mode can't happen yet
+— but it's the correct default the moment you add a second AZ, so there's no reason to set it any
+other way now.
+</p>
+</div>
+
+<h3 id="p2-dns">2.8 DNS &amp; TLS</h3>
+<ol>
+  <li>Once <code>ingress-nginx</code>'s Service is up: <code>kubectl get svc -n ingress-nginx ingress-nginx-controller</code> — note the NLB's DNS name under <code>EXTERNAL-IP</code>.</li>
+  <li>In Route53, create a hosted zone for <code>&lt;YOUR_DOMAIN&gt;</code> (if it isn't already), and an ALIAS record pointing <code>&lt;YOUR_DOMAIN&gt;</code> at that NLB DNS name.</li>
+  <li>Install cert-manager, then a <code>ClusterIssuer</code> for Let's Encrypt using the HTTP-01 challenge type (DNS-01 needs Route53 API credentials wired into cert-manager — HTTP-01 needs nothing extra since the Ingress is already internet-reachable once step 2 propagates).</li>
+  <li>Annotate the <code>Ingress</code> with <code>cert-manager.io/cluster-issuer: letsencrypt-prod</code> and add a <code>tls:</code> block naming a Secret for cert-manager to populate. It requests, stores, and auto-renews the certificate from there on — no manual renewal ever again.</li>
+</ol>
+
+<h3 id="p2-helm">2.9 Helm values overlay</h3>
+<pre><code># values-aws.yaml (excerpt)
+imageRegistry: "&lt;ECR_REGISTRY&gt;/finora"
+imageTag: v1
+imagePullPolicy: Always
+storageClassName: ebs-sc
+ingress:
+  host: "&lt;YOUR_DOMAIN&gt;"
+  tls: true
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits:   { cpu: 500m, memory: 512Mi }
+</code></pre>
+<p>
+Same chart, same templates as Part 1 — this file is the entire diff. If a change to the app's
+behavior requires editing a template rather than a value here, that's a signal the chart drifted
+away from being environment-agnostic, worth stopping and fixing before it compounds.
+</p>
+
+<h3 id="p2-runbook">2.10 Runbook</h3>
+<ol>
+  <li>Provision VPC, subnet, security groups, IAM instance profile, EC2 instances (§2.2).</li>
+  <li><code>kubeadm init</code> on control plane, install Calico, <code>kubeadm join</code> on workers (§2.3).</li>
+  <li>Install cloud-controller-manager, EBS CSI driver, metrics-server, ingress-nginx, cert-manager (§2.4).</li>
+  <li>Create ECR repositories, push all six images (§2.5).</li>
+  <li><code>kubectl create secret generic finora-secrets ...</code> with production values (§2.6).</li>
+  <li>Apply the <code>ebs-sc</code> StorageClass (§2.7).</li>
+  <li><code>helm install finora infrastructure/helm/finora -f infrastructure/helm/finora/values-aws.yaml</code></li>
+  <li>Point DNS at the provisioned NLB, install the <code>ClusterIssuer</code>, confirm the certificate issues (§2.8).</li>
+  <li>Open <code>https://&lt;YOUR_DOMAIN&gt;</code>.</li>
+</ol>
+
+<h3 id="p2-verify">2.11 Verification checklist</h3>
+<div class="callout checklist">
+<ul>
+  <li>Same functional checklist as §1.11, against the real domain over HTTPS</li>
+  <li><code>kubectl get certificate -n finora</code> — <code>READY: True</code></li>
+  <li><code>kubectl top nodes</code> — no node consistently pinned near its resource limits</li>
+  <li>Terminate a worker node deliberately (not the control plane) — confirm Pods reschedule onto the remaining worker within a couple of minutes</li>
+  <li>Confirm the ECR credential helper fix (§2.5) actually works: wait past the 12-hour token lifetime, then force a new Pod to schedule (e.g. <code>kubectl rollout restart deployment/gateway</code>) and confirm the image pull still succeeds</li>
+</ul>
+</div>
+
+<h3 id="p2-cost">2.12 Cost &amp; teardown</h3>
+<p>Every one of these bills continuously while it exists, whether or not you're using the app:</p>
+<table>
+<tr><th>Resource</th><th>Approximate cost</th></tr>
+<tr><td>3× <code>t3.medium</code> EC2 (control plane + 2 workers)</td><td>~$0.0416/hr each ≈ $0.125/hr total</td></tr>
+<tr><td>Network Load Balancer (from ingress-nginx)</td><td>~$0.0225/hr + per-LCU usage</td></tr>
+<tr><td>EBS volumes (root + Mongo/NATS PVCs)</td><td>~$0.08/GB-month (gp3)</td></tr>
+<tr><td>Route53 hosted zone</td><td>$0.50/month flat + per-query</td></tr>
+</table>
+<p>Teardown, in this order (order matters — deleting the LoadBalancer Service first lets the cloud-controller-manager actually deprovision the NLB instead of leaving it orphaned):</p>
+<pre><code>helm uninstall finora -n finora
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/.../deploy.yaml   # frees the NLB
+# then: terminate the 3 EC2 instances, delete their EBS volumes if not auto-deleted on termination,
+# delete the Route53 records (and hosted zone, if you're done with it entirely)
+</code></pre>
+
+<h3 id="p2-deferred">2.13 Deliberately deferred</h3>
+<p>Named explicitly so nothing here reads as an oversight:</p>
+<ul>
+  <li><strong>HA control plane</strong> — one etcd node is a single point of failure. Fine for a test cluster; not something to build a second module on top of until this one's fully understood.</li>
+  <li><strong>GitOps (Argo CD)</strong> — deliberately deferred per <code>CLAUDE.md</code>'s own roadmap; manual <code>helm upgrade</code> first.</li>
+  <li><strong>Managed secrets</strong> (External Secrets Operator / AWS Secrets Manager) — the imperative <code>kubectl create secret</code> approach in §2.6 is the seam this slots into later, not a dead end.</li>
+  <li><strong>Cluster autoscaler / node group scaling</strong> — fixed 2-worker count until there's a concrete reason to automate it.</li>
+  <li><strong>NetworkPolicy enforcement</strong> — Calico supports it (§2.2), nothing enforces it yet.</li>
+  <li><strong>Automated node patching / AMI rotation</strong> — nodes are hand-built for now.</li>
+</ul>
+
+<hr>
+
+<h2 id="cheatsheet"><span class="num"></span>Appendix: command cheat sheet</h2>
+<pre><code># context switching
+kubectl config get-contexts
+kubectl config use-context kind-finora
+
+# the four commands that answer "what's wrong"
+kubectl get pods -A
+kubectl describe pod &lt;name&gt;
+kubectl logs &lt;name&gt; [-c &lt;container&gt;] [--previous]
+kubectl exec -it &lt;name&gt; -- sh
+
+# rendering the chart without touching a cluster
+helm template infrastructure/helm/finora -f infrastructure/helm/finora/values-local.yaml
+
+# rolling out a change
+helm upgrade finora infrastructure/helm/finora -f infrastructure/helm/finora/values-local.yaml
+kubectl rollout status deployment/&lt;name&gt;
+kubectl rollout undo deployment/&lt;name&gt;
+</code></pre>
+
+<h2 id="glossary"><span class="num"></span>Appendix: glossary</h2>
+<table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Pod</td><td>Smallest deployable unit — one or more containers sharing a network namespace, scheduled together, no self-healing on its own.</td></tr>
+<tr><td>Deployment</td><td>Declares "N replicas of this Pod spec, always" for stateless workloads; owns a ReplicaSet that does the actual reconciling.</td></tr>
+<tr><td>StatefulSet</td><td>Like a Deployment, but each replica gets a stable name and its own persistent volume tied to that specific replica identity.</td></tr>
+<tr><td>Service</td><td>Stable DNS name + virtual IP load-balancing across Pods matched by label selector.</td></tr>
+<tr><td>Ingress</td><td>HTTP(S) routing rules (host/path → Service) fronted by an Ingress controller (here, <code>ingress-nginx</code>).</td></tr>
+<tr><td>ConfigMap / Secret</td><td>Externalized configuration injected as env vars or files; Secret is base64-encoded at rest, not encrypted by default — treat it as "not-plaintext," not "safe."</td></tr>
+<tr><td>PersistentVolumeClaim (PVC)</td><td>A request for storage, satisfied by a StorageClass's provisioner (<code>local-path-provisioner</code> locally, the EBS CSI driver on AWS).</td></tr>
+<tr><td>kubeadm</td><td>The tool that bootstraps a Kubernetes control plane (and joins workers to it) on plain machines — what kind and most managed-cluster CLIs use internally.</td></tr>
+<tr><td>Cloud controller manager</td><td>The component that lets in-cluster objects (Service type=LoadBalancer, Node metadata) trigger real cloud-provider API calls — absent by default on any self-bootstrapped cluster.</td></tr>
+<tr><td>CSI driver</td><td>Container Storage Interface — the plugin that lets Kubernetes provision/attach real cloud disks for PVCs.</td></tr>
+</table>
+
+<footer>
+Finora — Kubernetes Deployment Design Document. Amend this file the moment a decision here changes in practice; don't let it silently drift from what's actually built.
+</footer>
+
+</body>
+</html>
