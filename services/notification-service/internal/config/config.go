@@ -16,6 +16,7 @@ type Config struct {
 	MongoURI           string
 	LogLevel           string
 	ShutdownTimeout    time.Duration
+	DrainDelay         time.Duration
 	CORSAllowedOrigins []string
 	NATSURL            string
 }
@@ -39,6 +40,7 @@ func Load() Config {
 		MongoURI:           config.MustGetEnv("NOTIFICATION_SERVICE_MONGO_URI"),
 		LogLevel:           config.GetEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout:    config.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
+		DrainDelay:         config.GetEnvDuration("DRAIN_DELAY", 5*time.Second),
 		CORSAllowedOrigins: origins,
 		NATSURL:            config.GetEnv("NATS_URL", "nats://nats:4222"),
 	}

@@ -20,6 +20,7 @@ type Config struct {
 	JWTRefreshTTL      time.Duration
 	LogLevel           string
 	ShutdownTimeout    time.Duration
+	DrainDelay         time.Duration
 	CORSAllowedOrigins []string
 }
 
@@ -36,6 +37,7 @@ func Load() Config {
 		JWTRefreshTTL:      sharedconfig.GetEnvDuration("JWT_REFRESH_TTL", 168*time.Hour),
 		LogLevel:           sharedconfig.GetEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout:    sharedconfig.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
+		DrainDelay:         sharedconfig.GetEnvDuration("DRAIN_DELAY", 5*time.Second),
 		CORSAllowedOrigins: splitCSV(sharedconfig.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 	}
 }

@@ -215,7 +215,7 @@ paths:
   /ready:
     get:
       tags: [health]
-      summary: Readiness probe (checks MongoDB connectivity)
+      summary: Readiness probe (MongoDB connectivity, and fails during shutdown drain)
       security: []
       responses:
         '200':

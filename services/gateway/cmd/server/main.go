@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/finora/shared/health"
 	"github.com/finora/shared/logger"
 	"github.com/finora/shared/openapidoc"
 	"github.com/finora/shared/server"
@@ -44,15 +45,20 @@ func main() {
 
 	openapiSpec := openapidoc.Load("openapi.yaml", log)
 
+	// gate is flipped not-ready by server.Run at the start of its shutdown
+	// sequence, before the listener actually stops accepting connections —
+	// see shared/health.Gate and shared/server.Run's doc comments.
+	gate := &health.Gate{}
+
 	engine := router.New(cfg, log, router.Backends{
 		User:         userProxy,
 		Expense:      expenseProxy,
 		Budget:       budgetProxy,
 		Notification: notificationProxy,
-	}, openapiSpec)
+	}, openapiSpec, gate)
 
 	addr := "0.0.0.0:" + cfg.GatewayPort
-	if err := server.Run(addr, engine, log, cfg.ShutdownTimeout); err != nil {
+	if err := server.Run(addr, engine, log, cfg.ShutdownTimeout, cfg.DrainDelay, gate); err != nil {
 		log.Error("server exited with error", slog.String("error", err.Error()))
 		os.Exit(1)
 	}

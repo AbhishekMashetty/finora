@@ -121,7 +121,7 @@ paths:
   /ready:
     get:
       tags: [health]
-      summary: Readiness probe (ok only if Mongo ping succeeds)
+      summary: Readiness probe (Mongo + NATS connectivity, and fails during shutdown drain)
       responses:
         "200":
           description: Ready

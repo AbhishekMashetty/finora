@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/finora/shared/httpclient"
 	"github.com/finora/shared/middleware"
 )
 
@@ -53,7 +54,16 @@ type ExpenseHTTPClient struct {
 func NewExpenseHTTPClient(baseURL string) *ExpenseHTTPClient {
 	return &ExpenseHTTPClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{},
+		// &http.Client{} alone inherits http.DefaultTransport's
+		// MaxIdleConnsPerHost: 2 — pathological here, since this is the
+		// client SumExpensesByCategory drives in a loop of up to
+		// maxReportPages concurrent-capable calls per budget, against a
+		// single host (expense-service). See shared/httpclient's doc
+		// comment for what the default actually does under load. Each
+		// individual call still gets its own bounded deadline via doGet's
+		// context.WithTimeout(ctx, requestTimeout) — this only fixes
+		// connection reuse, not per-call timeouts.
+		http: &http.Client{Transport: httpclient.NewTransport()},
 	}
 }
 

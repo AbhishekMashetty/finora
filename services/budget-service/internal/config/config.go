@@ -16,6 +16,7 @@ type Config struct {
 	MongoURI            string
 	LogLevel            string
 	ShutdownTimeout     time.Duration
+	DrainDelay          time.Duration
 	CORSAllowedOrigins  []string
 	ExpenseServiceURL   string
 	NATSURL             string
@@ -37,6 +38,7 @@ func Load() Config {
 		MongoURI:           sharedconfig.MustGetEnv("BUDGET_SERVICE_MONGO_URI"),
 		LogLevel:           sharedconfig.GetEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout:    sharedconfig.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
+		DrainDelay:         sharedconfig.GetEnvDuration("DRAIN_DELAY", 5*time.Second),
 		CORSAllowedOrigins: splitCSV(sharedconfig.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 		// ExpenseServiceURL is the Phase-3 cross-service call target for
 		// reports (budget-vs-actual) AND (Phase 7) overspend recomputation.

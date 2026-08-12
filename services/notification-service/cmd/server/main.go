@@ -16,6 +16,7 @@ import (
 	"github.com/finora/notification-service/internal/router"
 	"github.com/finora/notification-service/internal/service"
 	"github.com/finora/shared/eventbus"
+	"github.com/finora/shared/health"
 	"github.com/finora/shared/logger"
 	"github.com/finora/shared/mongox"
 	"github.com/finora/shared/openapidoc"
@@ -88,10 +89,15 @@ func main() {
 	natsChecker := eventbus.Checker{Bus: bus}
 	openapiSpec := openapidoc.Load("openapi.yaml", log)
 
-	r := router.New(log, cfg.CORSAllowedOrigins, notificationHandler, openapiSpec, mongoChecker, natsChecker)
+	// gate is flipped not-ready by server.Run at the start of its shutdown
+	// sequence, before the listener actually stops accepting connections —
+	// see shared/health.Gate and shared/server.Run's doc comments.
+	gate := &health.Gate{}
+
+	r := router.New(log, cfg.CORSAllowedOrigins, notificationHandler, openapiSpec, mongoChecker, natsChecker, gate)
 
 	addr := "0.0.0.0:" + cfg.Port
-	if err := server.Run(addr, r, log, cfg.ShutdownTimeout); err != nil {
+	if err := server.Run(addr, r, log, cfg.ShutdownTimeout, cfg.DrainDelay, gate); err != nil {
 		log.Error("server exited with error", slog.String("error", err.Error()))
 		os.Exit(1)
 	}

@@ -317,7 +317,7 @@ paths:
   /ready:
     get:
       tags: [health]
-      summary: Readiness probe (depends on Mongo connectivity)
+      summary: Readiness probe (Mongo + NATS connectivity, and fails during shutdown drain)
       responses:
         "200":
           description: Ready

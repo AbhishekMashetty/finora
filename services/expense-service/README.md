@@ -107,6 +107,7 @@ Also serves `GET /openapi.yaml` — this service's spec, live from disk (see
 | `EXPENSE_SERVICE_MONGO_URI`   | MongoDB connection string (required, no default)   | `mongodb://mongo-expense:27017/finora_expenses`   |
 | `LOG_LEVEL`                   | `debug`, `info` (default), `warn`, `error`         | `info`                                             |
 | `SHUTDOWN_TIMEOUT`            | Graceful shutdown drain window                     | `10s`                                              |
+| `DRAIN_DELAY`                 | Wait between marking not-ready and actually shutting down | `5s`                                        |
 | `CORS_ALLOWED_ORIGINS`        | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |
 | `NATS_URL`                    | NATS JetStream connection string (Phase 7 — publishes `finora.transaction.created`) | `nats://nats:4222` |
 | `OUTBOX_RELAY_INTERVAL`       | How often the outbox relay polls for unpublished events and retries publishing them | `2s` |

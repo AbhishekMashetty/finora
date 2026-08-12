@@ -107,6 +107,7 @@ same service-layer-owns-business-validation convention used by
 | `JWT_REFRESH_TTL`          | Refresh token lifetime                      | `168h`                 |
 | `LOG_LEVEL`                | `debug`/`info`/`warn`/`error`               | `info`                 |
 | `SHUTDOWN_TIMEOUT`         | Graceful shutdown drain window              | `10s`                  |
+| `DRAIN_DELAY`              | Wait between marking not-ready and actually shutting down | `5s`            |
 | `CORS_ALLOWED_ORIGINS`     | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |
 
 Exact names match `.env.example` at the repo root — copy that file to `.env`

@@ -86,6 +86,7 @@ Safe to call on every boot — index creation is idempotent.
 | `NOTIFICATION_SERVICE_MONGO_URI`  | Mongo connection string                                | `mongodb://mongo-notification:27017/finora_notifications` |
 | `LOG_LEVEL`                       | slog level (`debug`, `info`, `warn`, `error`)          | `info`                                            |
 | `SHUTDOWN_TIMEOUT`                | Graceful shutdown drain timeout                        | `10s`                                              |
+| `DRAIN_DELAY`                     | Wait between marking not-ready and actually shutting down | `5s`                                            |
 | `CORS_ALLOWED_ORIGINS`            | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |
 | `NATS_URL`                        | NATS JetStream connection string (Phase 7 — consumes `finora.budget.overspent`) | `nats://nats:4222` |
 

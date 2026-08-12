@@ -156,6 +156,7 @@ cross-service aggregation.
 | `BUDGET_SERVICE_MONGO_URI`    | MongoDB connection string (required, no default)   | —                       |
 | `LOG_LEVEL`                   | `debug` / `info` / `warn` / `error`                | `info`                  |
 | `SHUTDOWN_TIMEOUT`            | Graceful-shutdown drain duration (Go duration)     | `10s`                   |
+| `DRAIN_DELAY`                 | Wait between marking not-ready and actually shutting down (Go duration) | `5s` |
 | `CORS_ALLOWED_ORIGINS`        | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |
 | `EXPENSE_SERVICE_URL`         | Base URL for the outbound REST call to expense-service that powers `/api/v1/reports/summary` and the event-driven overspend check (see above). Same docker-compose network address the gateway uses. | `http://expense-service:8082` |
 | `NATS_URL`                    | NATS JetStream connection string (Phase 7 — consumes `finora.transaction.created`, publishes `finora.budget.overspent`) | `nats://nats:4222` |

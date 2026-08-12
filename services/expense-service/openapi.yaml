@@ -39,7 +39,7 @@ paths:
   /ready:
     get:
       tags: [health]
-      summary: Readiness probe (MongoDB ping)
+      summary: Readiness probe (MongoDB + NATS connectivity, and fails during shutdown drain)
       security: []
       responses:
         "200":

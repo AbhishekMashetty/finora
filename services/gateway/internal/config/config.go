@@ -24,6 +24,7 @@ type Config struct {
 
 	LogLevel           string
 	ShutdownTimeout    time.Duration
+	DrainDelay         time.Duration
 	CORSAllowedOrigins []string
 
 	// RateLimitRequestsPerSecond/RateLimitBurst configure
@@ -64,6 +65,7 @@ func Load() Config {
 
 		LogLevel:           config.GetEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout:    config.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
+		DrainDelay:         config.GetEnvDuration("DRAIN_DELAY", 5*time.Second),
 		CORSAllowedOrigins: splitAndTrim(origins),
 
 		RateLimitRequestsPerSecond: config.GetEnvInt("RATE_LIMIT_REQUESTS_PER_SECOND", 10),

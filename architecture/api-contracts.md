@@ -276,16 +276,18 @@ Routes all of the above under `/api/v1/*` to the owning service; also exposes:
 ```
 GET /health   /ready   /live
 ```
-aggregating nothing special — its own liveness only (it doesn't own data).
+The gateway owns no data, so it registers no dependency checkers of its own — but `/ready` is not just an alias for `/live`: it also carries the shutdown gate described below, so it correctly reports not-ready during the drain window before a rollout terminates this pod.
 
 ## Health Endpoints (every service)
 
 ```
 GET /live    -> 200 {"status":"ok"}                      always ok if process is up
-GET /ready   -> 200 {"status":"ok"} | 503 {"status":"not_ready", "checks":[...]}   ok only if Mongo ping succeeds
+GET /ready   -> 200 {"status":"ok"} | 503 {"status":"not_ready", "checks":[...]}   ok only if every registered Checker passes
 GET /health  -> 200 aggregate of the above, richer payload for humans/dashboards
 ```
-Implemented once via `shared/health`; each service registers its Mongo client as a `Checker`.
+Implemented once via `shared/health`; each service registers its Mongo client (and, where relevant, its NATS connection) as a `Checker`.
+
+**Readiness-first shutdown.** Every service also registers a `shared/health.Gate` — a `Checker` that starts healthy and can be flipped to failing exactly once. `shared/server.Run` flips it at the very start of its SIGTERM handling, *before* calling `http.Server`'s own `Shutdown`, and waits `DRAIN_DELAY` before shutting the listener down. That ordering exists because SIGTERM and this pod's removal from Kubernetes Service endpoints are dispatched concurrently, not sequentially — endpoint propagation across kube-proxy/ingress typically takes a few seconds. Without it, a pod keeps receiving real traffic for that whole window while it has already stopped wanting it, which is what turns a rolling deploy into a burst of connection errors. With it, `/ready` starts failing (giving load balancers a window to stop routing here) while `/live` still passes and in-flight requests keep draining normally — only after `DRAIN_DELAY` does the listener actually stop accepting connections. `DRAIN_DELAY` (default `5s`) should be set to at least `readinessProbe.periodSeconds * failureThreshold`, plus a margin, once real probe intervals are configured in the Kubernetes manifests.
 
 ## OpenAPI Specs Served Live (Phase 6)
 

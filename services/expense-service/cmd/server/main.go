@@ -88,18 +88,23 @@ func main() {
 
 	openapiSpec := openapidoc.Load("openapi.yaml", log)
 
+	// gate is flipped not-ready by server.Run at the start of its shutdown
+	// sequence, before the listener actually stops accepting connections —
+	// see shared/health.Gate and shared/server.Run's doc comments.
+	gate := &health.Gate{}
+
 	r := router.New(router.Deps{
 		Logger:             log,
 		ServiceName:        serviceName,
 		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
-		HealthCheckers:     []health.Checker{mongox.Checker{Client: client}, eventbus.Checker{Bus: bus}},
+		HealthCheckers:     []health.Checker{mongox.Checker{Client: client}, eventbus.Checker{Bus: bus}, gate},
 		AccountHandler:     accountHandler,
 		TransactionHandler: transactionHandler,
 		CategoryHandler:    categoryHandler,
 		OpenAPISpec:        openapiSpec,
 	})
 
-	if err := server.Run(cfg.Addr(), r, log, cfg.ShutdownTimeout); err != nil {
+	if err := server.Run(cfg.Addr(), r, log, cfg.ShutdownTimeout, cfg.DrainDelay, gate); err != nil {
 		log.Error("server exited with error", slog.String("error", err.Error()))
 		os.Exit(1)
 	}

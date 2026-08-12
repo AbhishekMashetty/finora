@@ -5,7 +5,9 @@ package health
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,40 @@ import (
 type Checker interface {
 	Name() string
 	Check(ctx context.Context) error
+}
+
+// Gate is a Checker that starts healthy and can be flipped to failing
+// exactly once. shared/server.Run flips it at the very start of its
+// shutdown sequence — before calling http.Server's own Shutdown — so
+// /ready starts reporting "not ready" while the server is still accepting
+// and completing in-flight requests normally. That ordering is what gives
+// a Kubernetes Service (or any load balancer polling /ready) a window to
+// stop routing new traffic here before the listener actually stops
+// accepting connections. Without it, SIGTERM and this pod's eventual
+// removal from Service endpoints race — endpoint propagation across every
+// kube-proxy/ingress controller typically takes a few seconds — so
+// requests keep landing on a pod that has already begun shutting down,
+// which is what turns a rolling deploy into a burst of connection errors.
+type Gate struct {
+	down atomic.Bool
+}
+
+// Name implements Checker.
+func (g *Gate) Name() string { return "shutdown" }
+
+// Check implements Checker: fails once MarkNotReady has been called, and
+// never recovers — a gate only ever transitions healthy -> not ready.
+func (g *Gate) Check(_ context.Context) error {
+	if g.down.Load() {
+		return errors.New("server is shutting down")
+	}
+	return nil
+}
+
+// MarkNotReady flips the gate so Check starts failing. Safe to call more
+// than once, and from any goroutine.
+func (g *Gate) MarkNotReady() {
+	g.down.Store(true)
 }
 
 type checkResult struct {

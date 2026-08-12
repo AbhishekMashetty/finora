@@ -29,8 +29,11 @@ type Backends struct {
 	Notification *httputil.ReverseProxy
 }
 
-// New builds the fully wired gin.Engine for the gateway.
-func New(cfg gwconfig.Config, log *slog.Logger, b Backends, openapiSpec []byte) *gin.Engine {
+// New builds the fully wired gin.Engine for the gateway. checkers is
+// registered onto /ready and /health — today that's just the shutdown
+// gate (see shared/server.Run's drain sequence); the gateway still owns no
+// data, so it has no dependency checkers of its own.
+func New(cfg gwconfig.Config, log *slog.Logger, b Backends, openapiSpec []byte, checkers ...health.Checker) *gin.Engine {
 	r := gin.New()
 
 	// MIDDLEWARE ORDER: RequestID -> Logging -> Recovery -> BodyLimit -> CORS -> RateLimit.
@@ -47,10 +50,12 @@ func New(cfg gwconfig.Config, log *slog.Logger, b Backends, openapiSpec []byte) 
 	r.Use(middleware.CORS(cfg.CORSAllowedOrigins))
 	r.Use(middleware.RateLimit(float64(cfg.RateLimitRequestsPerSecond), cfg.RateLimitBurst))
 
-	// Health routes are public and mirror /live — the gateway owns no data,
-	// so it registers no checkers (its /ready is never more meaningful than
-	// /live, per architecture/api-contracts.md).
-	health.Register(r, "gateway")
+	// Health routes are public. The gateway owns no data, so besides the
+	// shutdown gate (checkers) it registers nothing — but the gate is what
+	// gives /ready real meaning now: during the drain window before
+	// shutdown, /ready starts failing while /live still passes, exactly as
+	// intended (see shared/server.Run and shared/health.Gate).
+	health.Register(r, "gateway", checkers...)
 	r.GET("/openapi.yaml", openapidoc.Handler(openapiSpec))
 
 	// ---- Public routes (no JWT check): straight through to user-service ----

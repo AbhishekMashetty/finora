@@ -64,6 +64,7 @@ string unchanged — the gateway does no path rewriting.
 | `JWT_ACCESS_SECRET`          | HS256 secret used to verify access tokens (must match user-service's signing secret) |
 | `LOG_LEVEL`                  | `debug`/`info`/`warn`/`error` (default `info`)         |
 | `SHUTDOWN_TIMEOUT`           | Graceful shutdown drain period, e.g. `10s` (default `10s`) |
+| `DRAIN_DELAY`                | Wait between marking not-ready and actually shutting down, e.g. `5s` (default `5s`) |
 | `CORS_ALLOWED_ORIGINS`       | Comma-separated list of allowed origins (default `http://localhost:3000`) |
 | `RATE_LIMIT_REQUESTS_PER_SECOND` | Per-client-IP sustained request rate (default `10`); `<= 0` disables rate limiting |
 | `RATE_LIMIT_BURST`           | Per-client-IP burst allowance above the sustained rate (default `20`); `<= 0` disables rate limiting |

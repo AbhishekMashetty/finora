@@ -16,6 +16,7 @@ type Config struct {
 	MongoURI            string
 	LogLevel            string
 	ShutdownTimeout     time.Duration
+	DrainDelay          time.Duration
 	CORSAllowedOrigins  []string
 	NATSURL             string
 	OutboxRelayInterval time.Duration
@@ -33,6 +34,7 @@ func Load() Config {
 	mongoURI := config.MustGetEnv("EXPENSE_SERVICE_MONGO_URI")
 	logLevel := config.GetEnv("LOG_LEVEL", "info")
 	shutdownTimeout := config.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second)
+	drainDelay := config.GetEnvDuration("DRAIN_DELAY", 5*time.Second)
 	origins := config.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 	natsURL := config.GetEnv("NATS_URL", "nats://nats:4222")
 	outboxRelayInterval := config.GetEnvDuration("OUTBOX_RELAY_INTERVAL", 2*time.Second)
@@ -42,6 +44,7 @@ func Load() Config {
 		MongoURI:            mongoURI,
 		LogLevel:            logLevel,
 		ShutdownTimeout:     shutdownTimeout,
+		DrainDelay:          drainDelay,
 		CORSAllowedOrigins:  splitCSV(origins),
 		NATSURL:             natsURL,
 		OutboxRelayInterval: outboxRelayInterval,

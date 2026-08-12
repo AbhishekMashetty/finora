@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/finora/shared/httpclient"
 	"github.com/finora/shared/httpx"
 )
 
@@ -30,6 +31,19 @@ func New(rawTarget string, log *slog.Logger) (*httputil.ReverseProxy, error) {
 	}
 
 	rp := httputil.NewSingleHostReverseProxy(target)
+
+	// httputil.NewSingleHostReverseProxy leaves Transport nil, which means
+	// http.DefaultTransport — MaxIdleConnsPerHost: 2. Every request to this
+	// backend beyond two concurrent ones would otherwise open a fresh TCP
+	// connection and, unable to return it to an already-full idle pool,
+	// close it and hold the socket in TIME_WAIT for 60s; under sustained
+	// gateway traffic that exhausts the local ephemeral port range and
+	// fails with "cannot assign requested address" — see
+	// shared/httpclient's doc comment for the full arithmetic. This is the
+	// single hottest connection pool in the fleet (every proxied request
+	// to every backend goes through one of these four transports), so it
+	// gets the shared tuned transport rather than the zero-value default.
+	rp.Transport = httpclient.NewTransport()
 
 	// A downstream service being unreachable is not a gateway bug — but the
 	// client still needs the standard envelope shape rather than a raw

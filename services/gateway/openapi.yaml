@@ -328,7 +328,7 @@ paths:
         '200': { description: OK }
   /ready:
     get:
-      summary: Readiness probe (gateway owns no data, so this always mirrors /live)
+      summary: Readiness probe (gateway owns no data, but fails during shutdown drain — see /live for pure liveness)
       security: []
       responses:
         '200': { description: OK }
