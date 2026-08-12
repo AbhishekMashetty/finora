@@ -1,0 +1,1340 @@
+<title>Finora Scale Readiness Review</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f6f7f9;
+    --bg-sunk: #eef0f4;
+    --ink: #1c2128;
+    --ink-secondary: #4b5563;
+    --ink-muted: #6b7280;
+    --border: #e2e5ea;
+    --border-strong: #c9cfd8;
+    --accent: #1f5fbf;
+    --accent-soft: #eaf1fc;
+    --code-bg: #0f172a;
+    --code-ink: #e2e8f0;
+    --code-dim: #94a3b8;
+
+    --decision: #1f5fbf;
+    --why: #6b46c1;
+    --rejected: #b91c1c;
+    --gotcha: #c2790a;
+    --cost: #0f766e;
+    --checklist: #15803d;
+
+    --sev-crit: #b91c1c;
+    --sev-crit-soft: #fdecec;
+    --sev-high: #b45309;
+    --sev-high-soft: #fdf3e3;
+    --sev-med: #0f766e;
+    --sev-med-soft: #e6f4f2;
+    --sev-low: #4b5563;
+    --sev-low-soft: #eef0f3;
+    --good: #15803d;
+    --good-soft: #e9f6ed;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117;
+    --bg-alt: #161b22;
+    --bg-sunk: #11161d;
+    --ink: #e6edf3;
+    --ink-secondary: #b6c0cc;
+    --ink-muted: #8b949e;
+    --border: #2a313c;
+    --border-strong: #3d4653;
+    --accent: #6fa8f5;
+    --accent-soft: #16223a;
+    --code-bg: #0a0e14;
+    --code-ink: #d8e2ef;
+    --code-dim: #6b7a8d;
+
+    --decision: #6fa8f5;
+    --why: #a78bfa;
+    --rejected: #f87171;
+    --gotcha: #fbbf24;
+    --cost: #2dd4bf;
+    --checklist: #4ade80;
+
+    --sev-crit: #f87171;
+    --sev-crit-soft: #2a1618;
+    --sev-high: #fbbf24;
+    --sev-high-soft: #2a2114;
+    --sev-med: #2dd4bf;
+    --sev-med-soft: #10241f;
+    --sev-low: #9ca3af;
+    --sev-low-soft: #1a1f26;
+    --good: #4ade80;
+    --good-soft: #12241a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117;
+      --bg-alt: #161b22;
+      --bg-sunk: #11161d;
+      --ink: #e6edf3;
+      --ink-secondary: #b6c0cc;
+      --ink-muted: #8b949e;
+      --border: #2a313c;
+      --border-strong: #3d4653;
+      --accent: #6fa8f5;
+      --accent-soft: #16223a;
+      --code-bg: #0a0e14;
+      --code-ink: #d8e2ef;
+      --code-dim: #6b7a8d;
+
+      --decision: #6fa8f5;
+      --why: #a78bfa;
+      --rejected: #f87171;
+      --gotcha: #fbbf24;
+      --cost: #2dd4bf;
+      --checklist: #4ade80;
+
+      --sev-crit: #f87171;
+      --sev-crit-soft: #2a1618;
+      --sev-high: #fbbf24;
+      --sev-high-soft: #2a2114;
+      --sev-med: #2dd4bf;
+      --sev-med-soft: #10241f;
+      --sev-low: #9ca3af;
+      --sev-low-soft: #1a1f26;
+      --good: #4ade80;
+      --good-soft: #12241a;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 6rem;
+  }
+  h1, h2, h3, h4 { line-height: 1.25; scroll-margin-top: 1rem; text-wrap: balance; }
+  h1 { font-size: 1.9rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--ink-secondary); font-size: 1.05rem; margin-top: 0; }
+  .byline { color: var(--ink-muted); font-size: 0.85rem; margin-bottom: 2rem; }
+  h2 {
+    font-size: 1.4rem;
+    margin-top: 3rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 0.5rem; }
+  h3 { font-size: 1.12rem; margin-top: 2rem; color: var(--ink); }
+  h4 { font-size: 0.98rem; margin-top: 1.4rem; color: var(--ink-secondary); }
+  p { color: var(--ink-secondary); }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  strong { color: var(--ink); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    color: var(--ink);
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    font-size: 0.83rem;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: 1em; }
+  pre .c { color: var(--code-dim); }
+
+  .scroll-x { overflow-x: auto; margin: 1rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--bg-alt); color: var(--ink); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { color: var(--ink-secondary); }
+  td strong { color: var(--ink); }
+  ul, ol { color: var(--ink-secondary); padding-left: 1.4rem; }
+  li { margin: 0.3rem 0; }
+  li::marker { color: var(--ink-muted); }
+
+  .callout {
+    border-left: 4px solid var(--border);
+    background: var(--bg-alt);
+    padding: 0.8rem 1rem;
+    margin: 1.1rem 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout .label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .decision  { border-left-color: var(--decision); }
+  .decision .label  { color: var(--decision); }
+  .why       { border-left-color: var(--why); }
+  .why .label       { color: var(--why); }
+  .rejected  { border-left-color: var(--rejected); }
+  .rejected .label  { color: var(--rejected); }
+  .gotcha    { border-left-color: var(--gotcha); }
+  .gotcha .label    { color: var(--gotcha); }
+  .cost      { border-left-color: var(--cost); }
+  .cost .label      { color: var(--cost); }
+  .checklist { border-left-color: var(--checklist); }
+  .checklist .label { color: var(--checklist); }
+
+  nav.toc {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.4rem;
+    margin: 1.5rem 0 2.5rem;
+  }
+  nav.toc h2 { border: none; margin-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+  nav.toc ol { columns: 2; column-gap: 2rem; }
+  nav.toc li { margin: 0.15rem 0; font-size: 0.92rem; }
+  nav.toc a { text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  /* Headline numbers */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.9rem; margin: 1.6rem 0; }
+  .stat { border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1rem; background: var(--bg-alt); }
+  .stat .n { font-size: 1.55rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.15; display: block; }
+  .stat .l { font-size: 0.78rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.35rem; display: block; }
+  .stat .s { font-size: 0.85rem; color: var(--ink-secondary); margin-top: 0.4rem; display: block; }
+
+  /* Severity chips */
+  .chip {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.12em 0.5em;
+    border-radius: 4px;
+    white-space: nowrap;
+    vertical-align: 0.12em;
+  }
+  .chip.crit { background: var(--sev-crit-soft); color: var(--sev-crit); }
+  .chip.high { background: var(--sev-high-soft); color: var(--sev-high); }
+  .chip.med  { background: var(--sev-med-soft);  color: var(--sev-med); }
+  .chip.low  { background: var(--sev-low-soft);  color: var(--sev-low); }
+  .chip.good { background: var(--good-soft);     color: var(--good); }
+
+  /* Finding blocks */
+  .finding { border: 1px solid var(--border); border-left-width: 5px; border-radius: 0 8px 8px 0; padding: 1rem 1.2rem 0.8rem; margin: 1.6rem 0; background: var(--bg); }
+  .finding.crit { border-left-color: var(--sev-crit); }
+  .finding.high { border-left-color: var(--sev-high); }
+  .finding.med  { border-left-color: var(--sev-med); }
+  .finding.low  { border-left-color: var(--sev-low); }
+  .finding > h3 { margin-top: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.55rem; font-size: 1.06rem; }
+  .finding > h3 .fid { color: var(--ink-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; font-weight: 600; }
+  .finding .where { font-size: 0.83rem; color: var(--ink-muted); margin: -0.3rem 0 0.8rem; }
+  .finding .where code { font-size: 0.9em; background: none; border: none; padding: 0; color: var(--ink-muted); }
+  .fix { border-top: 1px dashed var(--border); margin-top: 0.9rem; padding-top: 0.7rem; }
+  .fix .label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--good); display: block; margin-bottom: 0.3rem; }
+  .fix p { margin: 0.2rem 0; }
+
+  /* Figures */
+  figure { margin: 1.8rem 0; }
+  figure .frame { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-alt); padding: 1.1rem; }
+  figure svg { display: block; min-width: 640px; width: 100%; height: auto; }
+  figcaption { font-size: 0.83rem; color: var(--ink-muted); margin-top: 0.6rem; }
+
+  .part-banner {
+    background: linear-gradient(135deg, var(--accent-soft), transparent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.4rem 1.6rem;
+    margin: 2.5rem 0 1.5rem;
+  }
+  .part-banner h2 { border: none; margin: 0 0 0.3rem; font-size: 1.6rem; }
+  .part-banner p { margin: 0; color: var(--ink-secondary); }
+
+  details { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; margin: 1rem 0; background: var(--bg-alt); }
+  summary { cursor: pointer; font-weight: 600; color: var(--ink); font-size: 0.94rem; }
+  details[open] summary { margin-bottom: 0.6rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--ink-muted); font-size: 0.85rem; }
+
+  @media (max-width: 600px) {
+    nav.toc ol { columns: 1; }
+    body { padding: 1.75rem 1rem 4rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<h1>Finora Scale Readiness Review</h1>
+<p class="subtitle">An infrastructure critique of the five-service fleet, its data tier, its event bus, and its delivery pipeline — read against the requirements of high-throughput, low-latency operation.</p>
+<p class="byline">
+Review performed by reading the repository at branch <code>claude/infracritic-39fwta</code>: <code>docker-compose.yml</code>, all five <code>Dockerfile</code>s, <code>.github/workflows/ci.yml</code>, <code>infrastructure/kubernetes/</code>, every package under <code>shared/</code>, and the request/event paths through all five services.
+Companion to <code>infrastructure/kubernetes-deployment-design.html</code>, which covers <em>how to deploy</em>; this covers <em>what breaks when you do, at volume</em>.
+</p>
+
+<nav class="toc">
+<h2>Contents</h2>
+<ol>
+  <li><a href="#verdict">Verdict &amp; headline numbers</a></li>
+  <li><a href="#latency">On "zero latency"</a></li>
+  <li><a href="#credit">What is already right</a></li>
+  <li><a href="#index">Findings index</a></li>
+  <li><a href="#cascade">1. The write-amplification cascade</a></li>
+  <li><a href="#edge">2. Edge &amp; gateway</a></li>
+  <li><a href="#runtime">3. Service runtime</a></li>
+  <li><a href="#data">4. Data tier</a></li>
+  <li><a href="#events">5. Event bus &amp; outbox</a></li>
+  <li><a href="#k8s">6. Kubernetes &amp; deployment</a></li>
+  <li><a href="#cicd">7. CI/CD &amp; supply chain</a></li>
+  <li><a href="#security">8. Security as an availability property</a></li>
+  <li><a href="#obs">9. Observability</a></li>
+  <li><a href="#frontend">10. Frontend &amp; edge delivery</a></li>
+  <li><a href="#capacity">Capacity model</a></li>
+  <li><a href="#target">Target architecture</a></li>
+  <li><a href="#roadmap">Prioritised roadmap</a></li>
+  <li><a href="#slo">Proposed SLOs</a></li>
+</ol>
+</nav>
+
+<h2 id="verdict"><span class="num">§</span>Verdict &amp; headline numbers</h2>
+
+<p>
+The <em>application</em> architecture is genuinely good. Clean Architecture is real here, not aspirational: domain layers have no framework imports, every cross-cutting concern lives in one place in <code>shared/</code>, and the trade-offs are documented in the code where a reader will actually find them. That matters enormously for this review, because it means almost every problem below is fixable in one file rather than five.
+</p>
+<p>
+The <em>infrastructure</em> is not ready for volume, and the gap is not incremental. It is currently a single-instance-of-everything system: one gateway, one replica per service, one standalone MongoDB per service with no authentication and no failover, one NATS node with a single-replica stream, no Kubernetes manifests beyond a namespace and one database Deployment, no metrics, and no traces. Under load it will not degrade gracefully; it will hit three hard ceilings — an internal request-amplification cascade, a connection-pool default, and an unbounded-timeout HTTP server — and fall over.
+</p>
+<p>
+The most consequential finding is not any single misconfiguration. It is that <strong>a single user action fans out into tens of internal requests</strong>, and nothing in the system can currently observe that happening. Fixing that one design, plus roughly forty lines of connection and timeout configuration, is worth more than every other item in this document combined.
+</p>
+
+<div class="stats">
+  <div class="stat">
+    <span class="n">~33×</span>
+    <span class="l">Request amplification</span>
+    <span class="s">Internal HTTP calls generated per single <code>POST /transactions</code>, at a representative 8 budgets / 3 pages.</span>
+  </div>
+  <div class="stat">
+    <span class="n">2</span>
+    <span class="l">Idle connections per backend</span>
+    <span class="s">Go's <code>DefaultTransport</code> default, inherited unchanged by the gateway's reverse proxies.</span>
+  </div>
+  <div class="stat">
+    <span class="n">0</span>
+    <span class="l">Server timeouts set</span>
+    <span class="s">Read, ReadHeader, Write and Idle are all unset — that is, infinite — on every service.</span>
+  </div>
+  <div class="stat">
+    <span class="n">0</span>
+    <span class="l">Metrics or traces</span>
+    <span class="s">No <code>/metrics</code>, no OpenTelemetry, no request-id propagation across the two most expensive hops.</span>
+  </div>
+</div>
+
+<div class="callout gotcha">
+  <span class="label">Read this caveat first</span>
+  <p>
+  Every number in this document is derived from reading code, not from measuring a running system — because the system cannot currently be measured (see <a href="#f13">F13</a>). They are order-of-magnitude estimates intended to rank work, not to be quoted as benchmarks. <strong>The first deliverable on the roadmap is not a fix, it is instrumentation.</strong> Ship metrics and traces first, then re-derive these numbers from real percentiles, then fix in the order the data says.
+  </p>
+</div>
+
+<h2 id="latency"><span class="num">§</span>On "zero latency"</h2>
+
+<p>
+There is no such thing, and chasing it produces worse systems than chasing a budget. Latency is a physical quantity with a floor set by distance and by the number of sequential hops on the critical path. Intra-availability-zone round trips are roughly 0.3–0.7&nbsp;ms; cross-AZ is roughly 1–2&nbsp;ms; cross-region is 30–70&nbsp;ms and no amount of code changes that.
+</p>
+<p>
+That physics is exactly why <a href="#f01">F01</a> is the headline finding. A design that makes 32 sequential internal round trips to serve one write costs at minimum 10–30&nbsp;ms of pure network time even if every service and every database were infinitely fast. <strong>You cannot optimise your way out of a chatty design; you can only make it less chatty.</strong> Removing hops from the critical path is the only latency work that compounds.
+</p>
+<p>
+The useful replacement for "zero latency" is a <em>latency budget</em>: a stated p99 per route class, an error budget that permits some violation, and an alert when the budget burns faster than it refills. A proposal is in <a href="#slo">Proposed SLOs</a>. Everything in this review is ultimately in service of being able to state and defend such a budget.
+</p>
+
+<h2 id="credit"><span class="num">§</span>What is already right</h2>
+
+<p>
+A review that only lists faults misleads about where the work should go. These are load-bearing strengths, and several of them are why the remediation below is cheap:
+</p>
+<ul>
+  <li><strong>The <code>shared/</code> module is a genuine chokepoint for cross-cutting fixes.</strong> Connection pooling, timeouts, metrics, and tracing can each be added in one file and inherited by all five services. Very few codebases of this age have that.</li>
+  <li><strong>Database-per-service is enforced physically</strong>, not by convention — separate containers, separate URIs. That is the precondition for ever scaling the services independently, and it has not been compromised anywhere.</li>
+  <li><strong>The transactional outbox exists at all</strong>, with its non-atomicity documented honestly rather than papered over. Most systems this size publish events inline and lose them silently.</li>
+  <li><strong>Durable JetStream consumers with explicit acks and a bounded <code>MaxDeliver</code></strong> — the right primitives, even where the surrounding configuration needs work.</li>
+  <li><strong>The <code>/live</code> &middot; <code>/ready</code> &middot; <code>/health</code> trio is correct</strong>: liveness genuinely does not depend on downstream state, readiness genuinely pings Mongo. That distinction is wrong in most codebases and it is right here.</li>
+  <li><strong>Structured JSON logging with a propagated request id</strong>, and health-probe paths excluded from logs. Good instincts; it needs extending, not replacing.</li>
+  <li><strong>Graceful shutdown on SIGTERM</strong>, non-root container users, multi-stage builds, idempotent index creation at boot, and a real testcontainers integration tier separate from unit tests.</li>
+  <li><strong>Configuration is entirely environment-driven.</strong> The ConfigMap/Secret split is a translation, not a redesign.</li>
+</ul>
+
+<h2 id="index"><span class="num">§</span>Findings index</h2>
+
+<div class="scroll-x">
+<table>
+  <thead>
+    <tr><th>ID</th><th>Finding</th><th>Severity</th><th>Effort</th><th>Tier</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><a href="#f01">F01</a></td><td>Write-triggered read amplification: 1 write → <em>B</em>&times;(1+<em>P</em>) internal calls</td><td><span class="chip crit">Critical</span></td><td>M</td><td>Design</td></tr>
+    <tr><td><a href="#f02">F02</a></td><td>Reverse proxies and internal clients use <code>http.DefaultTransport</code> (2 idle conns/host)</td><td><span class="chip crit">Critical</span></td><td>XS</td><td>Gateway</td></tr>
+    <tr><td><a href="#f03">F03</a></td><td>No timeouts on any <code>http.Server</code> — Slowloris and unbounded goroutine growth</td><td><span class="chip crit">Critical</span></td><td>XS</td><td>Runtime</td></tr>
+    <tr><td><a href="#f04">F04</a></td><td>Outbox relay runs unclaimed in every replica; unbounded scan; no reaping</td><td><span class="chip crit">Critical</span></td><td>S</td><td>Events</td></tr>
+    <tr><td><a href="#f05">F05</a></td><td>Index cannot serve the sort on the hottest read — blocking in-memory sort</td><td><span class="chip high">High</span></td><td>XS</td><td>Data</td></tr>
+    <tr><td><a href="#f06">F06</a></td><td><code>CountDocuments</code> + <code>skip</code>/<code>limit</code> pagination on every list request</td><td><span class="chip high">High</span></td><td>M</td><td>Data</td></tr>
+    <tr><td><a href="#f07">F07</a></td><td>Rate limiter is per-instance, single-mutex, and trivially bypassed via <code>X-Forwarded-For</code></td><td><span class="chip high">High</span></td><td>S</td><td>Gateway</td></tr>
+    <tr><td><a href="#f08">F08</a></td><td>JetStream stream is R=1, size-unbounded, and mutated by three services at boot</td><td><span class="chip high">High</span></td><td>S</td><td>Events</td></tr>
+    <tr><td><a href="#f09">F09</a></td><td>Consumer has no backoff and no dead-letter path — events silently discarded</td><td><span class="chip high">High</span></td><td>S</td><td>Events</td></tr>
+    <tr><td><a href="#f10">F10</a></td><td>Shutdown does not sequence with endpoint removal — 502s on every rollout</td><td><span class="chip high">High</span></td><td>S</td><td>Runtime</td></tr>
+    <tr><td><a href="#f11">F11</a></td><td>MongoDB is standalone, unauthenticated, host-exposed, and pool-untuned</td><td><span class="chip high">High</span></td><td>L</td><td>Data</td></tr>
+    <tr><td><a href="#f12">F12</a></td><td>Money is <code>float64</code>, summed in application code across thousands of values</td><td><span class="chip high">High</span></td><td>L</td><td>Data</td></tr>
+    <tr><td><a href="#f13">F13</a></td><td>No metrics, no traces; correlation breaks at the two most expensive hops</td><td><span class="chip high">High</span></td><td>M</td><td>Observability</td></tr>
+    <tr><td><a href="#f14">F14</a></td><td><code>X-User-Id</code> is trusted with nothing enforcing that only the gateway sets it</td><td><span class="chip med">Medium</span></td><td>S</td><td>Security</td></tr>
+    <tr><td><a href="#f15">F15</a></td><td>Symmetric HS256 secret shared between services; no <code>kid</code>, no rotation, no revocation</td><td><span class="chip med">Medium</span></td><td>M</td><td>Security</td></tr>
+    <tr><td><a href="#f16">F16</a></td><td>No caching layer of any kind — every read reaches MongoDB</td><td><span class="chip med">Medium</span></td><td>M</td><td>Data</td></tr>
+    <tr><td><a href="#f17">F17</a></td><td>CI runs only <em>after</em> merge, never builds an image, never scans or signs</td><td><span class="chip med">Medium</span></td><td>M</td><td>CI/CD</td></tr>
+    <tr><td><a href="#f18">F18</a></td><td>Kubernetes surface is essentially empty; the one manifest models a database as a Deployment</td><td><span class="chip med">Medium</span></td><td>L</td><td>Kubernetes</td></tr>
+    <tr><td><a href="#f19">F19</a></td><td>Frontend cannot be promoted as an immutable artifact; no CDN, no edge caching</td><td><span class="chip med">Medium</span></td><td>S</td><td>Frontend</td></tr>
+    <tr><td><a href="#f20">F20</a></td><td>Gin runs in debug mode in production; default trusted-proxy config is permissive</td><td><span class="chip low">Low</span></td><td>XS</td><td>Runtime</td></tr>
+    <tr><td><a href="#f21">F21</a></td><td>Health checks run serially under one shared budget; reports silently truncate at 5,000 rows</td><td><span class="chip low">Low</span></td><td>XS</td><td>Runtime</td></tr>
+    <tr><td><a href="#f22">F22</a></td><td>No idempotency keys on financial writes — a client retry double-books</td><td><span class="chip med">Medium</span></td><td>S</td><td>Design</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p style="font-size:0.86rem;color:var(--ink-muted)">
+Effort: <strong>XS</strong> under an hour &middot; <strong>S</strong> under a day &middot; <strong>M</strong> a few days &middot; <strong>L</strong> a sprint or more.
+</p>
+
+<div class="part-banner">
+<h2 id="cascade" style="border:none">1. The write-amplification cascade</h2>
+<p>The single most important thing in this document. Everything else is configuration; this is design.</p>
+</div>
+
+<div class="finding crit" id="f01">
+<h3><span class="fid">F01</span> One transaction write generates tens of internal requests <span class="chip crit">Critical</span></h3>
+<p class="where"><code>expense-service/internal/service/transaction_service.go</code> → <code>shared/outbox</code> → NATS → <code>budget-service/internal/service/overspend_service.go</code> → <code>budget-service/internal/client/expense_client.go</code></p>
+
+<p>Trace the path of a single <code>POST /api/v1/transactions</code>:</p>
+<ol>
+  <li>expense-service writes the transaction and enqueues <code>finora.transaction.created</code> to its outbox.</li>
+  <li>The relay publishes it; budget-service's durable consumer picks it up.</li>
+  <li><code>HandleTransactionCreated</code> loads <strong>every budget the user owns</strong> and, for each one, calls <code>SumExpensesByCategory</code>.</li>
+  <li><code>SumExpensesByCategory</code> makes <strong>one</strong> <code>GET /api/v1/categories</code> call to resolve a category name to an id, then walks <code>GET /api/v1/transactions</code> <strong>page by page</strong>, up to 50 pages of 100, summing amounts client-side.</li>
+</ol>
+
+<p>
+So the cost of one write is <strong><em>B</em> × (1 + <em>P</em>)</strong> internal HTTP round trips, where <em>B</em> is the user's budget count and <em>P</em> is the number of transaction pages in that category and period. Each of those transaction-list calls additionally runs a <code>CountDocuments</code> over the full match set (<a href="#f06">F06</a>) whose result is computed and thrown away, so the Mongo query count is roughly double the HTTP count.
+</p>
+
+<figure>
+<div class="frame">
+<svg viewBox="0 0 760 300" role="img" aria-labelledby="casc-title">
+  <title id="casc-title">One POST to expense-service fans out into B times one-plus-P internal HTTP calls to expense-service</title>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-muted)"/>
+    </marker>
+    <marker id="arRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--sev-crit)"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11">
+
+    <rect x="8" y="120" width="96" height="42" rx="6" fill="var(--bg)" stroke="var(--border-strong)"/>
+    <text x="56" y="138" text-anchor="middle" fill="var(--ink)" font-size="11">client</text>
+    <text x="56" y="152" text-anchor="middle" fill="var(--ink-muted)" font-size="9.5">1 request</text>
+
+    <line x1="106" y1="141" x2="140" y2="141" stroke="var(--ink-muted)" stroke-width="1.4" marker-end="url(#ar)"/>
+
+    <rect x="142" y="112" width="118" height="58" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="201" y="132" text-anchor="middle" fill="var(--ink)" font-size="11">expense-service</text>
+    <text x="201" y="147" text-anchor="middle" fill="var(--ink-muted)" font-size="9.5">write + outbox</text>
+    <text x="201" y="160" text-anchor="middle" fill="var(--ink-muted)" font-size="9.5">enqueue</text>
+
+    <line x1="262" y1="141" x2="296" y2="141" stroke="var(--ink-muted)" stroke-width="1.4" marker-end="url(#ar)"/>
+
+    <rect x="298" y="118" width="80" height="46" rx="6" fill="var(--bg)" stroke="var(--border-strong)"/>
+    <text x="338" y="138" text-anchor="middle" fill="var(--ink)" font-size="11">NATS</text>
+    <text x="338" y="152" text-anchor="middle" fill="var(--ink-muted)" font-size="9.5">JetStream</text>
+
+    <line x1="380" y1="141" x2="414" y2="141" stroke="var(--ink-muted)" stroke-width="1.4" marker-end="url(#ar)"/>
+
+    <rect x="416" y="106" width="122" height="70" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="477" y="126" text-anchor="middle" fill="var(--ink)" font-size="11">budget-service</text>
+    <text x="477" y="141" text-anchor="middle" fill="var(--ink-muted)" font-size="9.5">for each of B</text>
+    <text x="477" y="154" text-anchor="middle" fill="var(--ink-muted)" font-size="9.5">budgets, walk</text>
+    <text x="477" y="167" text-anchor="middle" fill="var(--ink-muted)" font-size="9.5">P pages</text>
+
+    <path d="M 540 122 C 590 96 600 60 640 52" fill="none" stroke="var(--sev-crit)" stroke-width="1.4" marker-end="url(#arRed)"/>
+    <path d="M 540 132 C 590 118 600 100 640 96" fill="none" stroke="var(--sev-crit)" stroke-width="1.4" marker-end="url(#arRed)"/>
+    <path d="M 540 141 C 590 141 600 141 640 141" fill="none" stroke="var(--sev-crit)" stroke-width="1.4" marker-end="url(#arRed)"/>
+    <path d="M 540 150 C 590 164 600 182 640 186" fill="none" stroke="var(--sev-crit)" stroke-width="1.4" marker-end="url(#arRed)"/>
+    <path d="M 540 160 C 590 186 600 222 640 230" fill="none" stroke="var(--sev-crit)" stroke-width="1.4" marker-end="url(#arRed)"/>
+
+    <rect x="642" y="34" width="110" height="36" rx="5" fill="var(--sev-crit-soft)" stroke="var(--sev-crit)"/>
+    <text x="697" y="50" text-anchor="middle" fill="var(--sev-crit)" font-size="10">GET /categories</text>
+    <text x="697" y="63" text-anchor="middle" fill="var(--ink-muted)" font-size="9">&times; B</text>
+
+    <rect x="642" y="80" width="110" height="32" rx="5" fill="var(--sev-crit-soft)" stroke="var(--sev-crit)"/>
+    <text x="697" y="100" text-anchor="middle" fill="var(--sev-crit)" font-size="10">GET /transactions</text>
+
+    <rect x="642" y="124" width="110" height="32" rx="5" fill="var(--sev-crit-soft)" stroke="var(--sev-crit)"/>
+    <text x="697" y="144" text-anchor="middle" fill="var(--sev-crit)" font-size="10">GET /transactions</text>
+
+    <rect x="642" y="168" width="110" height="32" rx="5" fill="var(--sev-crit-soft)" stroke="var(--sev-crit)"/>
+    <text x="697" y="188" text-anchor="middle" fill="var(--sev-crit)" font-size="10">GET /transactions</text>
+
+    <text x="697" y="222" text-anchor="middle" fill="var(--ink-muted)" font-size="10">… &times; P pages, &times; B budgets</text>
+    <text x="697" y="240" text-anchor="middle" fill="var(--sev-crit)" font-size="11" font-weight="700">B &times; (1 + P)</text>
+
+    <text x="380" y="280" text-anchor="middle" fill="var(--ink-muted)" font-size="10">every one of these calls also runs a CountDocuments whose result is discarded</text>
+  </g>
+</svg>
+</div>
+<figcaption>The cascade. The right-hand column is all traffic <em>back into expense-service</em> — the same service that took the original write, now serving its own amplified load.</figcaption>
+</figure>
+
+<p>Put numbers on it. A user with 8 budgets and ~250 transactions in the current period per category:</p>
+
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Quantity</th><th>Value</th><th>Derivation</th></tr></thead>
+  <tbody>
+    <tr><td>Internal HTTP calls per write</td><td><strong>32</strong></td><td>8 × (1 + 3)</td></tr>
+    <tr><td>Mongo queries per write</td><td><strong>~56</strong></td><td>24 finds + 24 discarded counts + 8 category finds</td></tr>
+    <tr><td>Documents decoded and discarded</td><td><strong>~2,400</strong></td><td>24 pages × 100 docs, to produce 8 floats</td></tr>
+    <tr><td>At 1,000 writes/min external</td><td><strong>533 internal RPS</strong></td><td>32,000 calls/min ÷ 60</td></tr>
+    <tr><td>Consumer throughput ceiling</td><td><strong>~15 events/s/replica</strong></td><td>32 calls × ~2 ms serial ≈ 65 ms per event</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+That last row is the operative constraint. The consumer handler is invoked serially, so budget-service processes roughly 15 transaction events per second per replica. At about <strong>1,000 transactions per minute of ingest, event lag begins growing without bound</strong> — the queue depth rises, overspend alerts arrive minutes then hours late, and nothing in the system reports it (<a href="#f13">F13</a>). This is the fleet's real write ceiling today, and it is two orders of magnitude below what "high RPM" implies.
+</p>
+<p>
+The same code path also serves <code>GET /api/v1/reports/summary</code> synchronously, budget by budget, in a loop. A user with 12 budgets can trivially exceed three seconds of wall-clock latency on a page load, and there is no overall request deadline — only a 3-second timeout on each individual outbound call, of which there may be 48.
+</p>
+
+<div class="fix">
+<span class="label">Remediation</span>
+<p><strong>Step 1 — collapse the fan-out to one call (days).</strong> Add an aggregation endpoint to expense-service and delete the pagination loop entirely:</p>
+<pre><code><span class="c">// GET /api/v1/transactions/aggregate?group_by=category_id&amp;from=&amp;to=&amp;type=expense</span>
+pipeline := mongo.Pipeline{
+  {{"$match", bson.D{
+      {"user_id", userID},
+      {"type", "expense"},
+      {"date", bson.D{{"$gte", from}, {"$lt", to}}},
+  }}},
+  {{"$group", bson.D{
+      {"_id", "$category_id"},
+      {"total", bson.D{{"$sum", "$amount"}}},
+      {"count", bson.D{{"$sum", 1}}},
+  }}},
+}</code></pre>
+<p>
+With the index from <a href="#f05">F05</a> this is a single covered index scan with no documents crossing the wire. <em>B</em>&nbsp;×&nbsp;(1&nbsp;+&nbsp;<em>P</em>) becomes <strong>1</strong>, for any <em>B</em> and any <em>P</em>. The consumer's per-event cost drops from ~65&nbsp;ms to ~2&nbsp;ms, a roughly 30× throughput increase for a day of work. It also removes the silent truncation at 5,000 transactions (<a href="#f21">F21</a>) — the aggregate is correct for any volume.
+</p>
+<p><strong>Step 2 — debounce (days).</strong> A user importing a CSV of 500 transactions currently triggers 500 recomputations of the same figures. Coalesce events per user over a short window (2–5 s) and recompute once. Trivially: a per-user timer map, or a JetStream work queue keyed by user with a deliberate delay.</p>
+<p><strong>Step 3 — eliminate the cross-service call (weeks).</strong> The event already carries <code>user_id</code>, <code>category_id</code>, <code>amount</code>, and <code>date</code> — everything needed to maintain a rolling <code>(user_id, category_id, period)</code> spend counter in budget-service's own database with a single <code>$inc</code> upsert. Overspend detection then becomes an O(1) local read with <strong>zero</strong> cross-service traffic. Keep the aggregation endpoint as the reconciliation path: recompute from source on a schedule and correct drift, which is the standard pattern for derived financial counters.</p>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="edge" style="border:none">2. Edge &amp; gateway</h2>
+<p>The gateway is the only public entrypoint. Every ceiling here is a ceiling for the whole product.</p>
+</div>
+
+<div class="finding crit" id="f02">
+<h3><span class="fid">F02</span> Reverse proxies inherit Go's 2-idle-connection default <span class="chip crit">Critical</span></h3>
+<p class="where"><code>services/gateway/internal/proxy/proxy.go</code>, <code>services/budget-service/internal/client/expense_client.go</code></p>
+<p>
+<code>httputil.NewSingleHostReverseProxy</code> leaves <code>Transport</code> nil, which means <code>http.DefaultTransport</code>, which sets <code>MaxIdleConnsPerHost: 2</code>. Likewise <code>NewExpenseHTTPClient</code> builds <code>&amp;http.Client{}</code> — same default, on the single hottest internal path in the fleet.
+</p>
+<p>
+The consequence is not slow — it is catastrophic and it arrives suddenly. Beyond two concurrent requests to a backend, every additional request opens a fresh TCP connection, and on completion that connection <em>cannot be returned to the idle pool because the pool is full</em>, so it is closed. The gateway, as the side initiating the close, holds each socket in <code>TIME_WAIT</code> for 60 seconds.
+</p>
+<div class="callout rejected">
+  <span class="label">The arithmetic</span>
+  <p>
+  At 1,000 RPS to one backend, roughly 998 connections per second are created and destroyed. Sustained, that is <strong>~60,000 sockets in <code>TIME_WAIT</code></strong> against a single destination. The default Linux ephemeral port range is about 28,000 ports. You exhaust the port space and begin returning <code>connect: cannot assign requested address</code> — a hard, total failure of the gateway that looks like a network problem and is actually a two-line configuration default.
+  </p>
+</div>
+<p>Additional costs before that point: a TCP handshake (and, once TLS is introduced between hops, a TLS handshake) added to every single request's latency; kernel memory per socket; and connection-tracking table pressure on any NAT or CNI in the path.</p>
+<div class="fix">
+<span class="label">Remediation — under an hour, highest leverage in the repository</span>
+<pre><code>func newTransport() *http.Transport {
+    return &amp;http.Transport{
+        Proxy: http.ProxyFromEnvironment,
+        DialContext: (&amp;net.Dialer{
+            Timeout:   3 * time.Second,
+            KeepAlive: 30 * time.Second,
+        }).DialContext,
+        ForceAttemptHTTP2:     true,
+        MaxIdleConns:          512,
+        MaxIdleConnsPerHost:   256,  <span class="c">// the fix</span>
+        MaxConnsPerHost:       512,  <span class="c">// bulkhead: bounds blast radius</span>
+        IdleConnTimeout:       90 * time.Second,
+        TLSHandshakeTimeout:   3 * time.Second,
+        ResponseHeaderTimeout: 10 * time.Second,
+        ExpectContinueTimeout: 1 * time.Second,
+    }
+}</code></pre>
+<p>Assign it to <code>rp.Transport</code> in <code>proxy.New</code> and to the <code>http.Client</code> in <code>expense_client.go</code>. Size <code>MaxIdleConnsPerHost</code> to your target per-pod concurrency; <code>MaxConnsPerHost</code> is the bulkhead that stops one slow backend from consuming every file descriptor the pod has.</p>
+</div>
+</div>
+
+<div class="finding high" id="f07">
+<h3><span class="fid">F07</span> Rate limiting is per-instance, lock-contended, and bypassable <span class="chip high">High</span></h3>
+<p class="where"><code>shared/middleware/ratelimit.go</code>, <code>services/gateway/internal/router/router.go</code></p>
+<p>Three independent problems in one component:</p>
+<p>
+<strong>It can be bypassed outright.</strong> <code>gin.New()</code> trusts all proxies by default, so <code>c.ClientIP()</code> honours a client-supplied <code>X-Forwarded-For</code>. An attacker sending a different random value per request gets a fresh, full token bucket every time — the limiter enforces nothing. Worse, it inverts: each spoofed IP allocates a map entry retained for three minutes, so the very component meant to prevent resource exhaustion becomes an unbounded memory-growth vector. Its own doc comment identifies unbounded map growth as the thing to prevent; the trusted-proxy default reopens it.
+</p>
+<p>
+<strong>It serialises all traffic through one mutex.</strong> Every request takes a single global <code>sync.Mutex</code>, and the 60-second sweeper takes the same lock while iterating the <em>entire</em> map. With a few hundred thousand tracked IPs, that sweep is a multi-millisecond stop-the-world pause applied to all inbound traffic, once a minute — a periodic p99 spike that will be very hard to diagnose without traces.
+</p>
+<p>
+<strong>It does not survive horizontal scaling.</strong> The doc comment is candid that this is single-instance-only and that scaling out is the trigger to revisit. That trigger has arrived: with <em>N</em> replicas a client's effective limit is <em>N</em> × the configured rate, and it silently changes every time the HPA scales.
+</p>
+<div class="fix">
+<span class="label">Remediation</span>
+<p><strong>Now (minutes):</strong> <code>r.SetTrustedProxies([]string{ingressCIDR})</code>, or <code>r.TrustedPlatform</code> when behind a cloud LB that sets a trustworthy header. This is a correctness fix, not an optimisation.</p>
+<p><strong>Next (hours):</strong> shard the visitor map across ~256 mutexes keyed by a hash of the IP, and sweep one shard per tick rather than the whole map at once. Contention drops by two orders of magnitude and the sweep pause becomes invisible.</p>
+<p><strong>Then (days):</strong> two-tier limiting, which is what large systems actually run. Coarse per-IP limits at the edge — ingress-nginx, Envoy, or the CDN/WAF, where they cost you nothing and stop traffic before it reaches your compute. Fine-grained per-<em>user</em> and per-endpoint quotas in the app, backed by Redis with a GCRA or sliding-window script so the limit is fleet-wide and independent of replica count. Keep the in-process limiter as a local safety valve for when Redis is unavailable — fail open, exactly as it does today.</p>
+</div>
+</div>
+
+<div class="finding med" id="f22">
+<h3><span class="fid">F22</span> No idempotency keys on financial writes <span class="chip med">Medium</span></h3>
+<p class="where"><code>expense-service/internal/handler/transaction_handler.go</code>, <code>frontend/lib/api.ts</code></p>
+<p>
+<code>POST /api/v1/transactions</code> has no idempotency mechanism. The frontend wrapper retries once after a silent token refresh; browsers, mobile clients, and any future SDK retry on network errors. A retry that lands after the original succeeded but before the response arrived <strong>double-books a financial record</strong>. This is not a scale-only problem, but scale makes it routine: the rate of ambiguous timeouts is proportional to traffic, and at high RPM you will be creating duplicate transactions continuously.
+</p>
+<div class="fix">
+<span class="label">Remediation</span>
+<p>Accept an <code>Idempotency-Key</code> header on all non-GET routes. Store <code>(user_id, key) → (status, response_body)</code> with a unique index and a 24-hour TTL; on a duplicate key, replay the stored response rather than re-executing. This is the standard payments-API contract and it also gives the outbox a natural dedup identity. The gateway can enforce the header's presence centrally.</p>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="runtime" style="border:none">3. Service runtime</h2>
+<p>Shared across all five services via <code>shared/server</code> — which means one file fixes all five.</p>
+</div>
+
+<div class="finding crit" id="f03">
+<h3><span class="fid">F03</span> Every HTTP server has infinite timeouts <span class="chip crit">Critical</span></h3>
+<p class="where"><code>shared/server/server.go</code></p>
+<p><code>server.Run</code> constructs <code>&amp;http.Server{Addr: addr, Handler: handler}</code>. <code>ReadTimeout</code>, <code>ReadHeaderTimeout</code>, <code>WriteTimeout</code>, and <code>IdleTimeout</code> all default to zero, which in Go means <em>no limit</em>. Three consequences:</p>
+<ul>
+  <li><strong>Slowloris.</strong> An attacker opens thousands of connections and dribbles headers a byte at a time. Each holds a goroutine, a file descriptor, and a read buffer indefinitely. Neither the rate limiter nor the body-size limiter helps: the request never completes, so it is never counted and its body is never read. A single host can take the gateway down with negligible bandwidth.</li>
+  <li><strong>Head-of-line resource leaks.</strong> A backend that accepts a connection and then hangs holds a gateway goroutine forever. With <a href="#f02">F02</a>'s connection churn this compounds fast.</li>
+  <li><strong>Unbounded growth under load.</strong> Idle keep-alive connections are never reaped. Connection count only rises, until the file-descriptor limit is hit and <code>accept()</code> fails — at which point the service is fully down and its <code>/live</code> probe may well still pass, so Kubernetes will not even restart it.</li>
+</ul>
+<div class="fix">
+<span class="label">Remediation — under an hour, applies to all five services at once</span>
+<pre><code>srv := &amp;http.Server{
+    Addr:              addr,
+    Handler:           handler,
+    ReadHeaderTimeout: 5 * time.Second,   <span class="c">// kills Slowloris outright</span>
+    ReadTimeout:       15 * time.Second,
+    WriteTimeout:      30 * time.Second,
+    IdleTimeout:       120 * time.Second,
+    MaxHeaderBytes:    1 &lt;&lt; 20,
+    ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelError),
+}</code></pre>
+<p>
+<code>ReadHeaderTimeout</code> alone closes the Slowloris vector and is the single highest-value line. Set <code>WriteTimeout</code> above the slowest legitimate response — today that is the reports endpoint, which is unbounded until <a href="#f01">F01</a> is fixed, so fix F01 first or the timeout will cut off real users. The durable pattern is a generous <code>WriteTimeout</code> plus per-route <code>context.WithTimeout</code> deadlines that propagate into Mongo and outbound calls, so a slow request is cancelled all the way down rather than merely disconnected at the top.
+</p>
+</div>
+</div>
+
+<div class="finding high" id="f10">
+<h3><span class="fid">F10</span> Shutdown does not sequence with endpoint removal <span class="chip high">High</span></h3>
+<p class="where"><code>shared/server/server.go</code>, all <code>cmd/server/main.go</code></p>
+<p>
+On SIGTERM the server calls <code>srv.Shutdown</code> immediately. In Kubernetes, SIGTERM and Endpoint removal are dispatched concurrently and endpoint propagation to every kube-proxy and ingress controller is eventually consistent — typically 1–5 seconds. During that window the pod is still receiving traffic while actively refusing it. <strong>Every rolling deploy produces a burst of 502s</strong>, and the burst scales with replica count and request rate, so it gets worse exactly as you scale.
+</p>
+<p>
+Nothing flips <code>/ready</code> to failing first, so load balancers have no signal to drain against. Separately, the outbox relay and NATS consumer goroutines are cancelled after <code>server.Run</code> returns; in-flight message handlers are not waited on, so a handler can be cut mid-publish (recoverable — the message is redelivered — but it means shutdown is not clean).
+</p>
+<div class="fix">
+<span class="label">Remediation</span>
+<p>Implement the standard drain sequence in <code>shared/server</code>:</p>
+<ol>
+  <li>On SIGTERM, atomically flip a <code>ready</code> flag to false so <code>/ready</code> starts returning 503, but keep serving traffic.</li>
+  <li>Sleep <code>readinessProbe.periodSeconds × failureThreshold</code> plus a margin — long enough for every load balancer to observe the failure and remove the endpoint.</li>
+  <li><em>Then</em> call <code>srv.Shutdown</code> to drain in-flight requests.</li>
+  <li>Cancel background contexts and wait on a <code>sync.WaitGroup</code> for consumers and relays.</li>
+</ol>
+<p>Pair it with a pod spec <code>preStop: exec: ["sleep", "5"]</code> and <code>terminationGracePeriodSeconds</code> comfortably greater than preStop + drain + shutdown timeout. Verified correct, rollouts become invisible to users — which is the precondition for deploying frequently, which is the precondition for everything else on this roadmap.</p>
+</div>
+</div>
+
+<div class="finding low" id="f20">
+<h3><span class="fid">F20</span> Gin runs in debug mode in production <span class="chip low">Low</span></h3>
+<p class="where">all <code>internal/router/router.go</code>; <code>gin.SetMode</code> appears only in <code>_test.go</code> files</p>
+<p>
+Gin defaults to debug mode. Nothing in any Dockerfile or in <code>docker-compose.yml</code> sets <code>GIN_MODE=release</code>, so every container runs with debug route dumping and extra per-request bookkeeping. Small, but free to fix, and debug-mode output on startup is noise in the log pipeline you are about to build.
+</p>
+<div class="fix">
+<span class="label">Remediation</span>
+<p><code>gin.SetMode(gin.ReleaseMode)</code> in each <code>main.go</code> (or <code>ENV GIN_MODE=release</code> in the Dockerfiles — prefer the code, since it cannot be lost during a manifest edit). Take the trusted-proxy fix from <a href="#f07">F07</a> at the same time; both are one line in the same place.</p>
+</div>
+</div>
+
+<div class="finding low" id="f21">
+<h3><span class="fid">F21</span> Serial health checks, and reports that truncate silently <span class="chip low">Low</span></h3>
+<p class="where"><code>shared/health/health.go</code>, <code>budget-service/internal/client/expense_client.go</code></p>
+<p>
+<code>runChecks</code> creates one 2-second context and runs every checker <em>sequentially</em> against it. Services with both a Mongo and a NATS checker share that single budget, so a slow Mongo consumes the time allotted to the NATS check and readiness reports the wrong dependency as broken. Checks should run concurrently, each with its own deadline, with results aggregated. At high pod counts, also cache the result for ~1 second so probe traffic does not itself become a meaningful load on the database.
+</p>
+<p>
+Separately, <code>maxReportPages = 50</code> caps <code>SumExpensesByCategory</code> at 5,000 transactions and then <strong>returns a number that is simply wrong</strong>, with no error and no flag. In a personal-finance product, a silently under-reported spend total is worse than a failed request. The <a href="#f01">F01</a> aggregation fix removes the limit and the failure mode together.
+</p>
+</div>
+
+<div class="part-banner">
+<h2 id="data" style="border:none">4. Data tier</h2>
+<p>Four standalone MongoDB instances, no authentication, no failover, no tuning.</p>
+</div>
+
+<div class="finding high" id="f05">
+<h3><span class="fid">F05</span> The index cannot satisfy the sort on the hottest query <span class="chip high">High</span></h3>
+<p class="where"><code>expense-service/internal/repository/mongo.go</code>, <code>mongo_transaction.go</code></p>
+<p>
+The transactions index is <code>{user_id: 1, account_id: 1, date: 1}</code>. The list query filters on <code>user_id</code> (with <code>account_id</code> optional) and always sorts <code>{date: -1}</code>. When no account filter is supplied — the default dashboard view, and therefore the most-executed query in the product — MongoDB can use <code>user_id</code> as an index prefix for the match but <strong>cannot use the index to provide sorted order</strong>, because <code>account_id</code> sits between the equality field and the sort field.
+</p>
+<p>The result is a blocking in-memory SORT stage over the user's <em>entire</em> matched transaction set on every page request, including page 1. Two consequences:</p>
+<ul>
+  <li><strong>Cost is O(<em>n</em> log <em>n</em>) in the user's total transaction count</strong>, not in page size. Latency degrades as a user's history grows, which is precisely the wrong direction for a finance product where power users are your best users.</li>
+  <li><strong>It eventually fails outright.</strong> MongoDB aborts a blocking sort exceeding 32 MB without <code>allowDiskUse</code>. At roughly 200 bytes per document that is around 160,000 transactions for one user — reachable through the CSV importer. The endpoint then returns 500 for that user, permanently, until someone notices.</li>
+</ul>
+<div class="fix">
+<span class="label">Remediation — minutes</span>
+<pre><code><span class="c">// ESR: Equality fields, then Sort fields, then Range fields.</span>
+{user_id: 1, date: -1}                    <span class="c">// default list + date range</span>
+{user_id: 1, account_id: 1, date: -1}     <span class="c">// account-filtered list</span>
+{user_id: 1, category_id: 1, date: -1}    <span class="c">// category-filtered + the F01 aggregate</span></code></pre>
+<p>
+Sort direction matters: MongoDB can walk an index backwards, so <code>date: -1</code> and <code>date: 1</code> are interchangeable for a single-field sort, but keeping the declared direction aligned with the query's makes intent obvious to the next reader. Add an <code>explain("executionStats")</code> assertion to the existing testcontainers integration tests asserting <code>IXSCAN</code> and <strong>no <code>SORT</code> stage</strong> — that turns a class of regression into a test failure rather than a production incident. This repository already has the integration-test tier to host it.
+</p>
+</div>
+</div>
+
+<div class="finding high" id="f06">
+<h3><span class="fid">F06</span> Offset pagination with a full count on every page <span class="chip high">High</span></h3>
+<p class="where"><code>expense-service/internal/repository/mongo_transaction.go</code>, <code>notification-service/internal/repository/mongo_notification.go</code></p>
+<p>Both list endpoints do the same two things per request, and both scale with data rather than page size:</p>
+<ul>
+  <li><code>CountDocuments</code> runs a full aggregation count over the entire match set to produce a <code>total</code>. That is O(matched documents) — for a user with 100,000 transactions, every single page request scans 100,000 index entries to render "of 100,000".</li>
+  <li><code>skip(N)</code> is O(N): the server walks and discards N entries before returning any. Page 500 discards 10,000 entries; deep pagination degrades linearly and predictably.</li>
+</ul>
+<p>
+Under <a href="#f01">F01</a>'s cascade this is multiplied: each of the up-to-50 internal page fetches pays the full count again, computing and discarding the same number 50 times per budget.
+</p>
+<div class="fix">
+<span class="label">Remediation</span>
+<p><strong>Keyset (seek) pagination.</strong> Replace <code>skip</code> with a cursor on the sort key:</p>
+<pre><code><span class="c">// cursor encodes the last row's (date, _id) — _id breaks ties deterministically</span>
+q["$or"] = bson.A{
+    bson.M{"date": bson.M{"$lt": cursorDate}},
+    bson.M{"date": cursorDate, "_id": bson.M{"$lt": cursorID}},
+}
+opts := options.Find().SetSort(bson.D{{"date", -1}, {"_id", -1}}).SetLimit(pageSize + 1)
+<span class="c">// fetch pageSize+1: the extra row tells you has_more without a count</span></code></pre>
+<p>
+Every page then costs the same regardless of depth, and the flat latency curve is what makes a p99 target defensible. Return an opaque base64 <code>next_cursor</code> in the envelope; keep <code>page</code>/<code>page_size</code> accepted-but-deprecated for one release so the frontend can migrate.
+</p>
+<p>
+<strong>Drop the exact total.</strong> Serve <code>estimatedDocumentCount</code>, or a periodically cached per-user count, or nothing at all. Every product operating at scale shows "1–20 of many" precisely because an exact count is the most expensive thing on the page and the least valuable thing on it.
+</p>
+</div>
+</div>
+
+<div class="finding high" id="f11">
+<h3><span class="fid">F11</span> MongoDB is standalone, unauthenticated, host-exposed, and untuned <span class="chip high">High</span></h3>
+<p class="where"><code>docker-compose.yml</code>, <code>shared/mongox/mongox.go</code>, <code>infrastructure/kubernetes/mongo-user/</code></p>
+
+<h4>Topology</h4>
+<p>
+Every Mongo container runs standalone — no <code>--replSet</code>. That single decision costs four capabilities simultaneously:
+</p>
+<ul>
+  <li><strong>No failover.</strong> Any restart, node loss, or disk problem is a total outage of that service's data with no automatic recovery. There is one copy of the data and it is on one machine.</li>
+  <li><strong>No multi-document transactions</strong> — which is exactly why <code>shared/outbox</code> cannot be atomic. That limitation is honestly documented as a deliberate trade-off, and the documentation is right that fixing it is an infrastructure change rather than a code change. This is that infrastructure change.</li>
+  <li><strong>No change streams</strong>, which would otherwise be the cleanest possible outbox implementation — tail the oplog instead of polling (<a href="#f04">F04</a>).</li>
+  <li><strong>No read scaling.</strong> Secondaries with <code>readPreference=secondaryPreferred</code> are the cheapest available capacity increase for read-heavy endpoints like reports.</li>
+</ul>
+
+<h4>Access control</h4>
+<div class="callout rejected">
+  <span class="label">Unauthenticated and published</span>
+  <p>
+  No <code>--auth</code>, no credentials in any URI, and <code>ports: ["27017:27017"]</code> (through <code>:27020</code>) publishes all four databases on the host. Anything that can reach the host — or, in Kubernetes without NetworkPolicies, anything running anywhere in the cluster — has unauthenticated administrative access to every financial record in the system. The compose comment explains the port mapping is for MongoDB Compass, which is a reasonable local-development want served by <code>kubectl port-forward</code> or a compose override file, not by publishing the port by default.
+  </p>
+</div>
+
+<h4>Driver configuration</h4>
+<p><code>mongox.Connect</code> applies the URI and nothing else. Unset, and worth setting:</p>
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Setting</th><th>Current</th><th>Recommended</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>MaxPoolSize</code></td><td>100 (default)</td><td>Sized to target concurrency</td><td>Bounds Mongo-side connection count as replicas multiply; 20 pods × 100 = 2,000 connections to one node</td></tr>
+    <tr><td><code>MinPoolSize</code></td><td>0</td><td>10–20</td><td>Avoids a dial storm and a cold-start latency spike after every scale-up</td></tr>
+    <tr><td><code>ServerSelectionTimeout</code></td><td>30 s</td><td>3–5 s</td><td>30 s of hanging is indistinguishable from a hang to a caller; fail fast and shed load</td></tr>
+    <tr><td><code>Compressors</code></td><td>none</td><td><code>zstd,snappy</code></td><td>Transaction list responses are highly compressible; cuts wire bytes and tail latency materially</td></tr>
+    <tr><td><code>RetryWrites</code> / <code>RetryReads</code></td><td>implicit</td><td>explicit, with a replica set</td><td>Only meaningful once there is a replica set to fail over to</td></tr>
+    <tr><td><code>ReadPreference</code></td><td>primary</td><td><code>secondaryPreferred</code> for reports</td><td>Moves the heaviest analytical reads off the primary</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="fix">
+<span class="label">Remediation</span>
+<p><strong>Local:</strong> run each Mongo as a single-member replica set (<code>--replSet rs0</code> with an init container running <code>rs.initiate()</code>). One flag, and it unlocks transactions and change streams immediately — the outbox becomes genuinely atomic with no application redesign.</p>
+<p><strong>Kubernetes:</strong> a <code>StatefulSet</code> with three members and a per-member <code>PersistentVolumeClaim</code>, or the MongoDB Community Operator, which handles replica-set membership, TLS, and rolling upgrades for you. A managed service is the other legitimate answer, and for a system whose purpose includes learning to operate infrastructure, the operator is the more instructive choice.</p>
+<p><strong>Everywhere:</strong> enable <code>--auth</code> with per-service credentials from a Secret, enable TLS in transit, remove the published host ports from the default compose file, and add a <em>restore</em> drill — a backup you have never restored is a hypothesis, not a backup.</p>
+</div>
+</div>
+
+<div class="finding high" id="f12">
+<h3><span class="fid">F12</span> Money is stored and summed as <code>float64</code> <span class="chip high">High</span></h3>
+<p class="where"><code>expense-service/internal/domain/transaction.go</code>, <code>budget-service/internal/domain/budget.go</code>, <code>internal/client/expense_client.go</code></p>
+<p>
+Amounts are <code>float64</code> throughout — domain, BSON, and JSON. IEEE-754 binary floating point cannot represent 0.10 exactly, and <code>SumExpensesByCategory</code> accumulates <code>total += tx.Amount</code> across up to 5,000 values, compounding representation error with every addition. The overspend decision is then <code>b.Amount - actual &lt; 0</code> — a threshold comparison decided by that accumulated error.
+</p>
+<p>
+At small volume this is invisible. At scale it produces alerts that fire on the wrong side of a boundary, totals that disagree between the report endpoint and the overspend check, and reconciliation discrepancies that cannot be explained because they are not deterministic. It is listed here rather than dismissed as an application concern because <strong>it is the class of defect that cannot be retrofitted cheaply once there is production data</strong> — every fix requires a migration of every historical record.
+</p>
+<div class="fix">
+<span class="label">Remediation</span>
+<p>Store minor units as <code>int64</code> (cents), or MongoDB's <code>Decimal128</code> if multi-currency precision beyond two places is anticipated. Do the summation in the database with <code>$sum</code> rather than in Go — which the <a href="#f01">F01</a> aggregation pipeline already does. Keep the JSON wire format a decimal string, not a JSON number, so JavaScript's own float64 does not reintroduce the problem in the browser. Do this before there is production data; the cost rises monotonically from here.</p>
+</div>
+</div>
+
+<div class="finding med" id="f16">
+<h3><span class="fid">F16</span> No caching layer of any kind <span class="chip med">Medium</span></h3>
+<p class="where">fleet-wide</p>
+<p>
+Every read reaches MongoDB. There is no in-process cache, no Redis, no HTTP cache headers, no <code>ETag</code>, no CDN. Some of what is being re-fetched is close to static: <code>findCategoryIDByName</code> fetches a user's <em>entire</em> category list on every single <code>SumExpensesByCategory</code> call — which, under <a href="#f01">F01</a>, is once per budget per transaction event.
+</p>
+<p>
+<code>plan.md</code> defers Redis until there is a legitimate reason to introduce it, which is the right default posture. <a href="#f01">F01</a> is that reason, and it arrives with measurements attached.
+</p>
+<div class="fix">
+<span class="label">Remediation, cheapest first</span>
+<ul>
+  <li><strong><code>golang.org/x/sync/singleflight</code> + a small TTL LRU</strong> for the category lookup. In-process, no new infrastructure, and it collapses the thundering herd of identical concurrent lookups that a CSV import produces.</li>
+  <li><strong><code>Cache-Control</code> and <code>ETag</code> on GET responses.</strong> Free bandwidth and latency savings from the browser, and the precondition for ever putting a CDN in front of the API.</li>
+  <li><strong>Redis</strong> once multi-replica: shared caches, the distributed rate limiter from <a href="#f07">F07</a>, and idempotency-key storage from <a href="#f22">F22</a>. One dependency serving three needs is a much easier justification than one serving one.</li>
+</ul>
+<p>Cache invalidation is the real design work. Prefer short TTLs over clever invalidation: a 30-second stale category list is harmless and needs no invalidation logic at all, whereas an event-driven invalidation scheme is a new distributed-systems problem you would be choosing to own.</p>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="events" style="border:none">5. Event bus &amp; outbox</h2>
+<p>The right pattern, wired with defaults that do not survive multiple replicas.</p>
+</div>
+
+<div class="finding crit" id="f04">
+<h3><span class="fid">F04</span> The outbox relay is not safe to run in more than one replica <span class="chip crit">Critical</span></h3>
+<p class="where"><code>shared/outbox/outbox.go</code>, <code>expense-service</code> and <code>budget-service</code> <code>cmd/server/main.go</code></p>
+<p>Each service starts a relay goroutine at boot. That is correct for one replica and incorrect for two. Four distinct problems:</p>
+
+<h4>No claim, so every replica publishes every event</h4>
+<p>
+<code>RelayOnce</code> runs <code>Find({published_at: nil})</code>, publishes, then marks. With <em>N</em> replicas, all <em>N</em> read the same unpublished set and all <em>N</em> publish it. Both publishers do set a JetStream <code>MsgID</code> (<code>tx.ID</code>, and <code>budget_id:period_start</code>), and JetStream collapses duplicates within its dedup window — so this is bounded rather than unbounded, which is genuinely good design and worth crediting. But it only holds <em>inside the window</em>. Anything republished after the default two minutes — a backlog draining after a NATS outage, or an event whose <code>UpdateByID</code> marking failed — is delivered again for real. And even where dedup saves correctness, you are still paying <em>N</em>× the publish work and <em>N</em>× the Mongo write load, forever.
+</p>
+
+<h4>Unbounded scan</h4>
+<p>
+The find has no <code>limit</code> and no <code>sort</code>. After any outage the entire backlog is processed in a single serial pass holding one cursor open — and MongoDB times out an idle cursor after 10 minutes, so a large enough backlog fails with <code>CursorNotFound</code> partway through and restarts from the beginning on the next tick. The system's recovery behaviour gets worse the more there is to recover, which is the defining characteristic of an outage that does not end.
+</p>
+
+<h4>Serial publishes</h4>
+<p>One publish per round trip, sequentially. This is the throughput ceiling of the entire write path, and it does not improve with hardware.</p>
+
+<h4>Nothing reaps published events</h4>
+<p>
+<code>outbox_events</code> grows without bound; published rows are never deleted. Storage, backup time, and restore time all grow monotonically forever. The index on <code>{published_at: 1}</code> also indexes every published row, when only the unpublished ones are ever queried.
+</p>
+
+<div class="fix">
+<span class="label">Remediation — a day, and it unblocks horizontal scaling</span>
+<pre><code><span class="c">// 1. Partial index: only unpublished rows are indexed at all.</span>
+<span class="c">//    The index stays small permanently, no matter how many events ship.</span>
+mongo.IndexModel{
+    Keys: bson.D{{"published_at", 1}, {"created_at", 1}},
+    Options: options.Index().SetPartialFilterExpression(
+        bson.M{"published_at": bson.M{"$eq": nil}}),
+}
+
+<span class="c">// 2. TTL index reaps published rows after 72h (post-mortem headroom).</span>
+mongo.IndexModel{
+    Keys:    bson.D{{"published_at", 1}},
+    Options: options.Index().SetExpireAfterSeconds(72 * 3600),
+}
+
+<span class="c">// 3. Claim before publishing, so replicas cannot collide.</span>
+res := col.FindOneAndUpdate(ctx,
+    bson.M{"published_at": nil, "locked_until": bson.M{"$lt": now}},
+    bson.M{"$set": bson.M{"locked_until": now.Add(30 * time.Second), "locked_by": podName}},
+    options.FindOneAndUpdate().SetSort(bson.D{{"created_at", 1}}))
+
+<span class="c">// 4. Bounded batch + bounded concurrency, not one-at-a-time.</span>
+<span class="c">//    Fetch 500, publish with a pool of 32, mark with one BulkWrite.</span></code></pre>
+<p>
+<strong>The better long-term answer:</strong> once the replica set from <a href="#f11">F11</a> exists, replace polling with a MongoDB change stream on the outbox collection. Publish latency drops from "up to <code>OUTBOX_RELAY_INTERVAL</code>" (2 seconds today, a floor on every downstream notification) to milliseconds, the poll load disappears entirely, and resume tokens give you exactly the restart semantics the current design is trying to approximate with a ticker.
+</p>
+</div>
+</div>
+
+<div class="finding high" id="f08">
+<h3><span class="fid">F08</span> The JetStream stream is a single point of data loss <span class="chip high">High</span></h3>
+<p class="where"><code>shared/eventbus/eventbus.go</code>, all three <code>cmd/server/main.go</code>, <code>docker-compose.yml</code></p>
+<p><code>EnsureStream</code> sets a name, subjects, <code>LimitsPolicy</code>, and a 30-day <code>MaxAge</code>. What it does not set matters more:</p>
+<ul>
+  <li><strong><code>Replicas</code> is unset — the stream is R=1.</strong> Combined with a single NATS container, losing that one node or its volume loses every unacknowledged financial event in flight. The whole reason JetStream was chosen over core NATS was durability; R=1 on a single node gives you persistence across a restart but not durability against a node loss.</li>
+  <li><strong><code>MaxBytes</code> is unset.</strong> With <code>LimitsPolicy</code> and a 30-day age limit, the store grows until the volume is full, at which point publishes fail — the outbox backs up, Mongo's outbox collection grows (<a href="#f04">F04</a> has no reaping), and the failure cascades backwards into the write path.</li>
+  <li><strong><code>Discard</code> is unset</strong>, defaulting to <code>DiscardOld</code>: at a limit, JetStream silently deletes the <em>oldest</em> messages. For financial events, silently dropping the oldest is the worst available choice. <code>DiscardNew</code> fails the publish loudly instead, which the outbox is already built to retry.</li>
+  <li><strong>One <code>finora.&gt;</code> catch-all stream</strong> means every domain shares one retention policy, one storage budget, and one hot path. A burst on one subject consumes the headroom of every other.</li>
+  <li><strong>All three services call <code>CreateOrUpdateStream</code> at boot.</strong> The doc comment argues that shared infrastructure should not have a single designated owner, which is a defensible instinct — but the mechanism is <em>mutating</em>, so whichever pod boots last silently rewrites the stream's configuration. During a rolling deploy where subject lists differ between old and new versions, the stream config flaps.</li>
+</ul>
+<div class="fix">
+<span class="label">Remediation</span>
+<p>Run NATS as a 3-node cluster and declare streams with <code>Replicas: 3</code>, explicit <code>Storage: FileStorage</code>, an explicit <code>MaxBytes</code>, and <code>Discard: DiscardNew</code>. Split into per-domain streams (<code>FINORA_TRANSACTIONS</code>, <code>FINORA_BUDGETS</code>) so retention and limits can differ and a hot subject cannot starve a cold one.</p>
+<p>Move provisioning out of application startup into a Helm hook or a Kubernetes <code>Job</code> running the <code>nats</code> CLI, and have services <em>verify</em> the stream exists and fail fast if it does not, rather than mutating it. Stream topology is infrastructure; it belongs with the infrastructure, declared once, versioned, and reviewed.</p>
+</div>
+</div>
+
+<div class="finding high" id="f09">
+<h3><span class="fid">F09</span> No backoff, no dead-letter — failed events are silently discarded <span class="chip high">High</span></h3>
+<p class="where"><code>shared/eventbus/eventbus.go</code></p>
+<p>
+The consumer sets <code>AckExplicitPolicy</code> and <code>MaxDeliver: 10</code>, and on handler error calls a bare <code>msg.Nak()</code>. A bare Nak requests <em>immediate</em> redelivery. So when a dependency is down — expense-service unreachable, exactly the case <a href="#f01">F01</a>'s handler depends on — a message burns through all ten delivery attempts in milliseconds and is then <strong>dropped permanently, with no dead-letter queue, no alert, and no record</strong>. A budget-overspent notification the user should have received simply never exists, and nothing in the system knows.
+</p>
+<p>
+The hot retry loop is separately damaging: during a downstream outage, the consumer spins at full speed against a failing dependency, adding load precisely when the system is least able to absorb it. That is a textbook retry storm, and it turns a partial outage into a total one.
+</p>
+<p>
+Throughput is the other half. Messages are dispatched to the callback serially, so per-replica throughput is <code>1 / handler_latency</code>. With <a href="#f01">F01</a>'s ~65&nbsp;ms handler that is ~15 events/s/replica. Replicas do share load — they use the same durable name and therefore form a queue group, which is correct — but you are scaling pods to work around a design cost rather than removing it.
+</p>
+<div class="fix">
+<span class="label">Remediation</span>
+<pre><code>cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+    Durable:       durableName,
+    AckPolicy:     jetstream.AckExplicitPolicy,
+    FilterSubject: filterSubject,
+    MaxDeliver:    10,
+    AckWait:       30 * time.Second,          <span class="c">// &gt; p99 handler latency</span>
+    BackOff: []time.Duration{                  <span class="c">// server-side exponential backoff</span>
+        1 * time.Second, 5 * time.Second, 15 * time.Second,
+        30 * time.Second, 1 * time.Minute, 5 * time.Minute,
+    },
+    MaxAckPending: 256,                        <span class="c">// bounded in-flight window</span>
+})</code></pre>
+<p>
+Distinguish <em>retryable</em> from <em>terminal</em> in the handler contract: a network error should Nak with backoff; a permanently malformed payload should <code>msg.Term()</code> and be routed to a DLQ subject. Budget-service already gets this right for unmarshal failures — it acks and logs rather than retrying a payload that will never parse. Generalise that instinct into the shared <code>Handler</code> signature with a typed <code>ErrTerminal</code>.
+</p>
+<p>
+Then consume the JetStream advisory <code>$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.&gt;</code> into a durable dead-letter store and <strong>alert on it</strong>. An event that exhausted its retries is an incident, not a log line. Finally, add bounded concurrency inside the handler dispatch — a worker pool of <em>k</em> with <code>MaxAckPending</code> sized above it — so throughput is not pinned to one message at a time.
+</p>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="k8s" style="border:none">6. Kubernetes &amp; deployment</h2>
+<p>Honest framing: this is the least-built area, and it is explicitly a work in progress.</p>
+</div>
+
+<div class="finding med" id="f18">
+<h3><span class="fid">F18</span> Almost nothing exists yet, and the one manifest models a database as a Deployment <span class="chip med">Medium</span></h3>
+<p class="where"><code>infrastructure/kubernetes/</code></p>
+<p>
+The directory contains a namespace and a <code>mongo-user</code> Deployment with <code>replicas: 1</code>, no PVC, no resources, no probes, and no securityContext. Its README is candid that this is a deliberate learning-order decision and that PVCs come later, so this is not drift — it is a stated position. The critique is about what the target needs to include, and about one modelling choice worth correcting before it is copied four more times.
+</p>
+<div class="callout gotcha">
+  <span class="label">Correct this before replicating it</span>
+  <p>
+  A database belongs in a <code>StatefulSet</code>, not a <code>Deployment</code>. A Deployment's default <code>RollingUpdate</code> strategy starts the new pod <em>before</em> terminating the old one; once a PVC is attached, with a <code>ReadWriteOnce</code> volume the new pod simply cannot start (the deploy hangs), and with <code>ReadWriteMany</code> two <code>mongod</code> processes attempt to open the same data files, which corrupts them. StatefulSets give stable network identity, ordered rollout, and a <code>volumeClaimTemplate</code> that provisions one volume per replica — all three are prerequisites for a replica set. If you keep a Deployment for any stateful workload in the interim, set <code>strategy: Recreate</code> so the failure mode is downtime rather than corruption.
+  </p>
+</div>
+
+<h4>What the target manifests need</h4>
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Object / field</th><th>Why it is required for scale</th></tr></thead>
+  <tbody>
+    <tr><td><strong>resources.requests</strong> (CPU + memory)</td><td>Without requests the scheduler cannot bin-pack and <strong>the HPA cannot compute utilisation at all</strong> — autoscaling is impossible until these exist. This is the single highest-priority manifest field.</td></tr>
+    <tr><td><strong>resources.limits</strong> (memory only)</td><td>Memory limits prevent one leaking pod from evicting its neighbours. CPU limits are usually counterproductive in Go — throttling adds tail latency; prefer requests plus a CPU-based HPA.</td></tr>
+    <tr><td><strong>startup / liveness / readiness probes</strong></td><td>The endpoints already exist and are correctly designed. A startup probe prevents a slow first Mongo connect from being misread as a liveness failure and crash-looping the pod.</td></tr>
+    <tr><td><strong>HorizontalPodAutoscaler</strong></td><td>The whole point. CPU-based for the gateway and HTTP services.</td></tr>
+    <tr><td><strong>KEDA</strong> (consumer lag)</td><td>Budget- and notification-service are event-driven; CPU is the wrong signal. Scale on JetStream consumer lag — the metric that actually reflects whether they are keeping up.</td></tr>
+    <tr><td><strong>PodDisruptionBudget</strong></td><td>Without one, a node drain can evict every replica of a service simultaneously. <code>minAvailable: 1</code> at minimum.</td></tr>
+    <tr><td><strong>topologySpreadConstraints</strong> + anti-affinity</td><td>Three replicas on one node is one replica with extra steps. Spread across nodes, then across zones.</td></tr>
+    <tr><td><strong>securityContext</strong></td><td><code>runAsNonRoot</code>, <code>readOnlyRootFilesystem</code>, <code>allowPrivilegeEscalation: false</code>, <code>drop: [ALL]</code>, seccomp <code>RuntimeDefault</code>. The images already run as non-root user 10001, so most of this is nearly free.</td></tr>
+    <tr><td><strong>NetworkPolicy</strong></td><td>Default-deny, then allow gateway→services and services→their own database. This is what makes the <code>X-User-Id</code> trust model (<a href="#f14">F14</a>) defensible rather than merely documented.</td></tr>
+    <tr><td><strong>ServiceAccount</strong> per workload</td><td>One identity per service; <code>automountServiceAccountToken: false</code> where the API server is not needed — which is all five services.</td></tr>
+    <tr><td><strong>Ingress + cert-manager</strong></td><td>TLS termination, HTTP/2, and the correct place for edge rate limiting (<a href="#f07">F07</a>) and request-size limits.</td></tr>
+    <tr><td><strong>ConfigMap / Secret split</strong></td><td>Already structured for it. Use an external secret store (External Secrets Operator, or SOPS for a self-managed cluster); plain Secrets are base64, not encryption.</td></tr>
+    <tr><td><strong>PriorityClass</strong></td><td>The gateway and databases should evict last under node pressure, not in arbitrary order.</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="callout rejected">
+  <span class="label">Fix in the same change</span>
+  <p>
+  <code>docker-compose.yml</code> supplies fallback defaults for secrets: <code>${JWT_ACCESS_SECRET:-dev-access-secret-change-me}</code>. Carried into any non-local environment, a missing secret does not fail the boot — it starts the entire fleet with a signing key that is published in this repository, and everything looks healthy. Secrets must have <em>no</em> default. <code>shared/config.MustGetEnv</code> already implements exactly the right behaviour; the compose fallbacks defeat it.
+  </p>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="cicd" style="border:none">7. CI/CD &amp; supply chain</h2>
+<p>The pipeline validates code after it has already landed, and never builds the artifact it ships.</p>
+</div>
+
+<div class="finding med" id="f17">
+<h3><span class="fid">F17</span> CI runs after merge and never builds an image <span class="chip med">Medium</span></h3>
+<p class="where"><code>.github/workflows/ci.yml</code></p>
+<p>
+The trigger is <code>pull_request: types: [closed]</code> gated on <code>merged == true</code>. The workflow documents this as an explicit request and an accepted trade-off, and notes how to add a pre-merge gate later. Taking it on its own terms, here is what it costs at scale: <strong>there is no required status check possible</strong>, because a check that only runs post-merge can never gate a merge. Branch protection has nothing to enforce. <code>main</code> can be broken by any merge and stays broken until someone reads the notification. As contributor count and merge rate rise, mean-time-to-red-main rises with it.
+</p>
+<p>What the pipeline never does at all:</p>
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Missing</th><th>Consequence</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Docker image build</strong></td><td>Nothing verifies the five Dockerfiles. A broken Dockerfile is discovered at deploy time, or by a person running compose.</td></tr>
+    <tr><td><strong><code>go test -race</code></strong></td><td>This system is full of concurrency — relay goroutines, consumer callbacks, the rate limiter's shared map. Data races are the defects most likely to appear only under production load and hardest to reproduce afterwards.</td></tr>
+    <tr><td><strong><code>golangci-lint</code></strong></td><td><code>go vet</code> catches a fraction of what <code>errcheck</code>, <code>ineffassign</code>, <code>bodyclose</code>, and <code>noctx</code> catch. <code>bodyclose</code> in particular catches leaked HTTP response bodies — a real bug class on the <a href="#f01">F01</a> path.</td></tr>
+    <tr><td><strong>Image and dependency scanning</strong></td><td>No Trivy or Grype, no <code>govulncheck</code>. Go 1.21.3 is out of support with known stdlib CVEs, and nothing in the pipeline would tell you.</td></tr>
+    <tr><td><strong>SBOM + signing</strong></td><td>No provenance for what shipped. Syft plus cosign is roughly ten lines and makes "what version of what is running" answerable.</td></tr>
+    <tr><td><strong>Manifest validation</strong></td><td>No kubeconform or conftest, so a malformed or policy-violating manifest reaches the cluster.</td></tr>
+    <tr><td><strong>Load / regression testing</strong></td><td><code>scripts/load_test.sh</code> exists and is honest about being a smoke test. There is no k6 or Vegeta run producing comparable percentiles per commit, so performance regressions are invisible until users find them.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>Build reproducibility and image hygiene</h4>
+<ul>
+  <li><strong>Every base image is a floating tag</strong> — <code>golang:1.21-alpine</code>, <code>alpine:3.19</code>, <code>mongo:7</code>, <code>nats:2-alpine</code>, <code>node:20-alpine</code>. Two builds of the same commit can produce different binaries, and a base-image change lands unannounced. Pin by digest and let Renovate or Dependabot propose bumps as reviewable PRs.</li>
+  <li><strong>Layer caching is defeated.</strong> Every Dockerfile does <code>COPY shared/ ...</code> then <code>COPY services/x/ ...</code> then <code>RUN go mod download</code>. Because the source is copied before the download, <em>any</em> source edit invalidates the dependency layer and re-downloads every module. Copying only <code>go.mod</code>/<code>go.sum</code> first cuts rebuild time dramatically.</li>
+  <li><strong>No build flags.</strong> <code>-trimpath -ldflags="-s -w"</code> shrinks binaries and removes build-path leakage. No <code>--mount=type=cache</code> for the module and build caches.</li>
+  <li><strong>Alpine as the runtime base</strong> ships a shell and a package manager into production. <code>gcr.io/distroless/static</code> or <code>scratch</code> is a smaller attack surface for a static <code>CGO_ENABLED=0</code> binary. The one genuine exception is user-service, which needs <code>tzdata</code> — and distroless-static includes it, so even that is covered.</li>
+  <li><strong>No <code>.dockerignore</code> at the repository root</strong> (the frontend has one). Every service build ships <code>.git</code>, the 108&nbsp;KB <code>plan.md</code>, and any local <code>node_modules</code> into the build context.</li>
+</ul>
+
+<div class="fix">
+<span class="label">Remediation</span>
+<p>Split the pipeline in two, which the existing workflow comment already anticipates: a <strong>pre-merge</strong> workflow on <code>pull_request</code> running fmt, vet, lint, <code>-race</code> unit tests, integration tests, image builds, and scans — set as required status checks. A separate <strong>post-merge release</strong> workflow builds, signs, generates an SBOM, pushes by digest, and opens the deployment PR. Add a nightly <code>govulncheck</code> and a scheduled k6 run against a staging environment with percentiles published as a build artifact.</p>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="security" style="border:none">8. Security as an availability property</h2>
+<p>Scoped to the items that determine whether the system stays up and whether it can be multi-tenanted safely.</p>
+</div>
+
+<div class="finding med" id="f14">
+<h3><span class="fid">F14</span> <code>X-User-Id</code> is trusted with no enforcement that only the gateway sets it <span class="chip med">Medium</span></h3>
+<p class="where"><code>shared/middleware/identity.go</code>, <code>docker-compose.yml</code></p>
+<p>
+<code>RequireIdentity</code> accepts any non-empty <code>X-User-Id</code>. The gateway correctly overwrites the header with the validated subject and never forwards a client-supplied one — that part is right. The problem is that nothing prevents reaching a backend service <em>without going through the gateway</em>.
+</p>
+<p>
+In compose, ports 8081–8084 are published on the host, so <code>curl -H 'X-User-Id: &lt;any-user&gt;' localhost:8082/api/v1/transactions</code> returns another user's complete financial history with no token at all. In Kubernetes there are no NetworkPolicies, so any pod in the cluster can do the same. <code>CLAUDE.md</code> documents this as a deliberate trade-off revisited in Phase 9, so it is a known position rather than an oversight — but at scale the difference matters: it converts any single compromised workload anywhere in the cluster into a full customer-data breach, and it blocks multi-tenancy, partner traffic, and any compliance posture.
+</p>
+<div class="fix">
+<span class="label">Remediation, in increasing order of cost</span>
+<ol>
+  <li><strong>Stop publishing backend ports</strong> in the default compose file. Move them to <code>docker-compose.override.yml</code> for local debugging. Minutes.</li>
+  <li><strong>Default-deny NetworkPolicy</strong>, allowing only gateway→service and service→its own database. Hours, and it makes the trust boundary a real one instead of a documented convention.</li>
+  <li><strong>Sign the identity assertion.</strong> Have the gateway mint a short-lived internal token (30 s, audience = target service) that the service verifies. Preserves "the gateway is the only validator of <em>user</em> tokens" while making the header unforgeable. Days.</li>
+  <li><strong>mTLS via a service mesh.</strong> Linkerd is the low-overhead choice and gives you cryptographic workload identity, plus per-hop golden metrics for free — which also happens to be a large slice of <a href="#f13">F13</a>.</li>
+</ol>
+</div>
+</div>
+
+<div class="finding med" id="f15">
+<h3><span class="fid">F15</span> Shared symmetric signing key, no rotation, no revocation <span class="chip med">Medium</span></h3>
+<p class="where"><code>shared/jwtx/jwtx.go</code>, <code>services/gateway/internal/authmw/authmw.go</code></p>
+<ul>
+  <li><strong>HS256 with a shared secret.</strong> Gateway and user-service both hold <code>JWT_ACCESS_SECRET</code>. Anything that can read the gateway's environment can mint a valid token for any user. A verifier should never need the ability to sign.</li>
+  <li><strong>No <code>kid</code> header</strong>, so rotating the secret is a flag-day: every token issued under the old key breaks the instant the new key is deployed.</li>
+  <li><strong>No revocation.</strong> A stolen 15-minute access token is valid for 15 minutes with no kill switch. Refresh tokens are stored and revocable — good — but access tokens are not.</li>
+  <li><strong>No <code>jwt.WithValidMethods</code>, no <code>iss</code>/<code>aud</code> validation.</strong> Low risk today given an HMAC-only key function, but algorithm pinning is one argument and costs nothing.</li>
+</ul>
+<div class="fix">
+<span class="label">Remediation</span>
+<p>Move to RS256 or EdDSA with a JWKS endpoint on user-service and a caching JWKS client in the gateway. The gateway then holds only public keys, rotation becomes a rolling operation with overlapping <code>kid</code>s, and the architectural rule ("the gateway is the only JWT validator") is preserved intact. Add <code>WithValidMethods</code>, <code>iss</code>, and <code>aud</code> checks in the same change. For revocation, a small deny-list of <code>jti</code>s in Redis with a TTL equal to the access-token lifetime is sufficient and cheap.</p>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="obs" style="border:none">9. Observability</h2>
+<p>The prerequisite for every other item in this document.</p>
+</div>
+
+<div class="finding high" id="f13">
+<h3><span class="fid">F13</span> No metrics, no traces, and correlation breaks at the two most expensive hops <span class="chip high">High</span></h3>
+<p class="where">fleet-wide; <code>shared/logger</code>, <code>shared/middleware</code>, <code>budget-service/internal/client/expense_client.go</code></p>
+<p>
+Searching the entire repository for <code>prometheus</code>, <code>otel</code>, or <code>metrics</code> returns nothing. There is no <code>/metrics</code> endpoint, no OpenTelemetry, no tracing, no SLOs, and no alerting. Structured JSON logging with a request id exists and is well done — but logs alone cannot answer "what is my p99", "which dependency is slow", or "how many replicas do I need", and every one of those questions has to be answerable before any capacity decision can be made.
+</p>
+<p>Two specific gaps make the existing correlation less useful than it looks:</p>
+<ul>
+  <li><strong>The internal REST call does not propagate <code>X-Request-Id</code>.</strong> <code>ExpenseHTTPClient.doGet</code> sets only <code>X-User-Id</code>. The correlation chain therefore breaks at exactly the hop generating 97% of internal traffic (<a href="#f01">F01</a>) — the one place you most need it. This is a two-line fix.</li>
+  <li><strong>Events carry no correlation identifier at all.</strong> Neither <code>TransactionCreatedEvent</code> nor <code>BudgetOverspentEvent</code> includes a request id or <code>traceparent</code>, so a notification can never be traced back to the transaction that caused it. Debugging "why did this user get this alert" requires timestamp archaeology across four services.</li>
+</ul>
+<div class="callout why">
+  <span class="label">Why this ranks above most of the "Critical" items in sequencing</span>
+  <p>
+  Every capacity number in this document is inferred from reading code. Some will be wrong. Without metrics you cannot rank fixes by measured impact, size an HPA (which needs a utilisation target derived from real load), set a meaningful <code>AckWait</code> or <code>WriteTimeout</code> (both of which must exceed a p99 you do not know), or tell whether a deploy improved anything. <strong>Instrument first, then fix in the order the data says.</strong> The one exception is <a href="#f02">F02</a> and <a href="#f03">F03</a> — those are unconditional defaults-are-wrong fixes that need no measurement to justify.
+  </p>
+</div>
+<div class="fix">
+<span class="label">Remediation — days, and it pays for itself immediately</span>
+<ul>
+  <li><strong>RED metrics per route</strong> via <code>promhttp</code> on a separate admin port (so <code>/metrics</code> is never publicly routable): request rate, error rate, and a duration histogram with buckets chosen around your SLO thresholds, not the library defaults.</li>
+  <li><strong>Distributed tracing</strong> with <code>otelgin</code> and <code>otelhttp</code>. This is where a 32-span trace makes <a href="#f01">F01</a> visible in one screenshot — far more persuasive than any document, including this one.</li>
+  <li><strong>Trace context across NATS.</strong> Inject <code>traceparent</code> into message headers and extract it in the consumer, so the async hop joins the same trace as the originating write.</li>
+  <li><strong>The metrics that actually matter here:</strong> JetStream consumer lag per durable (the single best health signal for the write path); outbox depth and oldest-unpublished age; Mongo connection-pool saturation; per-backend HTTP client pool reuse ratio — which would have made <a href="#f02">F02</a> obvious from day one.</li>
+  <li><strong>Exemplars</strong> linking histogram buckets to trace ids, so clicking a p99 spike in Grafana opens a real slow trace.</li>
+</ul>
+</div>
+</div>
+
+<div class="part-banner">
+<h2 id="frontend" style="border:none">10. Frontend &amp; edge delivery</h2>
+</div>
+
+<div class="finding med" id="f19">
+<h3><span class="fid">F19</span> The frontend image cannot be promoted, and there is no edge <span class="chip med">Medium</span></h3>
+<p class="where"><code>frontend/Dockerfile</code>, <code>frontend/lib/api.ts</code>, <code>docker-compose.yml</code></p>
+<ul>
+  <li><strong>Build-time API URL.</strong> <code>NEXT_PUBLIC_API_BASE_URL</code> is a build <code>ARG</code> inlined into the client bundle — correctly identified in the Dockerfile comment as a build-time concern. The infrastructure consequence is that <strong>you need a different image per environment</strong>, so you can never promote the exact bytes you tested in staging to production. That breaks the core promise of immutable artifacts.</li>
+  <li><strong>No CDN and no cache strategy.</strong> Next.js static assets are content-hashed and immutable, which means they are ideal CDN candidates, and none of that is configured. Every asset request travels to the origin.</li>
+  <li><strong>Single replica, no SSR caching</strong>, no revalidation strategy.</li>
+  <li><strong>Tokens in <code>localStorage</code></strong>, which the module honestly flags as a Phase 0 simplification with a plan to move to httpOnly cookies. Beyond the XSS exposure, it forces the cross-origin API design that makes CORS necessary at all.</li>
+</ul>
+<div class="fix">
+<span class="label">Remediation</span>
+<p><strong>Serve the API same-origin.</strong> Route <code>/api/*</code> through the same ingress host as the frontend. This removes CORS entirely (deleting a whole class of bug, including the duplicate-header incident already documented in <code>CLAUDE.md</code>), enables httpOnly <code>SameSite</code> cookies, and lets a CDN sit in front of everything with per-path cache rules.</p>
+<p><strong>Make the API base runtime-configurable</strong> — a tiny <code>/config.js</code> served by the Node server and read at boot, or simply a relative <code>/api</code> path once same-origin. One image, promoted unchanged through every environment.</p>
+<p><strong>Put a CDN in front</strong> with <code>immutable</code> caching for hashed assets and short TTLs for HTML. This is the cheapest latency win available anywhere in the system and it scales to any RPM without touching your compute.</p>
+</div>
+</div>
+
+<h2 id="capacity"><span class="num">§</span>Capacity model</h2>
+
+<p>
+Little's Law — <em>L = λW</em>, concurrency equals arrival rate times latency — is the tool for sizing this. A Go service handles tens of thousands of concurrent goroutines comfortably, so at a 20&nbsp;ms mean latency a single gateway pod supports several thousand requests per second before goroutine concurrency is the binding constraint. Which means <strong>goroutines are never the ceiling here</strong>. The ceilings are elsewhere, and they are lower.
+</p>
+
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Tier</th><th>Binding constraint today</th><th>Estimated ceiling</th><th>After the XS/S fixes</th></tr></thead>
+  <tbody>
+    <tr><td>Gateway</td><td>Ephemeral port exhaustion from <a href="#f02">F02</a>'s 2-idle-conn pool</td><td>Low hundreds of RPS per pod, then hard failure</td><td>Several thousand RPS per pod, CPU-bound</td></tr>
+    <tr><td>Gateway (adversarial)</td><td>No <code>ReadHeaderTimeout</code> (<a href="#f03">F03</a>)</td><td>A single host can exhaust it</td><td>Bounded by connection limits</td></tr>
+    <tr><td>Write path (events)</td><td>Consumer fan-out, <a href="#f01">F01</a> + <a href="#f09">F09</a></td><td><strong>~15 events/s/replica → ~1,000 txn/min fleet-wide</strong></td><td>~500 events/s/replica after the aggregate fix</td></tr>
+    <tr><td>Outbox relay</td><td>Serial publish, 2 s poll, no claim (<a href="#f04">F04</a>)</td><td>Bounded by poll cadence; unsafe above 1 replica</td><td>Batched + concurrent; ms latency with change streams</td></tr>
+    <tr><td>Transaction list read</td><td>In-memory sort + full count (<a href="#f05">F05</a>, <a href="#f06">F06</a>)</td><td>Degrades with per-user history; 500s past ~160k rows</td><td>Flat latency at any depth</td></tr>
+    <tr><td>MongoDB</td><td>One standalone node, no replicas, no cache</td><td>Single-node write ceiling; zero HA</td><td>3-member RS + secondary reads + Redis</td></tr>
+    <tr><td>NATS</td><td>One node, R=1 stream</td><td>Single point of data loss</td><td>3-node cluster, R=3</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout cost">
+  <span class="label">Reading this table</span>
+  <p>
+  The write path is the constraint that matters. <strong>~1,000 transactions per minute</strong> is where event lag starts growing without bound — and because nothing measures lag today, the first symptom will not be an alert, it will be a user asking why their budget alert arrived four hours late. The <a href="#f01">F01</a> aggregation fix moves this ceiling by roughly 30× for a few days of work, and it is the highest return on effort available anywhere in this system.
+  </p>
+</div>
+
+<h3>What each order of magnitude actually requires</h3>
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Target</th><th>≈ RPS</th><th>What must be true</th></tr></thead>
+  <tbody>
+    <tr><td><strong>10k RPM</strong></td><td>167</td><td>F02, F03, F05, F20 fixed. Metrics in place. Single replica per service still viable; Mongo replica set for HA rather than throughput.</td></tr>
+    <tr><td><strong>100k RPM</strong></td><td>1,667</td><td>F01 aggregation shipped. Keyset pagination. HPA with resource requests. Redis cache + distributed rate limiting. 3-node NATS, R=3. Mongo replica sets with secondary reads. CDN for static. Full RED metrics and traces.</td></tr>
+    <tr><td><strong>1M RPM</strong></td><td>16,667</td><td>Rolling aggregates replace cross-service reads entirely. Read replicas or sharding keyed on <code>user_id</code>. Multi-AZ, then cell-based isolation so no single failure spans all users. Progressive delivery. Continuous load testing in CI. A real on-call rotation with an error budget.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="target"><span class="num">§</span>Target architecture</h2>
+
+<figure>
+<div class="frame">
+<svg viewBox="0 0 760 400" role="img" aria-labelledby="tgt-title">
+  <title id="tgt-title">Target topology: CDN and ingress at the edge, autoscaled gateway and services, replica-set databases, clustered NATS, Redis, and an observability plane spanning everything</title>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10.5">
+
+    <text x="14" y="20" fill="var(--ink-muted)" font-size="9.5" letter-spacing="1">EDGE</text>
+    <rect x="14" y="28" width="732" height="46" rx="7" fill="var(--bg)" stroke="var(--border)"/>
+    <rect x="30" y="38" width="126" height="26" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="93" y="55" text-anchor="middle" fill="var(--ink)">CDN</text>
+    <rect x="172" y="38" width="146" height="26" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="245" y="55" text-anchor="middle" fill="var(--ink)">WAF + rate limit</text>
+    <rect x="334" y="38" width="176" height="26" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="422" y="55" text-anchor="middle" fill="var(--ink)">Ingress + TLS (cert-manager)</text>
+    <rect x="526" y="38" width="204" height="26" rx="5" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+    <text x="628" y="55" text-anchor="middle" fill="var(--ink-secondary)">same-origin /api → no CORS</text>
+
+    <line x1="380" y1="74" x2="380" y2="94" stroke="var(--border-strong)" stroke-width="1.4"/>
+
+    <text x="14" y="110" fill="var(--ink-muted)" font-size="9.5" letter-spacing="1">COMPUTE — HPA on CPU, KEDA on consumer lag</text>
+    <rect x="14" y="118" width="732" height="86" rx="7" fill="var(--bg)" stroke="var(--border)"/>
+
+    <rect x="30" y="132" width="126" height="58" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="93" y="152" text-anchor="middle" fill="var(--ink)">gateway</text>
+    <text x="93" y="167" text-anchor="middle" fill="var(--ink-muted)" font-size="9">JWKS verify</text>
+    <text x="93" y="180" text-anchor="middle" fill="var(--ink-muted)" font-size="9">pooled transport</text>
+
+    <rect x="172" y="132" width="132" height="58" rx="5" fill="var(--bg-alt)" stroke="var(--border-strong)"/>
+    <text x="238" y="156" text-anchor="middle" fill="var(--ink)">user-service</text>
+    <text x="238" y="172" text-anchor="middle" fill="var(--ink-muted)" font-size="9">JWKS issuer</text>
+
+    <rect x="320" y="132" width="132" height="58" rx="5" fill="var(--bg-alt)" stroke="var(--border-strong)"/>
+    <text x="386" y="156" text-anchor="middle" fill="var(--ink)">expense-service</text>
+    <text x="386" y="172" text-anchor="middle" fill="var(--ink-muted)" font-size="9">$group aggregate</text>
+
+    <rect x="468" y="132" width="132" height="58" rx="5" fill="var(--bg-alt)" stroke="var(--border-strong)"/>
+    <text x="534" y="156" text-anchor="middle" fill="var(--ink)">budget-service</text>
+    <text x="534" y="172" text-anchor="middle" fill="var(--good)" font-size="9">rolling counters</text>
+
+    <rect x="616" y="132" width="114" height="58" rx="5" fill="var(--bg-alt)" stroke="var(--border-strong)"/>
+    <text x="673" y="156" text-anchor="middle" fill="var(--ink)">notification</text>
+    <text x="673" y="172" text-anchor="middle" fill="var(--ink-muted)" font-size="9">-service</text>
+
+    <line x1="380" y1="204" x2="380" y2="224" stroke="var(--border-strong)" stroke-width="1.4"/>
+
+    <text x="14" y="240" fill="var(--ink-muted)" font-size="9.5" letter-spacing="1">STATE — one replica set per service, never shared</text>
+    <rect x="14" y="248" width="732" height="70" rx="7" fill="var(--bg)" stroke="var(--border)"/>
+
+    <rect x="30" y="260" width="112" height="46" rx="5" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+    <text x="86" y="278" text-anchor="middle" fill="var(--ink)" font-size="10">mongo-user</text>
+    <text x="86" y="293" text-anchor="middle" fill="var(--ink-muted)" font-size="9">RS × 3 · auth · TLS</text>
+
+    <rect x="152" y="260" width="112" height="46" rx="5" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+    <text x="208" y="278" text-anchor="middle" fill="var(--ink)" font-size="10">mongo-expense</text>
+    <text x="208" y="293" text-anchor="middle" fill="var(--ink-muted)" font-size="9">RS × 3 · 2ndary reads</text>
+
+    <rect x="274" y="260" width="112" height="46" rx="5" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+    <text x="330" y="278" text-anchor="middle" fill="var(--ink)" font-size="10">mongo-budget</text>
+    <text x="330" y="293" text-anchor="middle" fill="var(--ink-muted)" font-size="9">RS × 3</text>
+
+    <rect x="396" y="260" width="112" height="46" rx="5" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+    <text x="452" y="278" text-anchor="middle" fill="var(--ink)" font-size="10">mongo-notif</text>
+    <text x="452" y="293" text-anchor="middle" fill="var(--ink-muted)" font-size="9">RS × 3</text>
+
+    <rect x="518" y="260" width="102" height="46" rx="5" fill="var(--good-soft)" stroke="var(--good)"/>
+    <text x="569" y="278" text-anchor="middle" fill="var(--ink)" font-size="10">NATS × 3</text>
+    <text x="569" y="293" text-anchor="middle" fill="var(--good)" font-size="9">R=3 · DLQ</text>
+
+    <rect x="630" y="260" width="100" height="46" rx="5" fill="var(--good-soft)" stroke="var(--good)"/>
+    <text x="680" y="278" text-anchor="middle" fill="var(--ink)" font-size="10">Redis</text>
+    <text x="680" y="293" text-anchor="middle" fill="var(--good)" font-size="9">cache · limits</text>
+
+    <rect x="14" y="336" width="732" height="46" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <text x="380" y="355" text-anchor="middle" fill="var(--ink)" font-size="10.5">OBSERVABILITY PLANE — spans every box above</text>
+    <text x="380" y="371" text-anchor="middle" fill="var(--ink-secondary)" font-size="9.5">OpenTelemetry traces (incl. traceparent over NATS) · Prometheus RED metrics · Loki logs · SLO burn-rate alerts</text>
+  </g>
+</svg>
+</div>
+<figcaption>Target topology. The two changes that matter most are not boxes: <strong>budget-service holds its own rolling counters</strong> instead of calling expense-service per event, and the observability plane exists at all.</figcaption>
+</figure>
+
+<h2 id="roadmap"><span class="num">§</span>Prioritised roadmap</h2>
+
+<h3>Phase A — days, no new infrastructure</h3>
+<p>Everything here is a code or configuration change inside the existing repository. Together these are the difference between "falls over at a few hundred RPS" and "scales predictably".</p>
+<div class="scroll-x">
+<table>
+  <thead><tr><th>#</th><th>Change</th><th>Finding</th><th>Effort</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Prometheus <code>/metrics</code> + OpenTelemetry tracing; propagate <code>X-Request-Id</code> on internal calls and <code>traceparent</code> over NATS</td><td><a href="#f13">F13</a></td><td>M</td></tr>
+    <tr><td>2</td><td>Tuned <code>http.Transport</code> on all reverse proxies and internal clients</td><td><a href="#f02">F02</a></td><td>XS</td></tr>
+    <tr><td>3</td><td>Timeouts on <code>http.Server</code> in <code>shared/server</code></td><td><a href="#f03">F03</a></td><td>XS</td></tr>
+    <tr><td>4</td><td><code>SetTrustedProxies</code> + <code>gin.ReleaseMode</code>; shard the rate-limiter map</td><td><a href="#f07">F07</a>, <a href="#f20">F20</a></td><td>S</td></tr>
+    <tr><td>5</td><td>Add <code>{user_id, date}</code> and <code>{user_id, category_id, date}</code> indexes; assert no <code>SORT</code> stage in integration tests</td><td><a href="#f05">F05</a></td><td>XS</td></tr>
+    <tr><td>6</td><td><strong>Aggregation endpoint replacing the pagination fan-out</strong></td><td><a href="#f01">F01</a></td><td>M</td></tr>
+    <tr><td>7</td><td>Outbox: partial index, TTL reaping, claim-before-publish, batched concurrent publish</td><td><a href="#f04">F04</a></td><td>S</td></tr>
+    <tr><td>8</td><td>Consumer <code>BackOff</code>, <code>AckWait</code>, <code>MaxAckPending</code>, terminal-vs-retryable errors, DLQ + alert</td><td><a href="#f09">F09</a></td><td>S</td></tr>
+    <tr><td>9</td><td>Readiness-first drain sequence in <code>shared/server</code></td><td><a href="#f10">F10</a></td><td>S</td></tr>
+    <tr><td>10</td><td>Pre-merge CI: lint, <code>-race</code>, image build, Trivy, <code>govulncheck</code>; digest-pinned bases; fixed Dockerfile layer order</td><td><a href="#f17">F17</a></td><td>M</td></tr>
+    <tr><td>11</td><td>Remove published backend ports and secret fallback defaults from compose</td><td><a href="#f14">F14</a>, <a href="#f18">F18</a></td><td>XS</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Phase B — weeks</h3>
+<ul>
+  <li><strong>Mongo replica sets</strong> with auth and TLS; an atomic outbox using real transactions; change-stream-driven relay; secondary reads for reports. <a href="#f11">F11</a></li>
+  <li><strong>NATS cluster</strong> with R=3 streams, <code>MaxBytes</code>, <code>DiscardNew</code>, per-domain streams provisioned by a Job rather than by application startup. <a href="#f08">F08</a></li>
+  <li><strong>Keyset pagination</strong> across both list endpoints; drop exact counts. <a href="#f06">F06</a></li>
+  <li><strong>Redis</strong> for shared caching, distributed rate limits, and idempotency keys — one dependency, three jobs. <a href="#f16">F16</a>, <a href="#f07">F07</a>, <a href="#f22">F22</a></li>
+  <li><strong>Full Kubernetes manifests</strong>: requests/limits, probes, HPA, KEDA on consumer lag, PDBs, NetworkPolicies, securityContexts, topology spread, Ingress + cert-manager — packaged as the Helm chart the deployment design document already plans. <a href="#f18">F18</a></li>
+  <li><strong>Asymmetric JWTs</strong> with JWKS and <code>kid</code> rotation. <a href="#f15">F15</a></li>
+  <li><strong>Same-origin API, runtime frontend config, CDN.</strong> <a href="#f19">F19</a></li>
+  <li><strong>Money as integer minor units</strong>, before there is production data to migrate. <a href="#f12">F12</a></li>
+</ul>
+
+<h3>Phase C — quarters</h3>
+<ul>
+  <li><strong>Rolling aggregates</strong> in budget-service, removing the cross-service read entirely, with scheduled reconciliation against source. <a href="#f01">F01</a></li>
+  <li><strong>A partitioning strategy keyed on <code>user_id</code></strong> — the natural shard key here, since every query is already owner-scoped. Decide it before the data volume makes it a migration project.</li>
+  <li><strong>Multi-AZ, then cell-based isolation</strong>: partition users into independent cells so no single failure spans the whole customer base.</li>
+  <li><strong>Progressive delivery</strong> (Argo Rollouts) with automated rollback on SLO burn.</li>
+  <li><strong>Continuous load testing in CI</strong> with percentiles published per commit, plus periodic chaos experiments — pod kills, network latency injection, dependency failure — to verify the timeout and retry behaviour actually works rather than assuming it does.</li>
+  <li><strong>An error-budget process</strong>: when the budget is spent, reliability work outranks features. That policy is what keeps the rest of this list from being rewritten in two years.</li>
+</ul>
+
+<h2 id="slo"><span class="num">§</span>Proposed SLOs</h2>
+<p>
+Starting targets, to be revised once <a href="#f13">F13</a> produces real percentiles. Set them where you can currently meet them, then tighten deliberately — an SLO you are permanently violating teaches your team to ignore alerts, which is worse than having none.
+</p>
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Route class</th><th>p50</th><th>p99</th><th>Availability</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Auth (login, refresh)</td><td>60 ms</td><td>250 ms</td><td>99.95%</td><td>bcrypt dominates p50 by design; do not "optimise" it</td></tr>
+    <tr><td>Reads (list, get)</td><td>15 ms</td><td>120 ms</td><td>99.95%</td><td>Achievable only with keyset pagination (<a href="#f06">F06</a>)</td></tr>
+    <tr><td>Writes (create, update)</td><td>25 ms</td><td>200 ms</td><td>99.9%</td><td>Excludes async event processing</td></tr>
+    <tr><td>Reports (aggregate)</td><td>80 ms</td><td>500 ms</td><td>99.9%</td><td>Requires the <a href="#f01">F01</a> aggregation; unachievable today</td></tr>
+    <tr><td>Event → notification</td><td>2 s</td><td>30 s</td><td>99.9% within 60 s</td><td>Freshness SLO, not latency; measured on consumer lag</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+Alert on <strong>burn rate</strong>, not on threshold crossings — a multi-window, multi-burn-rate policy (fast burn over 5 minutes, slow burn over 6 hours) pages for real problems and stays quiet for noise. Page on symptoms users feel: error-budget burn, consumer lag, and saturation. Everything else is a dashboard.
+</p>
+
+<hr>
+
+<h2 id="close"><span class="num">§</span>Closing</h2>
+<p>
+The gap between this system and one that handles high volume is not a rewrite. The application architecture is sound and, crucially, the discipline that makes it sound — one place for every cross-cutting concern, documented trade-offs, enforced service boundaries — is exactly what makes the remediation tractable. Items 2, 3, 4, 5 and 11 in Phase A are collectively a few hours of work in <code>shared/</code> and they move the system's failure mode from "falls over unpredictably" to "degrades measurably".
+</p>
+<p>
+The two items that need real thought rather than configuration are <a href="#f01">F01</a>, because it is a design decision and not a default, and <a href="#f13">F13</a>, because without it you are optimising blind. Ship the instrumentation first. Then look at a 32-span trace of a single <code>POST /transactions</code> — it will make the case for the aggregation endpoint more effectively than this entire document.
+</p>
+
+<footer>
+Finora Scale Readiness Review · branch <code>claude/infracritic-39fwta</code> · companion to <code>infrastructure/kubernetes-deployment-design.html</code>.<br>
+Findings are derived from source reading, not from measurement. Re-derive every capacity figure once metrics exist, and correct this document when reality disagrees with it — the same standard <code>CLAUDE.md</code> holds itself to.
+</footer>
