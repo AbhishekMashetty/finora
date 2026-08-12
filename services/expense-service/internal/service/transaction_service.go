@@ -218,3 +218,19 @@ func (s *transactionService) Update(ctx context.Context, userID, id string, in d
 func (s *transactionService) Delete(ctx context.Context, userID, id string) error {
 	return s.repo.DeleteByIDForUser(ctx, id, userID)
 }
+
+func (s *transactionService) AggregateByCategory(ctx context.Context, userID string, in domain.AggregateByCategoryInput) ([]domain.CategoryTotal, error) {
+	if !domain.ValidTransactionType(in.Type) {
+		return nil, NewValidationError("type", "type must be one of: income, expense")
+	}
+	if in.From.IsZero() {
+		return nil, NewValidationError("from", "from is required")
+	}
+	if in.To.IsZero() {
+		return nil, NewValidationError("to", "to is required")
+	}
+	if in.To.Before(in.From) {
+		return nil, NewValidationError("to", "to must not be before from")
+	}
+	return s.repo.AggregateByCategory(ctx, userID, in.Type, in.From, in.To)
+}

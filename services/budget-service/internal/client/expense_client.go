@@ -14,31 +14,18 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/finora/budget-service/internal/domain"
 	"github.com/finora/shared/httpclient"
 	"github.com/finora/shared/middleware"
 )
 
-const (
-	// reportPageSize is the page size requested per call to expense-service's
-	// transaction list endpoint (its own max is 100, see
-	// expense-service/internal/service/transaction_service.go).
-	reportPageSize = 100
-
-	// maxReportPages bounds how many pages SumExpensesByCategory will walk
-	// for a single budget's actual-spend computation (100 * 50 = 5,000
-	// transactions), so a pathological account can never make a report
-	// request loop unboundedly.
-	maxReportPages = 50
-
-	// requestTimeout bounds each individual outbound call to expense-service.
-	// This is an internal, same-datacenter call (docker/K8s network), so a
-	// couple of seconds is generous, not tight.
-	requestTimeout = 3 * time.Second
-)
+// requestTimeout bounds each individual outbound call to expense-service.
+// This is an internal, same-datacenter call (docker/K8s network), so a
+// couple of seconds is generous, not tight.
+const requestTimeout = 3 * time.Second
 
 // ExpenseHTTPClient implements domain.ExpenseClient against expense-service's
 // real HTTP API, reusing the gateway's trusted X-User-Id header contract
@@ -55,14 +42,12 @@ func NewExpenseHTTPClient(baseURL string) *ExpenseHTTPClient {
 	return &ExpenseHTTPClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		// &http.Client{} alone inherits http.DefaultTransport's
-		// MaxIdleConnsPerHost: 2 — pathological here, since this is the
-		// client SumExpensesByCategory drives in a loop of up to
-		// maxReportPages concurrent-capable calls per budget, against a
-		// single host (expense-service). See shared/httpclient's doc
-		// comment for what the default actually does under load. Each
-		// individual call still gets its own bounded deadline via doGet's
-		// context.WithTimeout(ctx, requestTimeout) — this only fixes
-		// connection reuse, not per-call timeouts.
+		// MaxIdleConnsPerHost: 2 — see shared/httpclient's doc comment for
+		// what that default does under sustained load. This is the busiest
+		// internal-network client in the fleet outside the gateway itself.
+		// Each individual call still gets its own bounded deadline via
+		// doGet's context.WithTimeout(ctx, requestTimeout) — this only
+		// fixes connection reuse, not per-call timeouts.
 		http: &http.Client{Transport: httpclient.NewTransport()},
 	}
 }
@@ -84,10 +69,13 @@ type categoryDTO struct {
 	Type string `json:"type"`
 }
 
-type transactionDTO struct {
-	ID     string  `json:"id"`
-	Type   string  `json:"type"`
-	Amount float64 `json:"amount"`
+// categoryTotalDTO mirrors one entry of expense-service's GET
+// /transactions/aggregate response — see that endpoint's openapi.yaml
+// entry for the wire shape.
+type categoryTotalDTO struct {
+	CategoryID string  `json:"category_id"`
+	Total      float64 `json:"total"`
+	Count      int64   `json:"count"`
 }
 
 // doGet performs an authenticated (X-User-Id) GET against expense-service and
@@ -132,81 +120,76 @@ func (c *ExpenseHTTPClient) doGet(ctx context.Context, userID, path string, quer
 	return &env, nil
 }
 
-// findCategoryIDByName looks up the caller's expense-service categories and
-// returns the id of the one whose name matches categoryName case-
-// insensitively. found is false (with a nil error) if there's no match —
-// that's a normal, non-error outcome (see domain.ExpenseClient).
-func (c *ExpenseHTTPClient) findCategoryIDByName(ctx context.Context, userID, categoryName string) (id string, found bool, err error) {
+// categoriesByID fetches the caller's expense-service categories and
+// returns a map from category id to category name. Needed because the
+// aggregation endpoint groups by category_id (what transactions actually
+// store), while budgets identify their category by name — this is what
+// lets SumExpensesByCategory translate one to the other.
+func (c *ExpenseHTTPClient) categoriesByID(ctx context.Context, userID string) (map[string]string, error) {
 	env, err := c.doGet(ctx, userID, "/api/v1/categories", nil)
 	if err != nil {
-		return "", false, err
+		return nil, err
 	}
 
 	var body struct {
 		Categories []categoryDTO `json:"categories"`
 	}
 	if err := json.Unmarshal(env.Data, &body); err != nil {
-		return "", false, fmt.Errorf("decoding categories response: %w", err)
+		return nil, fmt.Errorf("decoding categories response: %w", err)
 	}
 
+	names := make(map[string]string, len(body.Categories))
 	for _, cat := range body.Categories {
-		if strings.EqualFold(cat.Name, categoryName) {
-			return cat.ID, true, nil
-		}
+		names[cat.ID] = cat.Name
 	}
-	return "", false, nil
+	return names, nil
 }
 
-// SumExpensesByCategory implements domain.ExpenseClient. See the interface
-// doc comment for the category-not-found contract.
+// SumExpensesByCategory implements domain.ExpenseClient. See the
+// interface's doc comment for the full contract.
 //
-// expense-service's transaction list filters ?category=<id> by category_id,
-// not by name (a known pre-existing wrinkle — see
-// expense-service/internal/repository/mongo_transaction.go's
-// buildTransactionFilter), which is why a category-name-to-id lookup happens
-// first. Its ListTransactionsInput/TransactionFilter also has no server-side
-// "type" filter, so income/expense filtering is done client-side here on
-// each page's results instead of trusting the ?type= query param.
-func (c *ExpenseHTTPClient) SumExpensesByCategory(ctx context.Context, userID, categoryName string, from, to time.Time) (float64, error) {
-	categoryID, found, err := c.findCategoryIDByName(ctx, userID, categoryName)
+// Exactly two calls, regardless of how many budgets or categories the
+// caller has: one to resolve category id -> name (categoriesByID), one to
+// expense-service's GET /transactions/aggregate for every category's
+// total in [from, to]. This replaces what used to be a category-name-to-id
+// lookup PLUS a full paginated transaction walk, per call, per budget (see
+// infrastructure/scale-readiness-review.html finding F01) — B budgets used
+// to mean B*(1+P) internal HTTP requests; this is 2, independent of B.
+func (c *ExpenseHTTPClient) SumExpensesByCategory(ctx context.Context, userID string, from, to time.Time) ([]domain.ExpenseSummary, error) {
+	names, err := c.categoriesByID(ctx, userID)
 	if err != nil {
-		return 0, err
-	}
-	if !found {
-		return 0, nil
+		return nil, err
 	}
 
-	var total float64
-	for page := 1; page <= maxReportPages; page++ {
-		query := url.Values{}
-		query.Set("category", categoryID)
-		query.Set("from", from.Format(time.RFC3339))
-		query.Set("to", to.Format(time.RFC3339))
-		query.Set("page", strconv.Itoa(page))
-		query.Set("page_size", strconv.Itoa(reportPageSize))
+	query := url.Values{}
+	query.Set("from", from.Format(time.RFC3339))
+	query.Set("to", to.Format(time.RFC3339))
+	query.Set("type", "expense")
 
-		env, err := c.doGet(ctx, userID, "/api/v1/transactions", query)
-		if err != nil {
-			return 0, err
-		}
-
-		var body struct {
-			Transactions []transactionDTO `json:"transactions"`
-		}
-		if err := json.Unmarshal(env.Data, &body); err != nil {
-			return 0, fmt.Errorf("decoding transactions response: %w", err)
-		}
-
-		for _, tx := range body.Transactions {
-			if tx.Type == "expense" {
-				total += tx.Amount
-			}
-		}
-
-		if len(body.Transactions) < reportPageSize {
-			break // last page
-		}
+	env, err := c.doGet(ctx, userID, "/api/v1/transactions/aggregate", query)
+	if err != nil {
+		return nil, err
 	}
 
-	return total, nil
+	var body struct {
+		Categories []categoryTotalDTO `json:"categories"`
+	}
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		return nil, fmt.Errorf("decoding aggregate response: %w", err)
+	}
+
+	summaries := make([]domain.ExpenseSummary, 0, len(body.Categories))
+	for _, ct := range body.Categories {
+		name, ok := names[ct.CategoryID]
+		if !ok {
+			// A category the aggregation grouped by no longer exists in the
+			// caller's category list (e.g. deleted after a transaction that
+			// referenced it was created) — nothing meaningful to match it
+			// against, so skip it rather than surfacing an unnamed entry no
+			// budget could ever match.
+			continue
+		}
+		summaries = append(summaries, domain.ExpenseSummary{Category: name, Actual: ct.Total})
+	}
+	return summaries, nil
 }

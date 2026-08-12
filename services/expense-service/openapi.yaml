@@ -237,6 +237,62 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /api/v1/transactions/aggregate:
+    get:
+      tags: [transactions]
+      summary: Per-category totals for a date range, in one query
+      description: >
+        Groups the caller's transactions by category and sums amount/count
+        for the requested [from, to] range and type — the fix for the
+        fleet's worst internal request-amplification problem (see
+        infrastructure/scale-readiness-review.html finding F01).
+        budget-service used to compute one budget's actual spend by
+        resolving its category name to an id and then paginating through
+        every matching transaction, summing client-side — once per budget.
+        This endpoint returns every category's total in a single
+        aggregation query, independent of both transaction volume and
+        budget count. Transactions with no category are excluded; a
+        category with no matching transactions in range simply has no
+        entry in the result (not a zero-valued one).
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Inclusive lower bound on transaction date (RFC3339 or YYYY-MM-DD)
+          schema: { type: string }
+        - name: to
+          in: query
+          required: true
+          description: Inclusive upper bound on transaction date (RFC3339 or YYYY-MM-DD)
+          schema: { type: string }
+        - name: type
+          in: query
+          description: Defaults to "expense"
+          schema: { type: string, enum: [income, expense], default: expense }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          categories:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                category_id: { type: string }
+                                total: { type: number }
+                                count: { type: integer }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /api/v1/transactions/import:
     post:
       tags: [transactions]

@@ -136,35 +136,62 @@ func TestOverspendService_HandleTransactionCreated(t *testing.T) {
 		}
 	})
 
-	t.Run("a per-budget expense-client error is logged and does not prevent checking the user's other budgets", func(t *testing.T) {
+	t.Run("a per-period expense-client error is logged and does not prevent checking the user's budgets in other periods", func(t *testing.T) {
 		budgetRepo := newFakeBudgetRepository()
 		ctx := context.Background()
+		now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC) // a Wednesday
 
+		// Two budgets on DIFFERENT periods, so HandleTransactionCreated makes
+		// two separate SumExpensesByCategory calls (one per distinct period
+		// start) rather than one shared call — see overspend_service.go's
+		// doc comment on why isolation is now per-period, not per-budget.
 		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "flaky", Amount: 100, Period: domain.PeriodMonthly}); err != nil {
 			t.Fatalf("setup create failed: %v", err)
 		}
-		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "groceries", Amount: 100, Period: domain.PeriodMonthly}); err != nil {
+		if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: "groceries", Amount: 100, Period: domain.PeriodWeekly}); err != nil {
 			t.Fatalf("setup create failed: %v", err)
 		}
 
-		expenseClient := &erroringForCategoryExpenseClient{
-			errorFor: "flaky",
-			err:      errors.New("expense-service unreachable"),
-			byCategory: map[string]float64{
-				"groceries": 150,
-			},
+		monthlyStart := currentPeriodStart(domain.PeriodMonthly, now)
+		expenseClient := &fakeExpenseClient{
+			errForFrom:    &monthlyStart,
+			errForFromErr: errors.New("expense-service unreachable"),
+			byCategory:    map[string]float64{"groceries": 150},
 		}
 		pub := &fakeEventPublisher{}
 		svc := NewOverspendService(budgetRepo, expenseClient, pub, discardLogger())
 
-		if err := svc.HandleTransactionCreated(ctx, "user-1", time.Now().UTC()); err != nil {
-			t.Fatalf("expected HandleTransactionCreated to return nil (per-budget errors are logged, not propagated), got: %v", err)
+		if err := svc.HandleTransactionCreated(ctx, "user-1", now); err != nil {
+			t.Fatalf("expected HandleTransactionCreated to return nil (per-period errors are logged, not propagated), got: %v", err)
 		}
 		if len(pub.published) != 1 {
-			t.Fatalf("published = %d, want 1 (the healthy budget should still be checked despite the other's expense-client error)", len(pub.published))
+			t.Fatalf("published = %d, want 1 (the weekly budget's period should still be checked despite the monthly period's expense-client error)", len(pub.published))
 		}
 		if pub.published[0].Category != "groceries" {
 			t.Errorf("published category = %q, want groceries", pub.published[0].Category)
+		}
+	})
+
+	t.Run("budgets sharing the same period make exactly one expense-client call, not one per budget", func(t *testing.T) {
+		budgetRepo := newFakeBudgetRepository()
+		ctx := context.Background()
+		now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
+
+		for _, cat := range []string{"groceries", "rent", "utilities"} {
+			if _, err := NewBudgetService(budgetRepo).Create(ctx, "user-1", domain.CreateBudgetInput{Category: cat, Amount: 100, Period: domain.PeriodMonthly}); err != nil {
+				t.Fatalf("setup create failed: %v", err)
+			}
+		}
+
+		expenseClient := &fakeExpenseClient{byCategory: map[string]float64{}}
+		pub := &fakeEventPublisher{}
+		svc := NewOverspendService(budgetRepo, expenseClient, pub, discardLogger())
+
+		if err := svc.HandleTransactionCreated(ctx, "user-1", now); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(expenseClient.calls) != 1 {
+			t.Fatalf("expenseClient.calls = %d, want 1 for three budgets sharing one period — this is the whole point of F01's grouping", len(expenseClient.calls))
 		}
 	})
 
@@ -227,22 +254,6 @@ func TestCurrentPeriodStart(t *testing.T) {
 			}
 		})
 	}
-}
-
-// erroringForCategoryExpenseClient errors only for one specific category
-// name, succeeding normally for every other — used to prove one budget's
-// expense-client failure doesn't abort checking a user's other budgets.
-type erroringForCategoryExpenseClient struct {
-	errorFor   string
-	err        error
-	byCategory map[string]float64
-}
-
-func (f *erroringForCategoryExpenseClient) SumExpensesByCategory(_ context.Context, _, categoryName string, _, _ time.Time) (float64, error) {
-	if categoryName == f.errorFor {
-		return 0, f.err
-	}
-	return f.byCategory[categoryName], nil
 }
 
 // erroringListBudgetRepository fails ListByUser unconditionally, to prove a

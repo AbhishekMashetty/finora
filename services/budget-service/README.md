@@ -115,12 +115,15 @@ the full contract):
   after every transaction write) via a durable consumer
   (`budget-service-transaction-created`). On receipt,
   `internal/service/overspend_service.go`'s `OverspendService.HandleTransactionCreated`
-  lists the event's user's budgets and, for each, recomputes the **current
-  period's** actual spend via the existing `expenseClient.SumExpensesByCategory`
-  REST call (the same synchronous query `Summary()` uses — kept as REST,
-  since it's a genuine query, not a notification). A per-budget
-  expense-service error is logged and skipped, not fatal to checking the
-  user's other budgets.
+  lists the event's user's budgets, groups them by distinct period start
+  (weekly/monthly/yearly budgets each have their own), and for each group
+  recomputes that **current period's** actual spend via the existing
+  `expenseClient.SumExpensesByCategory` REST call (the same synchronous
+  query `Summary()` uses, and — as of the F01 fix — one aggregation call
+  per distinct period, not one call per budget; see
+  `architecture/api-contracts.md`'s cross-service call section). A given
+  period's expense-service error is logged and skipped, not fatal to
+  checking the user's budgets in other periods.
 - **Publishes** `finora.budget.overspent` (via `internal/events.OutboxPublisher`,
   the same Mongo-backed outbox pattern expense-service uses) when a budget's
   recomputed actual exceeds its amount, consumed in turn by
@@ -155,6 +158,7 @@ cross-service aggregation.
 | `BUDGET_SERVICE_PORT`         | Port to bind (`0.0.0.0:<port>`)                    | `8083`                  |
 | `BUDGET_SERVICE_MONGO_URI`    | MongoDB connection string (required, no default)   | —                       |
 | `LOG_LEVEL`                   | `debug` / `info` / `warn` / `error`                | `info`                  |
+| `GIN_MODE`                    | Read by gin itself at package init — `release` disables debug-mode route logging | `release` (docker-compose); unset outside a container |
 | `SHUTDOWN_TIMEOUT`            | Graceful-shutdown drain duration (Go duration)     | `10s`                   |
 | `DRAIN_DELAY`                 | Wait between marking not-ready and actually shutting down (Go duration) | `5s` |
 | `CORS_ALLOWED_ORIGINS`        | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |

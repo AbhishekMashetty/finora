@@ -143,6 +143,54 @@ func (r *TransactionRepository) ListByUser(ctx context.Context, userID string, f
 	return domain.TransactionPage{Transactions: transactions, Total: total}, nil
 }
 
+// AggregateByCategory implements domain.TransactionRepository. The $match
+// stage's {user_id, date range} leading shape mirrors idx_user_category_date
+// (see mongo.go's EnsureIndexes) so this is an index scan feeding the
+// $group, not a collection scan — cost is proportional to the user's
+// transaction count in range, same as any query here, but the RESULT is
+// bounded by the user's category count (typically tens), not by how many
+// transactions or pages exist, which is what makes this safe to call once
+// per report/overspend-check instead of the old per-category pagination
+// loop it replaces.
+func (r *TransactionRepository) AggregateByCategory(ctx context.Context, userID string, txType domain.TransactionType, from, to time.Time) ([]domain.CategoryTotal, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{
+			{Key: "user_id", Value: userID},
+			{Key: "type", Value: string(txType)},
+			{Key: "category_id", Value: bson.D{{Key: "$ne", Value: nil}}},
+			{Key: "date", Value: bson.D{{Key: "$gte", Value: from}, {Key: "$lte", Value: to}}},
+		}}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$category_id"},
+			{Key: "total", Value: bson.D{{Key: "$sum", Value: "$amount"}}},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+	}
+
+	cur, err := r.col.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	totals := make([]domain.CategoryTotal, 0)
+	for cur.Next(ctx) {
+		var row struct {
+			CategoryID string  `bson:"_id"`
+			Total      float64 `bson:"total"`
+			Count      int64   `bson:"count"`
+		}
+		if err := cur.Decode(&row); err != nil {
+			return nil, err
+		}
+		totals = append(totals, domain.CategoryTotal{CategoryID: row.CategoryID, Total: row.Total, Count: row.Count})
+	}
+	if err := cur.Err(); err != nil {
+		return nil, err
+	}
+	return totals, nil
+}
+
 func (r *TransactionRepository) GetByIDForUser(ctx context.Context, id, userID string) (*domain.Transaction, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {

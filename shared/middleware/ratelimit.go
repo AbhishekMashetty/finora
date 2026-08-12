@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"hash/fnv"
 	"net/http"
 	"sync"
 	"time"
@@ -16,6 +17,32 @@ import (
 type visitor struct {
 	limiter  *rate.Limiter
 	lastSeen time.Time
+}
+
+// rateLimitShardCount splits the visitors map (and its guarding mutex)
+// into this many independent shards, so a request for one client IP never
+// contends on the same lock as a request for an unrelated one, and the
+// periodic staleness sweep (see below) only ever holds one shard's lock at
+// a time instead of the whole map's. Without sharding, every request in
+// the fleet serializes through a single mutex, and the once-a-minute sweep
+// iterating the entire map while holding that same mutex becomes a
+// stop-the-world pause for all inbound traffic once the visitor count
+// reaches real production scale (hundreds of thousands of distinct IPs).
+const rateLimitShardCount = 64
+
+type rateLimitShard struct {
+	mu       sync.Mutex
+	visitors map[string]*visitor
+}
+
+// shardFor picks a deterministic shard for ip via FNV-1a — fast,
+// dependency-free (stdlib hash/fnv), and not required to be
+// cryptographically strong since the only property that matters here is
+// spreading distinct IPs roughly evenly across shards.
+func shardFor(shards []*rateLimitShard, ip string) *rateLimitShard {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(ip))
+	return shards[h.Sum32()%rateLimitShardCount]
 }
 
 // RateLimit is gateway-only, by the same reasoning CLAUDE.md §5 already
@@ -37,14 +64,24 @@ type visitor struct {
 // replica has its own independent bucket), and that's the legitimate
 // reason to introduce Redis for this, not before.
 //
-// Keyed by client IP (gin's c.ClientIP(), which already respects
-// configured trusted-proxy headers) rather than authenticated user ID,
-// because rate limiting has to cover the public, unauthenticated routes
-// too (register/login/refresh/password-reset) — precisely the endpoints
-// most worth protecting from brute-force, and JWT validation for
+// Keyed by client IP (gin's c.ClientIP()) rather than authenticated user
+// ID, because rate limiting has to cover the public, unauthenticated
+// routes too (register/login/refresh/password-reset) — precisely the
+// endpoints most worth protecting from brute-force, and JWT validation for
 // protected routes happens later in the chain (authmw, only in the
 // catch-all route resolver), so a user ID isn't available this early for
 // every request uniformly.
+//
+// c.ClientIP()'s own trustworthiness depends entirely on the engine's
+// trusted-proxy configuration: gin.New() defaults to trusting every remote
+// IP as a proxy ([]string{"0.0.0.0/0", "::/0"}), which means, unless the
+// caller has configured otherwise, ClientIP() honors a client-supplied
+// X-Forwarded-For unconditionally — an external attacker can put any
+// value there and get a fresh rate-limit budget on every request, making
+// this middleware enforce nothing. See the gateway's router.New, which
+// calls SetTrustedProxies(nil) (or a configured list of real upstream
+// proxies) for exactly this reason; this middleware trusts that call has
+// already happened and does no CIDR validation of its own.
 //
 // RateLimit returns gin middleware enforcing a token-bucket limit of
 // requestsPerSecond sustained per client IP, allowing short bursts up to
@@ -66,41 +103,50 @@ func RateLimit(requestsPerSecond float64, burst int) gin.HandlerFunc {
 		return func(c *gin.Context) { c.Next() }
 	}
 
-	var (
-		mu       sync.Mutex
-		visitors = make(map[string]*visitor)
-	)
+	shards := make([]*rateLimitShard, rateLimitShardCount)
+	for i := range shards {
+		shards[i] = &rateLimitShard{visitors: make(map[string]*visitor)}
+	}
 
 	// Sweep stale entries periodically so a client that stops sending
 	// requests doesn't keep its limiter (and map slot) alive forever —
 	// unbounded per-IP map growth would itself be a resource-exhaustion
 	// vector, the exact thing this middleware exists to prevent in the
-	// first place.
+	// first place. One shard per tick, not the whole map at once: a full
+	// sweep cycle still completes roughly once a minute (rateLimitShardCount
+	// ticks at time.Minute/rateLimitShardCount apart), but each tick only
+	// ever holds one shard's mutex, so it can never become a stop-the-world
+	// pause for every other shard's concurrent requests the way sweeping a
+	// single unsharded map under one mutex would.
 	go func() {
+		idx := 0
 		for {
-			time.Sleep(time.Minute)
-			mu.Lock()
-			for ip, v := range visitors {
+			time.Sleep(time.Minute / rateLimitShardCount)
+			sh := shards[idx%rateLimitShardCount]
+			idx++
+			sh.mu.Lock()
+			for ip, v := range sh.visitors {
 				if time.Since(v.lastSeen) > 3*time.Minute {
-					delete(visitors, ip)
+					delete(sh.visitors, ip)
 				}
 			}
-			mu.Unlock()
+			sh.mu.Unlock()
 		}
 	}()
 
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
+		sh := shardFor(shards, ip)
 
-		mu.Lock()
-		v, ok := visitors[ip]
+		sh.mu.Lock()
+		v, ok := sh.visitors[ip]
 		if !ok {
 			v = &visitor{limiter: rate.NewLimiter(rate.Limit(requestsPerSecond), burst)}
-			visitors[ip] = v
+			sh.visitors[ip] = v
 		}
 		v.lastSeen = time.Now()
 		allowed := v.limiter.Allow()
-		mu.Unlock()
+		sh.mu.Unlock()
 
 		if !allowed {
 			httpx.Fail(c, http.StatusTooManyRequests, httpx.CodeRateLimited, "too many requests, slow down and try again", nil)

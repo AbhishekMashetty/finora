@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/finora/expense-service/internal/domain"
 )
@@ -150,6 +151,33 @@ func (f *fakeTransactionRepository) DeleteByIDForUser(_ context.Context, id, use
 	}
 	delete(f.transactions, id)
 	return nil
+}
+
+// AggregateByCategory mirrors the real Mongo aggregation pipeline
+// (mongo_transaction.go): group by category_id, sum amount, count, scoped
+// to userID/txType/[from, to], excluding transactions with no category.
+func (f *fakeTransactionRepository) AggregateByCategory(_ context.Context, userID string, txType domain.TransactionType, from, to time.Time) ([]domain.CategoryTotal, error) {
+	totals := make(map[string]*domain.CategoryTotal)
+	for _, t := range f.transactions {
+		if t.UserID != userID || t.Type != txType || t.CategoryID == nil {
+			continue
+		}
+		if t.Date.Before(from) || t.Date.After(to) {
+			continue
+		}
+		ct, ok := totals[*t.CategoryID]
+		if !ok {
+			ct = &domain.CategoryTotal{CategoryID: *t.CategoryID}
+			totals[*t.CategoryID] = ct
+		}
+		ct.Total += t.Amount
+		ct.Count++
+	}
+	out := make([]domain.CategoryTotal, 0, len(totals))
+	for _, ct := range totals {
+		out = append(out, *ct)
+	}
+	return out, nil
 }
 
 // fakeCategoryRepository is a hand-written in-memory stand-in for

@@ -28,6 +28,7 @@ never confirm the existence of another user's data.
 | PUT    | `/api/v1/transactions/:id`| `{account_id, category_id?, type, amount, currency, date, note?}` | `200 {transaction}`                    |
 | DELETE | `/api/v1/transactions/:id`| -                                                            | `204`                                        |
 | POST   | `/api/v1/transactions/import` | `multipart/form-data: account_id, file` (CSV)           | `200 {imported, skipped, errors: [{row, message}]}` |
+| GET    | `/api/v1/transactions/aggregate` | query: `from, to` (required), `type` (default `expense`) | `200 {categories: [{category_id, total, count}]}` |
 | GET    | `/api/v1/categories`      | -                                                            | `200 {categories: []}`                       |
 | POST   | `/api/v1/categories`      | `{name, type}`                                               | `201 {category}`                            |
 
@@ -46,6 +47,20 @@ previously `page` echoed back `0` whenever `?page=` was omitted, and
 `page_size` wasn't returned at all). Optional filters: `account_id`,
 `category`, and a `from`/`to` date range applied to the transaction's `date`
 field (accepts RFC3339 or `YYYY-MM-DD`).
+
+### Category aggregation
+
+`GET /transactions/aggregate` returns every category's total amount and
+transaction count for a `[from, to]` range and `type` (default `expense`) in
+a single `$match`+`$group` Mongo aggregation — one query, independent of
+transaction volume or how many categories exist. This is what
+budget-service's reports and overspend checks call instead of paginating
+through `/transactions` once per category; see
+`architecture/api-contracts.md`'s cross-service call section and
+`infrastructure/scale-readiness-review.html` finding F01 for why that
+mattered. `from`/`to` are required (RFC3339 or `YYYY-MM-DD`); transactions
+with no `category_id` are excluded, and a category with no matching
+transactions in range simply has no entry in the result.
 
 ### CSV import
 
@@ -106,6 +121,7 @@ Also serves `GET /openapi.yaml` — this service's spec, live from disk (see
 | `EXPENSE_SERVICE_PORT`        | Port to bind (`0.0.0.0:<port>`)                    | `8082`                                             |
 | `EXPENSE_SERVICE_MONGO_URI`   | MongoDB connection string (required, no default)   | `mongodb://mongo-expense:27017/finora_expenses`   |
 | `LOG_LEVEL`                   | `debug`, `info` (default), `warn`, `error`         | `info`                                             |
+| `GIN_MODE`                    | Read by gin itself at package init — `release` disables debug-mode route logging | `release` (docker-compose); unset outside a container |
 | `SHUTDOWN_TIMEOUT`            | Graceful shutdown drain window                     | `10s`                                              |
 | `DRAIN_DELAY`                 | Wait between marking not-ready and actually shutting down | `5s`                                        |
 | `CORS_ALLOWED_ORIGINS`        | Accepted for config-load compatibility but **unused** — CORS is applied only by the gateway (see `architecture/api-contracts.md`); a backend applying it too duplicates the header via the reverse proxy | `http://localhost:3000` |

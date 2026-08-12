@@ -27,6 +27,18 @@ type Config struct {
 	DrainDelay         time.Duration
 	CORSAllowedOrigins []string
 
+	// TrustedProxies is passed to gin.Engine.SetTrustedProxies in
+	// cmd/server/main.go. gin.New() defaults to trusting every remote IP as
+	// a proxy, which means (unless this is set) c.ClientIP() honors a
+	// client-supplied X-Forwarded-For unconditionally — an external
+	// attacker can put anything there and get a fresh rate-limit budget on
+	// every request (see shared/middleware.RateLimit's doc comment). Empty
+	// by default: no proxy trusted, ClientIP() always falls back to the
+	// direct TCP connection's address, which a request header can't spoof.
+	// Set to the real upstream proxy's CIDR(s) (an ingress controller, a
+	// cloud load balancer) once one sits in front of the gateway.
+	TrustedProxies []string
+
 	// RateLimitRequestsPerSecond/RateLimitBurst configure
 	// shared/middleware.RateLimit — see that file's doc comment for why
 	// this lives only in the gateway. Defaults (10 req/s sustained, burst
@@ -67,6 +79,7 @@ func Load() Config {
 		ShutdownTimeout:    config.GetEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 		DrainDelay:         config.GetEnvDuration("DRAIN_DELAY", 5*time.Second),
 		CORSAllowedOrigins: splitAndTrim(origins),
+		TrustedProxies:     splitAndTrim(config.GetEnv("TRUSTED_PROXIES", "")),
 
 		RateLimitRequestsPerSecond: config.GetEnvInt("RATE_LIMIT_REQUESTS_PER_SECOND", 10),
 		RateLimitBurst:             config.GetEnvInt("RATE_LIMIT_BURST", 20),

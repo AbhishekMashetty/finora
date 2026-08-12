@@ -61,6 +61,22 @@ type TransactionPage struct {
 	Total        int64
 }
 
+// CategoryTotal is one category's aggregated transaction total for a
+// requested [from, to] range and transaction type — the result shape
+// AggregateByCategory returns. This is the fix for the fleet's worst
+// internal-request-amplification problem (see
+// infrastructure/scale-readiness-review.html, finding F01):
+// budget-service used to compute one budget's actual spend by resolving
+// its category name to an id and then paginating through every matching
+// transaction, client-side-summing as it went — repeated once per budget.
+// A single aggregation query returns every category's total in one round
+// trip, independent of both transaction volume and budget count.
+type CategoryTotal struct {
+	CategoryID string  `json:"category_id"`
+	Total      float64 `json:"total"`
+	Count      int64   `json:"count"`
+}
+
 // TransactionRepository persists and queries Transaction documents, always
 // scoped to a specific owning user.
 type TransactionRepository interface {
@@ -69,6 +85,21 @@ type TransactionRepository interface {
 	GetByIDForUser(ctx context.Context, id, userID string) (*Transaction, error)
 	Update(ctx context.Context, tx *Transaction) error
 	DeleteByIDForUser(ctx context.Context, id, userID string) error
+	// AggregateByCategory sums amount and counts transactions of txType
+	// within [from, to], grouped by category_id, for one user. Transactions
+	// with no category (CategoryID nil) are excluded — there's nothing
+	// meaningful to group them under. One entry per category the user
+	// actually has a matching transaction in; a category with none simply
+	// has no entry (not a zero-valued one).
+	AggregateByCategory(ctx context.Context, userID string, txType TransactionType, from, to time.Time) ([]CategoryTotal, error)
+}
+
+// AggregateByCategoryInput carries validated params for
+// TransactionService.AggregateByCategory.
+type AggregateByCategoryInput struct {
+	Type TransactionType
+	From time.Time
+	To   time.Time
 }
 
 // TransactionService is the business-logic surface handlers depend on.
@@ -79,6 +110,7 @@ type TransactionService interface {
 	Update(ctx context.Context, userID, id string, in UpdateTransactionInput) (*Transaction, error)
 	Delete(ctx context.Context, userID, id string) error
 	Import(ctx context.Context, userID, accountID string, rows []ImportRow) (ImportResult, error)
+	AggregateByCategory(ctx context.Context, userID string, in AggregateByCategoryInput) ([]CategoryTotal, error)
 }
 
 // ImportRow is one CSV data row, still raw strings — column parsing

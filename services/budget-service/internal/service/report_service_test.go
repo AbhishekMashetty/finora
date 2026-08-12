@@ -12,22 +12,51 @@ import (
 )
 
 // fakeExpenseClient is a hand-written fake of domain.ExpenseClient so
-// report_service can be tested without any live HTTP call to
-// expense-service, per CLAUDE.md §7 (no live Mongo/HTTP in unit tests).
+// report_service and overspendService can be tested without any live HTTP
+// call to expense-service, per CLAUDE.md §7 (no live Mongo/HTTP in unit
+// tests). Since the real interface now returns every category's total in
+// one call (see domain.ExpenseClient's doc comment / F01) rather than one
+// category per call, a budget whose category has no entry in byCategory
+// simply gets no matching domain.ExpenseSummary back — the caller-side
+// "no match -> actual=0" contract lives in report_service.go/
+// overspend_service.go's own map lookups, not in this fake.
 type fakeExpenseClient struct {
-	// byCategory maps a category name (case-sensitive, tests use exact
-	// matches) to the actual-spend figure that category should report.
-	// Categories absent from this map return (0, nil), mirroring the real
-	// client's "no matching expense-service category" contract.
+	// byCategory maps a category name (case-sensitive; tests use exact
+	// matches) to the actual-spend figure that category should report,
+	// for any [from, to] range requested.
 	byCategory map[string]float64
-	err        error
+
+	// err, if set, is returned unconditionally by every call.
+	err error
+
+	// errForFrom, if non-nil, makes SumExpensesByCategory fail only for
+	// calls whose `from` argument equals this exact time — used to prove
+	// one period's expense-client failure doesn't prevent evaluating a
+	// user's budgets in other periods (see
+	// overspend_service_test.go's per-period-isolation test).
+	errForFrom    *time.Time
+	errForFromErr error
+
+	calls []expenseClientCall
 }
 
-func (f *fakeExpenseClient) SumExpensesByCategory(ctx context.Context, userID, categoryName string, from, to time.Time) (float64, error) {
-	if f.err != nil {
-		return 0, f.err
+type expenseClientCall struct {
+	from, to time.Time
+}
+
+func (f *fakeExpenseClient) SumExpensesByCategory(_ context.Context, _ string, from, to time.Time) ([]domain.ExpenseSummary, error) {
+	f.calls = append(f.calls, expenseClientCall{from, to})
+	if f.errForFrom != nil && from.Equal(*f.errForFrom) {
+		return nil, f.errForFromErr
 	}
-	return f.byCategory[categoryName], nil
+	if f.err != nil {
+		return nil, f.err
+	}
+	summaries := make([]domain.ExpenseSummary, 0, len(f.byCategory))
+	for cat, amt := range f.byCategory {
+		summaries = append(summaries, domain.ExpenseSummary{Category: cat, Actual: amt})
+	}
+	return summaries, nil
 }
 
 // discardLogger is a *slog.Logger that writes nowhere, for tests that don't

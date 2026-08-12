@@ -63,9 +63,11 @@ string unchanged — the gateway does no path rewriting.
 | `NOTIFICATION_SERVICE_URL`   | Base URL of notification-service                      |
 | `JWT_ACCESS_SECRET`          | HS256 secret used to verify access tokens (must match user-service's signing secret) |
 | `LOG_LEVEL`                  | `debug`/`info`/`warn`/`error` (default `info`)         |
+| `GIN_MODE`                   | Read by gin itself at package init, not by this repo's code — `release` disables gin's debug-mode route logging (default `release` in docker-compose; unset outside a container) |
 | `SHUTDOWN_TIMEOUT`           | Graceful shutdown drain period, e.g. `10s` (default `10s`) |
 | `DRAIN_DELAY`                | Wait between marking not-ready and actually shutting down, e.g. `5s` (default `5s`) |
 | `CORS_ALLOWED_ORIGINS`       | Comma-separated list of allowed origins (default `http://localhost:3000`) |
+| `TRUSTED_PROXIES`            | Comma-separated CIDRs/IPs of real upstream proxies (an ingress, a cloud LB) to trust for `X-Forwarded-For`. Empty by default — no proxy trusted, `ClientIP()` always uses the direct connection address. **Never** set this to `0.0.0.0/0`; an untrusted or overly broad value lets a client spoof the IP `RATE_LIMIT_*` buckets on (see `shared/middleware.RateLimit`'s doc comment). |
 | `RATE_LIMIT_REQUESTS_PER_SECOND` | Per-client-IP sustained request rate (default `10`); `<= 0` disables rate limiting |
 | `RATE_LIMIT_BURST`           | Per-client-IP burst allowance above the sustained rate (default `20`); `<= 0` disables rate limiting |
 | `MAX_REQUEST_BODY_BYTES`     | Max request body size in bytes before a `400 VALIDATION_ERROR` (default `1048576`, 1 MiB); `<= 0` disables the limit |

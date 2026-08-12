@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/finora/budget-service/internal/domain"
@@ -48,28 +49,48 @@ func NewOverspendService(budgetRepo domain.BudgetRepository, expenseClient domai
 // in (rather than read via time.Now() here) purely so tests can control
 // which period gets evaluated deterministically.
 //
-// A single budget's expense-client failure is logged and does NOT abort
-// checking the user's other budgets — one flaky lookup shouldn't prevent
-// every other budget from being correctly evaluated.
+// Budgets don't all share one [from, now] range the way a report's do —
+// each budget's Period (weekly/monthly/yearly) gives it its own period
+// start — so this groups budgets by their distinct period start and makes
+// one ExpenseClient call per distinct start, not one per budget. In
+// practice that's at most 3 calls (one per Period value in use), down from
+// one per budget before F01, and exactly 1 for the overwhelmingly common
+// case of a user whose budgets are all the same cadence.
+//
+// A given period's expense-client failure is logged and does NOT abort
+// checking the user's budgets in other periods — one flaky lookup
+// shouldn't prevent every other period's budgets from being correctly
+// evaluated. It does mean every budget sharing that period is skipped
+// together this pass (they share the one call that failed), not evaluated
+// individually — a deliberate trade of the finer-grained-but-artificial
+// per-category isolation the old per-budget-call design had, for the real
+// win of not making that call once per budget in the first place.
 func (s *OverspendService) HandleTransactionCreated(ctx context.Context, userID string, now time.Time) error {
 	budgets, err := s.budgetRepo.ListByUser(ctx, userID)
 	if err != nil {
 		return err
 	}
 
+	actualsByPeriodStart := make(map[time.Time]map[string]float64)
 	for _, b := range budgets {
 		from := currentPeriodStart(b.Period, now)
-		actual, err := s.expenseClient.SumExpensesByCategory(ctx, userID, b.Category, from, now)
-		if err != nil {
-			s.log.Error("failed to sum expenses while checking for overspend",
-				slog.String("user_id", userID),
-				slog.String("budget_id", b.ID),
-				slog.String("category", b.Category),
-				slog.String("error", err.Error()),
-			)
-			continue
+
+		byCategory, ok := actualsByPeriodStart[from]
+		if !ok {
+			actuals, err := s.expenseClient.SumExpensesByCategory(ctx, userID, from, now)
+			if err != nil {
+				s.log.Error("failed to sum expenses while checking for overspend",
+					slog.String("user_id", userID),
+					slog.Time("period_start", from),
+					slog.String("error", err.Error()),
+				)
+				continue
+			}
+			byCategory = actualsByLowerCategory(actuals)
+			actualsByPeriodStart[from] = byCategory
 		}
 
+		actual := byCategory[strings.ToLower(b.Category)]
 		if b.Amount-actual < 0 {
 			s.notifyIfOverspent(ctx, userID, b, actual, from)
 		}

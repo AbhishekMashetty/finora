@@ -54,7 +54,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	bus, err := eventbus.Connect(cfg.NATSURL)
+	bus, err := eventbus.Connect(cfg.NATSURL, log)
 	if err != nil {
 		log.Error("failed to connect to nats", slog.String("error", err.Error()))
 		os.Exit(1)

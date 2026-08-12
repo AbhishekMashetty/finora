@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -50,7 +51,7 @@ func main() {
 	notificationService := service.NewNotificationService(notificationRepo, emailSender, log)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 
-	bus, err := eventbus.Connect(cfg.NATSURL)
+	bus, err := eventbus.Connect(cfg.NATSURL, log)
 	if err != nil {
 		log.Error("failed to connect to nats", slog.String("error", err.Error()))
 		os.Exit(1)
@@ -72,11 +73,14 @@ func main() {
 			func(ctx context.Context, _ string, data []byte) error {
 				var event domain.BudgetOverspentEvent
 				if err := json.Unmarshal(data, &event); err != nil {
-					// A malformed event is not retryable — acking (returning
-					// nil) is correct here so it doesn't churn through
-					// MaxDeliver retries for a payload that will never parse.
-					log.Error("failed to unmarshal budget.overspent event, discarding", slog.String("error", err.Error()))
-					return nil
+					// A malformed event is not retryable, but it's also not
+					// nothing — wrapping eventbus.ErrTerminal tells Subscribe
+					// to Term() it immediately (no MaxDeliver churn on a
+					// payload that will never parse) AND publish it to a
+					// dead-letter subject, so this failure is a durable,
+					// observable event instead of one that just vanishes
+					// after this log line scrolls off.
+					return fmt.Errorf("%w: unmarshal budget.overspent event: %v", eventbus.ErrTerminal, err)
 				}
 				return overspendConsumer.HandleBudgetOverspent(ctx, event)
 			})

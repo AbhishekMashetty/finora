@@ -303,6 +303,90 @@ func TestGateway_RateLimitAppliesThroughRealConfig(t *testing.T) {
 	}
 }
 
+// TestGateway_DoesNotTrustClientSuppliedForwardedForByDefault is the
+// regression test for F07: gin.New() defaults to trusting every remote IP
+// as a proxy ([]string{"0.0.0.0/0", "::/0"}), which means an unconfigured
+// engine honors a client-supplied X-Forwarded-For unconditionally — an
+// attacker sending a different spoofed value per request would get a
+// fresh shared/middleware.RateLimit budget every time, enforcing nothing.
+// This test replicates cmd/server/main.go's real wiring exactly
+// (cfg.TrustedProxies defaults to empty, and main.go calls
+// engine.SetTrustedProxies(cfg.TrustedProxies) before serving) and proves
+// two requests with different spoofed X-Forwarded-For values still share
+// one rate-limit budget, keyed by the real underlying TCP connection.
+func TestGateway_DoesNotTrustClientSuppliedForwardedForByDefault(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	log := logger.New("gateway-test", "error")
+
+	userSrv := newEchoServer(&echoBackend{})
+	defer userSrv.Close()
+	userProxy, err := proxy.New(userSrv.URL, log)
+	if err != nil {
+		t.Fatalf("failed building user proxy: %v", err)
+	}
+
+	cfg := gwconfig.Config{
+		GatewayPort:                "8080",
+		UserServiceURL:             userSrv.URL,
+		ExpenseServiceURL:          userSrv.URL,
+		BudgetServiceURL:           userSrv.URL,
+		NotificationServiceURL:     userSrv.URL,
+		JWTAccessSecret:            testSecret,
+		LogLevel:                   "error",
+		ShutdownTimeout:            5 * time.Second,
+		CORSAllowedOrigins:         []string{"http://localhost:3000"},
+		RateLimitRequestsPerSecond: 1,
+		RateLimitBurst:             1,
+		// TrustedProxies left at its zero value (nil) — exactly what
+		// gwconfig.Load() defaults to when TRUSTED_PROXIES is unset.
+	}
+
+	engine := router.New(cfg, log, router.Backends{
+		User:         userProxy,
+		Expense:      userProxy,
+		Budget:       userProxy,
+		Notification: userProxy,
+	}, nil)
+	// Mirrors the call cmd/server/main.go makes right after router.New,
+	// before the engine ever serves a request.
+	if err := engine.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		t.Fatalf("SetTrustedProxies: %v", err)
+	}
+	gwSrv := httptest.NewServer(engine)
+	defer gwSrv.Close()
+
+	getWithForwardedFor := func(forwardedFor string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, gwSrv.URL+"/live", nil)
+		if err != nil {
+			t.Fatalf("failed building request: %v", err)
+		}
+		req.Header.Set("X-Forwarded-For", forwardedFor)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		return resp
+	}
+
+	first := getWithForwardedFor("203.0.113.1")
+	first.Body.Close()
+	if first.StatusCode != http.StatusOK {
+		t.Fatalf("first request (spoofed X-Forwarded-For: 203.0.113.1): expected 200 (within burst of 1), got %d", first.StatusCode)
+	}
+
+	// A DIFFERENT spoofed X-Forwarded-For value. If the engine trusted it,
+	// this would look like a brand-new client with a fresh budget and
+	// return 200; since it doesn't, this must still be rate-limited —
+	// proving ClientIP() fell back to the real (shared) connection address.
+	second := getWithForwardedFor("198.51.100.2")
+	defer second.Body.Close()
+	if second.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("second request (different spoofed X-Forwarded-For): expected 429 (still rate-limited on the real client IP), got %d — "+
+			"the engine appears to be trusting a client-supplied X-Forwarded-For", second.StatusCode)
+	}
+}
+
 // TestGateway_BodyLimitAppliesThroughRealConfig proves the full wiring —
 // gwconfig.Config's MaxRequestBodyBytes actually reaching
 // shared/middleware.BodyLimit through router.New — not just the middleware

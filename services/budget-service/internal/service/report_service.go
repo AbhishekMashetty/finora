@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/finora/budget-service/internal/domain"
@@ -39,6 +40,16 @@ func (s *reportService) Summary(ctx context.Context, userID string, from, to tim
 		return nil, err
 	}
 
+	// One call for every budget in this report, not one per budget (see
+	// domain.ExpenseClient's doc comment / F01) — every budget in a report
+	// shares the same caller-supplied [from, to] range by definition, so a
+	// single aggregation covers all of them.
+	actuals, err := s.expenseClient.SumExpensesByCategory(ctx, userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	byCategory := actualsByLowerCategory(actuals)
+
 	summary := &domain.ReportSummary{
 		From:       from.Format(time.RFC3339),
 		To:         to.Format(time.RFC3339),
@@ -47,13 +58,10 @@ func (s *reportService) Summary(ctx context.Context, userID string, from, to tim
 
 	for _, b := range budgets {
 		// A budget whose category name has no match in expense-service's
-		// categories returns actual=0, not an error — the user simply
+		// categories reports actual=0, not an error — the user simply
 		// hasn't logged anything under that name yet (see
 		// domain.ExpenseClient's doc comment).
-		actual, err := s.expenseClient.SumExpensesByCategory(ctx, userID, b.Category, from, to)
-		if err != nil {
-			return nil, err
-		}
+		actual := byCategory[strings.ToLower(b.Category)]
 		remaining := b.Amount - actual
 
 		summary.Categories = append(summary.Categories, domain.CategorySummary{

@@ -47,6 +47,9 @@ func (f *fakeTransactionServiceForImport) Update(context.Context, string, string
 func (f *fakeTransactionServiceForImport) Delete(context.Context, string, string) error {
 	return nil
 }
+func (f *fakeTransactionServiceForImport) AggregateByCategory(context.Context, string, domain.AggregateByCategoryInput) ([]domain.CategoryTotal, error) {
+	return nil, nil
+}
 
 func (f *fakeTransactionServiceForImport) Import(_ context.Context, userID, accountID string, rows []domain.ImportRow) (domain.ImportResult, error) {
 	f.callCount++

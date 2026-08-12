@@ -379,3 +379,91 @@ func TestTransactionService_CrossUserAccess_ReturnsNotFound(t *testing.T) {
 		t.Fatalf("expected ErrNotFound on delete, got %v", err)
 	}
 }
+
+func TestTransactionService_AggregateByCategory(t *testing.T) {
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 1, 31, 23, 59, 59, 0, time.UTC)
+
+	t.Run("groups totals per category, excluding other users, other types, and out-of-range dates", func(t *testing.T) {
+		svc, _, categoryRepo, accountID := setupTransactionServiceWithAccountAndCategory(t, "user-1")
+		ctx := context.Background()
+
+		groceriesCat := &domain.Category{UserID: "user-1", Name: "Groceries", Type: domain.TransactionTypeExpense}
+		if err := categoryRepo.Create(ctx, groceriesCat); err != nil {
+			t.Fatalf("setup category: %v", err)
+		}
+		rentCat := &domain.Category{UserID: "user-1", Name: "Rent", Type: domain.TransactionTypeExpense}
+		if err := categoryRepo.Create(ctx, rentCat); err != nil {
+			t.Fatalf("setup category: %v", err)
+		}
+		groceries, rent := groceriesCat.ID, rentCat.ID
+
+		mustCreateTx(t, svc, "user-1", accountID, &groceries, domain.TransactionTypeExpense, 40, time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC))
+		mustCreateTx(t, svc, "user-1", accountID, &groceries, domain.TransactionTypeExpense, 25, time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC))
+		mustCreateTx(t, svc, "user-1", accountID, &rent, domain.TransactionTypeExpense, 1000, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+		// Out of range: must not be counted.
+		mustCreateTx(t, svc, "user-1", accountID, &groceries, domain.TransactionTypeExpense, 999, time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC))
+		// Wrong type: must not be counted.
+		mustCreateTx(t, svc, "user-1", accountID, &groceries, domain.TransactionTypeIncome, 999, time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC))
+		// No category: must not appear at all.
+		mustCreateTx(t, svc, "user-1", accountID, nil, domain.TransactionTypeExpense, 999, time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC))
+
+		totals, err := svc.AggregateByCategory(ctx, "user-1", domain.AggregateByCategoryInput{
+			Type: domain.TransactionTypeExpense, From: from, To: to,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		byCategory := make(map[string]domain.CategoryTotal, len(totals))
+		for _, ct := range totals {
+			byCategory[ct.CategoryID] = ct
+		}
+
+		if len(totals) != 2 {
+			t.Fatalf("len(totals) = %d, want 2 (got %+v)", len(totals), totals)
+		}
+		g, ok := byCategory[groceries]
+		if !ok || g.Total != 65 || g.Count != 2 {
+			t.Errorf("groceries = %+v (ok=%v), want Total=65 Count=2", g, ok)
+		}
+		r, ok := byCategory[rent]
+		if !ok || r.Total != 1000 || r.Count != 1 {
+			t.Errorf("rent = %+v (ok=%v), want Total=1000 Count=1", r, ok)
+		}
+	})
+
+	t.Run("validation rejects a missing from/to, an invalid type, and to before from", func(t *testing.T) {
+		svc, _, _ := setupTransactionServiceWithAccount(t, "user-1")
+		ctx := context.Background()
+
+		tests := []struct {
+			name string
+			in   domain.AggregateByCategoryInput
+		}{
+			{"missing type", domain.AggregateByCategoryInput{From: from, To: to}},
+			{"missing from", domain.AggregateByCategoryInput{Type: domain.TransactionTypeExpense, To: to}},
+			{"missing to", domain.AggregateByCategoryInput{Type: domain.TransactionTypeExpense, From: from}},
+			{"to before from", domain.AggregateByCategoryInput{Type: domain.TransactionTypeExpense, From: to, To: from}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if _, err := svc.AggregateByCategory(ctx, "user-1", tt.in); err == nil {
+					t.Fatal("expected a validation error, got nil")
+				}
+			})
+		}
+	})
+}
+
+// mustCreateTx creates a transaction directly against svc, failing the
+// test immediately on error — a small helper so AggregateByCategory's
+// table above reads as data, not boilerplate.
+func mustCreateTx(t *testing.T, svc domain.TransactionService, userID, accountID string, categoryID *string, txType domain.TransactionType, amount float64, date time.Time) {
+	t.Helper()
+	if _, err := svc.Create(context.Background(), userID, domain.CreateTransactionInput{
+		AccountID: accountID, CategoryID: categoryID, Type: txType, Amount: amount, Currency: "USD", Date: date,
+	}); err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+}

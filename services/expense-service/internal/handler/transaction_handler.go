@@ -97,6 +97,42 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	})
 }
 
+// Aggregate handles GET /api/v1/transactions/aggregate. It returns each
+// category's total amount and transaction count for the requested [from,
+// to] range and type in a single query — replacing what used to require a
+// caller (budget-service's report and overspend checks, see
+// architecture/scale-readiness-review.html finding F01) to paginate
+// through every matching transaction and sum client-side, once per
+// category it cared about.
+func (h *TransactionHandler) Aggregate(c *gin.Context) {
+	userID := middleware.UserID(c)
+
+	txType := c.DefaultQuery("type", string(domain.TransactionTypeExpense))
+
+	from, ok := parseDate(c.Query("from"))
+	if !ok {
+		httpx.Fail(c, http.StatusBadRequest, httpx.CodeValidation, "from is required and must be RFC3339 or YYYY-MM-DD", gin.H{"field": "from"})
+		return
+	}
+	to, ok := parseDate(c.Query("to"))
+	if !ok {
+		httpx.Fail(c, http.StatusBadRequest, httpx.CodeValidation, "to is required and must be RFC3339 or YYYY-MM-DD", gin.H{"field": "to"})
+		return
+	}
+
+	totals, err := h.svc.AggregateByCategory(c.Request.Context(), userID, domain.AggregateByCategoryInput{
+		Type: domain.TransactionType(txType),
+		From: from,
+		To:   to,
+	})
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, gin.H{"categories": totals})
+}
+
 // Create handles POST /api/v1/transactions.
 func (h *TransactionHandler) Create(c *gin.Context) {
 	userID := middleware.UserID(c)

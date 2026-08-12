@@ -43,6 +43,12 @@ x-go-service-env: &go-service-env
   SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-10s}
   DRAIN_DELAY: ${DRAIN_DELAY:-5s}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+  # gin reads GIN_MODE from the environment itself at package init (no Go
+  # code in this repo calls gin.SetMode) — release mode drops gin's default
+  # debug-mode route-registration logging and internal per-request
+  # bookkeeping. Left unset, `go run`/`go test` outside a container still
+  # default to gin's own DebugMode, which is fine for local iteration.
+  GIN_MODE: ${GIN_MODE:-release}
 
 services:
   # ---------------------------------------------------------------- MongoDB

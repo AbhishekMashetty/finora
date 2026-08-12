@@ -15,6 +15,7 @@ import (
 	"github.com/finora/shared/mongotest"
 	"github.com/finora/shared/natstest"
 	"github.com/finora/shared/outbox"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func discardLogger() *slog.Logger {
@@ -113,7 +114,7 @@ func TestRelay_PublishesUnpublishedEventsAndMarksThemPublished(t *testing.T) {
 	}
 }
 
-func TestRelay_FailedPublishLeavesEventQueuedForNextPoll(t *testing.T) {
+func TestRelay_FailedPublishStaysClaimedUntilItsLockExpiresThenGetsRetried(t *testing.T) {
 	client := mongotest.StartClient(t)
 	db := client.Database("outbox_test")
 	store := outbox.NewStore(db)
@@ -128,15 +129,73 @@ func TestRelay_FailedPublishLeavesEventQueuedForNextPoll(t *testing.T) {
 	pub := &fakePublisher{failNext: 1}
 	relay := outbox.NewRelay(store, pub, discardLogger())
 
-	relay.RelayOnce(ctx) // fails — publish errors, event stays unpublished
+	relay.RelayOnce(ctx) // fails — publish errors, the event stays claimed but unpublished
 	if len(pub.calls()) != 0 {
 		t.Fatalf("expected 0 successful publishes after the simulated failure, got %d", len(pub.calls()))
 	}
 
-	relay.RelayOnce(ctx) // succeeds this time — proves the failed event was retried, not dropped
+	// Immediately retrying must NOT re-publish: a failed publish deliberately
+	// leaves the claim's lock in place (see Relay.publishOne) — a fixed
+	// backoff instead of hot-retrying a dependency that just failed, every
+	// poll interval, which is exactly the retry-storm pattern F09 also fixes
+	// on the consumer side.
+	relay.RelayOnce(ctx)
+	if len(pub.calls()) != 0 {
+		t.Fatalf("expected the event to stay claimed (not retried) immediately after a failed publish, got %d publishes", len(pub.calls()))
+	}
+
+	// Force the claim's lock to look expired the way real wall-clock time
+	// passing (relayLockDuration) would, rather than sleeping 30s in a test.
+	if _, err := db.Collection("outbox_events").UpdateMany(ctx,
+		bson.M{}, bson.M{"$set": bson.M{"locked_until": time.Now().Add(-time.Minute)}}); err != nil {
+		t.Fatalf("force-expire the claim's lock: %v", err)
+	}
+
+	relay.RelayOnce(ctx) // the lock has "expired" — this pass reclaims and retries the event
 	calls := pub.calls()
 	if len(calls) != 1 {
-		t.Fatalf("expected the event to be retried and published on the next pass, got %d publishes", len(calls))
+		t.Fatalf("expected the event to be reclaimed and published once its lock expired, got %d publishes", len(calls))
+	}
+}
+
+// TestRelay_ConcurrentInstancesDoNotDoublePublish is the actual regression
+// test for F04: two Relay instances (standing in for two replicas of the
+// same service) racing RelayOnce against the same Store and the same
+// backlog of events must still publish each event exactly once. This only
+// proves anything against a real MongoDB — the guarantee comes entirely
+// from FindOneAndUpdate's document-level atomicity, which a fake can't
+// exercise.
+func TestRelay_ConcurrentInstancesDoNotDoublePublish(t *testing.T) {
+	client := mongotest.StartClient(t)
+	db := client.Database("outbox_test")
+	store := outbox.NewStore(db)
+	ctx := context.Background()
+	if err := store.EnsureIndexes(ctx); err != nil {
+		t.Fatalf("ensure indexes: %v", err)
+	}
+
+	const eventCount = 20
+	for i := 0; i < eventCount; i++ {
+		if err := store.Enqueue(ctx, "test.subject", []byte("payload"), ""); err != nil {
+			t.Fatalf("enqueue %d: %v", i, err)
+		}
+	}
+
+	pub := &fakePublisher{}
+	relayA := outbox.NewRelay(store, pub, discardLogger())
+	relayB := outbox.NewRelay(store, pub, discardLogger())
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); relayA.RelayOnce(ctx) }()
+	go func() { defer wg.Done(); relayB.RelayOnce(ctx) }()
+	wg.Wait()
+
+	calls := pub.calls()
+	if len(calls) != eventCount {
+		t.Fatalf("expected exactly %d publishes across both relay instances racing on the same %d events, got %d — "+
+			"more than %d means the claim step failed to prevent a double publish",
+			eventCount, eventCount, len(calls), eventCount)
 	}
 }
 
@@ -154,7 +213,7 @@ func TestOutbox_EndToEnd_WithRealNATS(t *testing.T) {
 	}
 
 	natsURL := natstest.StartURL(t)
-	bus, err := eventbus.Connect(natsURL)
+	bus, err := eventbus.Connect(natsURL, discardLogger())
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

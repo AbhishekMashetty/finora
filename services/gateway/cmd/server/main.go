@@ -57,6 +57,17 @@ func main() {
 		Notification: notificationProxy,
 	}, openapiSpec, gate)
 
+	// Must happen before the engine ever serves a request: gin.New()
+	// defaults to trusting every remote IP as a proxy, which would let a
+	// client's own X-Forwarded-For header spoof shared/middleware.RateLimit's
+	// per-IP budget (see TrustedProxies' doc comment in internal/config).
+	// Empty cfg.TrustedProxies (the default) means "trust nobody" —
+	// c.ClientIP() always falls back to the real TCP connection's address.
+	if err := engine.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		log.Error("invalid TRUSTED_PROXIES", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
 	addr := "0.0.0.0:" + cfg.GatewayPort
 	if err := server.Run(addr, engine, log, cfg.ShutdownTimeout, cfg.DrainDelay, gate); err != nil {
 		log.Error("server exited with error", slog.String("error", err.Error()))
