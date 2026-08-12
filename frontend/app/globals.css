@@ -1,74 +1,269 @@
 @import "tailwindcss";
 
-/* Design tokens — see architecture/frontend-design-system.md for the full
- * rationale (palette source, why these exact values, what was rejected).
- * Each token is a CSS variable that flips value under the dark media query
- * below, then mapped to a Tailwind color name via @theme inline — so a plain
- * utility like `bg-surface` or `text-ink-secondary` is correct in both color
- * schemes with no `dark:` variant needed at the call site. */
+/* ============================================================================
+ * Design tokens — see architecture/frontend-design-system.md for the full
+ * rationale (palette source, why these exact values, what was rejected, and
+ * the dataviz-skill provenance of the categorical/sequential/status ramps).
+ *
+ * Theming model: three states, not two.
+ *   1. Bare `:root`            → light values (the default, no JS required).
+ *   2. `@media (prefers-color-scheme: dark)` guarded by `:not([data-theme="light"])`
+ *                               → dark values when the OS prefers dark AND the
+ *                                 user hasn't explicitly forced light.
+ *   3. `:root[data-theme="dark"]` → dark values when the user's toggle choice
+ *                                 (persisted in localStorage, applied by
+ *                                 components/theme/ThemeProvider.tsx) says so,
+ *                                 overriding the OS setting either way.
+ * Every token is a CSS custom property, mapped to a Tailwind color/font name
+ * via `@theme inline` — so a plain utility like `bg-surface` or
+ * `text-ink-secondary` is correct in every theme state with no `dark:`
+ * variant needed at the call site.
+ * ============================================================================ */
+
 :root {
+  color-scheme: light;
+
+  /* ---- Neutral surfaces & ink ---- */
   --plane: #f9f9f7;
   --surface: #fcfcfb;
+  --surface-raised: #ffffff;
   --ink-primary: #0b0b0b;
   --ink-secondary: #52514e;
   --ink-muted: #898781;
   --hairline: rgba(11, 11, 11, 0.1);
+  --hairline-strong: rgba(11, 11, 11, 0.18);
   --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+
+  /* ---- Brand (violet — categorical slot 7, reused so the brand color is
+   * itself already CVD-validated as a chart series) ---- */
   --brand: #4a3aa7;
+  --brand-hover: #3d2f8c;
+  --brand-active: #302470;
+  --brand-subtle: #efecfa;
+  --brand-subtle-border: #d9d0f5;
+  --brand-foreground: #ffffff;
+
+  /* ---- Status (fixed 4-tier — good/warning/serious/critical never themed,
+   * per the dataviz skill's reference palette. warning/serious are sub-3:1
+   * on a light surface BY DESIGN — never render them as bare text, always
+   * pair with an icon + label; see Badge.tsx.) ---- */
   --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-critical: #d03b3b;
   --status-good-text: #006300;
+  --status-good-subtle: #e6f7e6;
+  --status-warning: #fab219;
+  --status-warning-subtle: #fef3dc;
+  --status-serious: #ec835a;
+  --status-serious-subtle: #fde7de;
+  --status-critical: #d03b3b;
+  --status-critical-subtle: #fbe2e2;
+
+  /* ---- Categorical chart palette (fixed order — never cycle, never
+   * reassign by rank; see the dataviz skill's color-formula.md) ---- */
+  --chart-1: #2a78d6; /* blue */
+  --chart-2: #eb6834; /* orange */
+  --chart-3: #1baf7a; /* aqua */
+  --chart-4: #eda100; /* yellow */
+  --chart-5: #e87ba4; /* magenta */
+  --chart-6: #008300; /* green */
+  --chart-7: #4a3aa7; /* violet — same hex as --brand */
+  --chart-8: #e34948; /* red */
+
+  /* ---- Sequential ramp (single hue, light→dark; mode-invariant per the
+   * reference palette — used for magnitude/heatmap encodings) ---- */
+  --seq-blue-100: #cde2fb;
+  --seq-blue-150: #b7d3f6;
+  --seq-blue-200: #9ec5f4;
+  --seq-blue-250: #86b6ef;
+  --seq-blue-300: #6da7ec;
+  --seq-blue-350: #5598e7;
+  --seq-blue-400: #3987e5;
+  --seq-blue-450: #2a78d6;
+  --seq-blue-500: #256abf;
+  --seq-blue-550: #1c5cab;
+  --seq-blue-600: #184f95;
+  --seq-blue-650: #104281;
+  --seq-blue-700: #0d366b;
+
+  /* ---- Diverging pair (blue ↔ red poles; neutral midpoint reads as
+   * "nothing" between them) ---- */
+  --div-cool: #2a78d6;
+  --div-warm: #e34948;
+  --div-neutral: #f0efec;
+
+  /* ---- Elevation (dark mode uses flatter, cooler shadows — see the dark
+   * block below) ---- */
+  --shadow-sm: 0 1px 2px rgba(11, 11, 11, 0.06);
+  --shadow-md: 0 4px 12px rgba(11, 11, 11, 0.08), 0 1px 2px rgba(11, 11, 11, 0.06);
+  --shadow-lg: 0 12px 32px rgba(11, 11, 11, 0.12), 0 2px 6px rgba(11, 11, 11, 0.06);
+  --shadow-popover: 0 8px 24px rgba(11, 11, 11, 0.14), 0 0 0 1px rgba(11, 11, 11, 0.06);
+
+  /* ---- Radius ---- */
+  --radius-control: 0.5rem;
+  --radius-card: 0.875rem;
+  --radius-pill: 999px;
+
+  /* ---- Motion ---- */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 @theme inline {
   --color-plane: var(--plane);
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-ink-primary: var(--ink-primary);
   --color-ink-secondary: var(--ink-secondary);
   --color-ink-muted: var(--ink-muted);
   --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
   --color-grid: var(--grid);
+  --color-baseline: var(--baseline);
+
   --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-active: var(--brand-active);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-subtle-border: var(--brand-subtle-border);
+  --color-brand-foreground: var(--brand-foreground);
+
   --color-status-good: var(--status-good);
-  --color-status-warning: var(--status-warning);
-  --color-status-critical: var(--status-critical);
   --color-status-good-text: var(--status-good-text);
+  --color-status-good-subtle: var(--status-good-subtle);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-subtle: var(--status-warning-subtle);
+  --color-status-serious: var(--status-serious);
+  --color-status-serious-subtle: var(--status-serious-subtle);
+  --color-status-critical: var(--status-critical);
+  --color-status-critical-subtle: var(--status-critical-subtle);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-pill: var(--radius-pill);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
 }
 
+/* State 2: OS prefers dark, no explicit toggle choice */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
     --plane: #0d0d0d;
     --surface: #1a1a19;
+    --surface-raised: #232322;
     --ink-primary: #ffffff;
     --ink-secondary: #c3c2b7;
     --ink-muted: #898781;
     --hairline: rgba(255, 255, 255, 0.1);
+    --hairline-strong: rgba(255, 255, 255, 0.18);
     --grid: #2c2c2a;
+    --baseline: #383835;
+
     --brand: #9085e9;
+    --brand-hover: #a89fee;
+    --brand-active: #bab3f2;
+    --brand-subtle: #2b2557;
+    --brand-subtle-border: #453c85;
+    --brand-foreground: #1a1230;
+
     --status-good-text: #0ca30c;
+    --status-good-subtle: #113611;
+    --status-warning-subtle: #3a2d10;
+    --status-serious-subtle: #3a2016;
+    --status-critical-subtle: #3a1616;
+
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
+    --chart-5: #d55181;
+    --chart-6: #008300;
+    --chart-7: #9085e9;
+    --chart-8: #e66767;
+
+    --div-cool: #3987e5;
+    --div-warm: #e66767;
+    --div-neutral: #383835;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.36), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.44), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
+}
+
+/* State 3: explicit user toggle to dark — wins over the OS setting either way */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --plane: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-raised: #232322;
+  --ink-primary: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --hairline-strong: rgba(255, 255, 255, 0.18);
+  --grid: #2c2c2a;
+  --baseline: #383835;
+
+  --brand: #9085e9;
+  --brand-hover: #a89fee;
+  --brand-active: #bab3f2;
+  --brand-subtle: #2b2557;
+  --brand-subtle-border: #453c85;
+  --brand-foreground: #1a1230;
+
+  --status-good-text: #0ca30c;
+  --status-good-subtle: #113611;
+  --status-warning-subtle: #3a2d10;
+  --status-serious-subtle: #3a2016;
+  --status-critical-subtle: #3a1616;
+
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+  --chart-7: #9085e9;
+  --chart-8: #e66767;
+
+  --div-cool: #3987e5;
+  --div-warm: #e66767;
+  --div-neutral: #383835;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.36), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.44), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 body {
   background: var(--plane);
   color: var(--ink-primary);
-  /* Pre-redesign bug: this rule used to hardcode Arial/Helvetica, which
-   * silently overrode the Geist font loaded in app/layout.tsx (`font-sans`
-   * was never applied to <body>, so the var(--font-geist-sans) chain had no
-   * effect and the whole app rendered in the browser's serif-adjacent
-   * fallback the entire time). Reference the loaded font directly here. */
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Strip the native number-input spin button: it's extra browser-supplied
  * chrome an amount field doesn't need, it isn't present on any other field
  * type in the same row (select/date/text), and leaving it in made Amount
- * fields look visually heavier than their neighbors — the same class of
- * "native control chrome differs per field type" issue h-10 on
- * components/ui/Input.tsx's fieldClasses fixes for height. */
+ * fields look visually heavier than their neighbors. */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -76,4 +271,18 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 input[type="number"] {
   appearance: textfield;
+}
+
+/* Respect the OS-level motion preference globally — no per-component opt-in
+ * required. Anything using `transition-*`/`animate-*` utilities or `motion`
+ * still runs, but collapses to effectively instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
