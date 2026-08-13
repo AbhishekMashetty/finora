@@ -346,7 +346,7 @@ export default function TransactionsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-medium text-ink-primary">Transactions</h1>
         {refDataLoaded && hasAccounts && (
           <div className="flex gap-2">

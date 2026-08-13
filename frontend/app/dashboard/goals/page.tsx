@@ -193,7 +193,7 @@ export default function GoalsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-medium text-ink-primary">Goals</h1>
         <Button size="sm" variant={isAddOpen ? "secondary" : "primary"} onClick={() => setIsAddOpen((v) => !v)}>
           <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
