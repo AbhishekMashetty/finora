@@ -9,14 +9,17 @@
 // offered as a soft suggestion, not a strict dropdown, per the contract.
 
 import { useEffect, useState, type FormEvent } from "react";
+import { Pencil, Plus, Target, Trash2 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { formatNumber } from "@/lib/format";
 import type { Budget, Category } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { PencilIcon, PlusIcon, TargetIcon, TrashIcon } from "@/components/icons";
+import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const PERIODS = ["weekly", "monthly", "yearly"] as const;
 
@@ -153,9 +156,9 @@ export default function BudgetsPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink-primary">Budgets</h1>
+        <h1 className="font-display text-2xl font-medium text-ink-primary">Budgets</h1>
         <Button size="sm" variant={isAddOpen ? "secondary" : "primary"} onClick={() => setIsAddOpen((v) => !v)}>
-          <PlusIcon size={16} />
+          <Plus size={16} strokeWidth={1.75} />
           {isAddOpen ? "Cancel" : "Add budget"}
         </Button>
       </div>
@@ -211,25 +214,21 @@ export default function BudgetsPage() {
               {isCreating ? "Adding…" : "Add budget"}
             </Button>
           </form>
-          {createError && (
-            <p className="mt-3 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-              {createError}
-            </p>
-          )}
+          {createError && <Alert variant="error" className="mt-3">{createError}</Alert>}
         </Card>
       )}
 
       <Card className="mt-6 overflow-hidden">
         {isLoading && <SkeletonRows rows={4} />}
-        {!isLoading && loadError && <p className="text-sm text-status-critical">{loadError}</p>}
+        {!isLoading && loadError && <Alert variant="error">{loadError}</Alert>}
         {!isLoading && !loadError && budgets.length === 0 && (
           <EmptyState
-            icon={<TargetIcon size={24} />}
+            icon={<Target size={24} strokeWidth={1.75} />}
             title="No budgets yet"
             description="Add a budget to start tracking your spending."
             action={
               <Button size="sm" onClick={() => setIsAddOpen(true)}>
-                <PlusIcon size={16} />
+                <Plus size={16} strokeWidth={1.75} />
                 Add budget
               </Button>
             }
@@ -238,9 +237,9 @@ export default function BudgetsPage() {
         {!isLoading && !loadError && budgets.length > 0 && (
           <div className="-m-6 overflow-x-auto">
             {rowError && (
-              <p className="m-4 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-                {rowError}
-              </p>
+              <div className="m-4">
+                <Alert variant="error">{rowError}</Alert>
+              </div>
             )}
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-hairline text-xs uppercase text-ink-muted">
@@ -299,7 +298,9 @@ export default function BudgetsPage() {
                   ) : (
                     <tr key={budget.id}>
                       <td className="px-6 py-3 font-medium capitalize text-ink-primary">{budget.category}</td>
-                      <td className="px-6 py-3 tabular-nums text-ink-secondary">{budget.amount.toFixed(2)}</td>
+                      <td className="px-6 py-3 tabular-nums text-ink-secondary">
+                        {formatNumber(budget.amount)}
+                      </td>
                       <td className="px-6 py-3 capitalize text-ink-secondary">{budget.period}</td>
                       <td className="px-6 py-3 text-right">
                         <div className="flex justify-end gap-1">
@@ -309,18 +310,23 @@ export default function BudgetsPage() {
                             aria-label="Edit budget"
                             onClick={() => startEdit(budget)}
                           >
-                            <PencilIcon size={16} />
+                            <Pencil size={16} strokeWidth={1.75} />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Delete budget"
-                            disabled={deletingId === budget.id}
-                            onClick={() => handleDelete(budget.id)}
-                            className="text-status-critical hover:bg-status-critical/10"
-                          >
-                            <TrashIcon size={16} />
-                          </Button>
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Delete budget"
+                                disabled={deletingId === budget.id}
+                              >
+                                <Trash2 size={16} strokeWidth={1.75} />
+                              </Button>
+                            }
+                            title={`Delete the ${budget.category} budget?`}
+                            description="This can't be undone."
+                            onConfirm={() => handleDelete(budget.id)}
+                          />
                         </div>
                       </td>
                     </tr>

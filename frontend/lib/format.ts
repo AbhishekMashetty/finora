@@ -29,6 +29,17 @@ export function formatSignedAmount(
   return type === "income" ? `+${formatted}` : `−${formatted}`;
 }
 
+/** Plain grouped number, no currency symbol — for amounts with no currency
+ * field to format against (e.g. Budget, which budget-service stores without
+ * one; guessing a currency here would misrepresent a non-USD user's data). */
+export function formatNumber(
+  amount: number,
+  options: Intl.NumberFormatOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+  locale = DEFAULT_LOCALE,
+): string {
+  return new Intl.NumberFormat(locale, options).format(amount);
+}
+
 export function formatDate(
   dateStr: string,
   options: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" },

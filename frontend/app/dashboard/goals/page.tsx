@@ -8,14 +8,17 @@
 // absolute current_amount value, per the contract.
 
 import { useEffect, useState, type FormEvent } from "react";
+import { Flag, Pencil, Plus, Trash2 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { formatDate, formatNumber } from "@/lib/format";
 import type { Goal } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { FlagIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 function defaultTargetDate(): string {
   const d = new Date();
@@ -64,22 +67,7 @@ export default function GoalsPage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await apiFetch<{ goals: Goal[] }>("/api/v1/goals");
-        if (!cancelled) setGoals(data.goals ?? []);
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err instanceof ApiError ? err.message : "Could not load goals.");
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    loadGoals();
   }, []);
 
   async function handleCreate(event: FormEvent) {
@@ -191,9 +179,9 @@ export default function GoalsPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink-primary">Goals</h1>
+        <h1 className="font-display text-2xl font-medium text-ink-primary">Goals</h1>
         <Button size="sm" variant={isAddOpen ? "secondary" : "primary"} onClick={() => setIsAddOpen((v) => !v)}>
-          <PlusIcon size={16} />
+          <Plus size={16} strokeWidth={1.75} />
           {isAddOpen ? "Cancel" : "Add goal"}
         </Button>
       </div>
@@ -238,11 +226,7 @@ export default function GoalsPage() {
               {isCreating ? "Adding…" : "Add goal"}
             </Button>
           </form>
-          {createError && (
-            <p className="mt-3 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-              {createError}
-            </p>
-          )}
+          {createError && <Alert variant="error" className="mt-3">{createError}</Alert>}
         </Card>
       )}
 
@@ -254,18 +238,18 @@ export default function GoalsPage() {
         )}
         {!isLoading && loadError && (
           <Card>
-            <p className="text-sm text-status-critical">{loadError}</p>
+            <Alert variant="error">{loadError}</Alert>
           </Card>
         )}
         {!isLoading && !loadError && goals.length === 0 && (
           <Card>
             <EmptyState
-              icon={<FlagIcon size={24} />}
+              icon={<Flag size={24} strokeWidth={1.75} />}
               title="No goals yet"
               description="Set a savings goal to track your progress."
               action={
                 <Button size="sm" onClick={() => setIsAddOpen(true)}>
-                  <PlusIcon size={16} />
+                  <Plus size={16} strokeWidth={1.75} />
                   Add goal
                 </Button>
               }
@@ -318,31 +302,39 @@ export default function GoalsPage() {
                             aria-label="Edit goal"
                             onClick={() => startEdit(goal)}
                           >
-                            <PencilIcon size={16} />
+                            <Pencil size={16} strokeWidth={1.75} />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Delete goal"
-                            disabled={deletingId === goal.id}
-                            onClick={() => handleDelete(goal.id)}
-                            className="text-status-critical hover:bg-status-critical/10"
-                          >
-                            <TrashIcon size={16} />
-                          </Button>
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Delete goal"
+                                disabled={deletingId === goal.id}
+                              >
+                                <Trash2 size={16} strokeWidth={1.75} />
+                              </Button>
+                            }
+                            title={`Delete "${goal.name}"?`}
+                            description="This can't be undone."
+                            onConfirm={() => handleDelete(goal.id)}
+                          />
                         </div>
                       </div>
                       <p className="mt-1 text-sm text-ink-muted">
-                        Target: <span className="tabular-nums">{goal.target_amount.toFixed(2)}</span> by{" "}
-                        {goal.target_date.slice(0, 10)}
+                        Target: <span className="tabular-nums">{formatNumber(goal.target_amount)}</span> by{" "}
+                        {formatDate(goal.target_date)}
                       </p>
 
                       <div className="mt-3">
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-ink-muted/15">
-                          <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+                        <div className="h-2 w-full overflow-hidden rounded-pill bg-ink-muted/15">
+                          <div
+                            className="h-full rounded-pill bg-brand transition-[width] duration-[var(--duration-slow)]"
+                            style={{ width: `${pct}%` }}
+                          />
                         </div>
                         <p className="mt-1 text-xs tabular-nums text-ink-muted">
-                          {goal.current_amount.toFixed(2)} / {goal.target_amount.toFixed(2)} ({pct}%)
+                          {formatNumber(goal.current_amount)} / {formatNumber(goal.target_amount)} ({pct}%)
                         </p>
                       </div>
 
