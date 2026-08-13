@@ -1,95 +1,131 @@
 # Frontend Design System
 
-This document is the visual/UX constitution for `frontend/` — the same role `CLAUDE.md` plays for backend architecture. It exists because the original Phase 0–3 UI (functional, but a bare Tailwind starter aesthetic: unthemed zinc grayscale, ad hoc class strings repeated per-file, no icons, no data visualization, plain "Loading…" text) was never actually designed, just assembled to prove the API wiring worked. This is the pass that makes it look and feel like a real product, without touching any data-fetching logic, API contracts, or backend code.
+This document is the visual/UX constitution for `frontend/` — the same role `CLAUDE.md` plays for backend architecture. It describes the **editorial data-product** revamp (see `frontend/UI-REVAMP-CHECKLIST.md` for the original audit and decision record), which replaced the Phase 0–3 UI in full: every design token, every shared component, every one of the app's 13 pages, and the shell they sit in.
 
-Every rule below is chosen the same way `CLAUDE.md` chooses backend rules: pick the option that's easiest to keep consistent as the app grows, document why, document what was rejected.
+Every rule below is chosen the same way `CLAUDE.md` chooses backend rules: pick the option that's easiest to keep consistent as the app grows, document why, document what was rejected. **When this document and the code disagree, the code is wrong** — the same standard `CLAUDE.md` holds itself to.
 
 ---
 
 ## 1. Design philosophy
 
-**Flat, confident, one accent color, real data density.** Fintech products people trust (Mercury, Ramp, Linear) share a look: near-neutral ink/surface system, a single restrained brand hue reserved for actions and identity, and status color used *only* for status — never decoration. No shadows-for-depth, no gradients, no illustration. Depth comes from spacing and typography, not elevation effects.
+**Editorial data-product.** A confident, near-neutral ink/surface system carries the UI; a validated violet accent is reserved for actions and identity; status color is reserved exclusively for state. A display serif (Fraunces) is used for headlines and hero moments — page titles, the landing page, empty-state and error copy — paired with Geist Sans for every interactive/dense surface (forms, tables, nav, and — per the data-viz method — everything inside a chart). This is the "editorial" half of the direction: confident typography and generous whitespace on top of the same flat, no-shadow, no-gradient surface system the app already had. Depth still comes from spacing and typography, not elevation effects, except where Radix's overlay components (`Dialog`, `DropdownMenu`, `Tooltip`) need a popover to visually separate from the page — those get the `--shadow-popover` token, the one place true elevation is used.
 
-**Rejected alternative: a UI kit (shadcn/ui, Radix Themes, Chakra).** Would give faster scaffolding, but adds a real dependency surface (CLAUDE.md §10 requires justifying every new package) for a component set this app's actual surface area (a dozen form/table/card patterns) doesn't need. Hand-rolled Tailwind primitives in `frontend/components/ui/` cost nothing to audit, patch, or delete, and match how the rest of this codebase already prefers explicit code over framework magic (CLAUDE.md §1, "no clever code").
+**Previously rejected, now adopted: Radix UI, an icon library, and a charting library.** The original Phase 0–3 doc rejected all three for a hand-rolled equivalent, on the grounds that the app's surface area didn't justify the dependency. That calculus changed with the editorial revamp's scope — 13 pages' worth of consistent, accessible interactive components (dialogs, dropdowns, tooltips) and a real chart (see §6) are a different order of complexity than the dozen form/table patterns the original doc was scoped against, and CLAUDE.md §10 was satisfied the normal way: each dependency was checked for React 19 peer-dependency compatibility before installing, and is used for exactly the problem it solves (Radix for unstyled-but-accessible primitives — focus trap, `Escape`/outside-click, ARIA wiring, all real correctness work a hand-rolled `<div>` would have to reimplement; `lucide-react` for a consistent, larger glyph set than 19 hand-drawn SVGs could offer; `recharts` for the one page that now needs a real chart). The old hand-rolled `components/icons.tsx` and its `ComingSoon` placeholder were deleted in the same phase that finished migrating every page off them — see §5.
 
-**Rejected alternative: an icon library (lucide-react, heroicons).** ~14 fixed, simple glyphs are needed across the whole app (nav items + a few action icons). Hand-rolling them as inline SVG in `frontend/components/icons.tsx` avoids a dependency for what amounts to a dozen `<path>` elements, keeps them trivially themeable via `currentColor`, and adds effectively zero bundle weight versus importing a whole icon package (even tree-shaken).
-
-**Rejected alternative: a charting library (recharts, visx, chart.js).** The one real chart need — budget-vs-actual per category — is a bullet-style comparison (a target line plus a filled bar), which is a few `<div>`s and a `<svg>` marker line, not a general-purpose charting problem. Hand-rolled per the data-viz method below. If Phase 5+ ever needs genuinely complex charts (multi-series time trends, stacked area), revisit then — don't pay the dependency cost now for a need that doesn't exist yet (`plan.md`'s "don't introduce complexity before there's a legitimate reason," applied to the frontend).
-
-**Data visualization method.** Built using Claude Code's `dataviz` skill (form → color → validate → marks → interaction → accessibility), not eyeballed. Concretely: colors below are the skill's validated default palette (`references/palette.md`), chosen because rolling a fresh brand palette and hand-checking colorblind-safety/contrast per shade is exactly the kind of "reasoning about ΔE" the skill says never to do — the reference palette is already validated (CVD ΔE, contrast, both color-scheme modes) so adopting it outright is strictly safer than inventing new hex values and re-deriving that work. The one deviation: **brand/accent** below reuses the palette's validated "violet" categorical slot rather than introducing an unvalidated hex, since violet doesn't collide with the two hues this app actually needs for financial polarity (green/red, reserved below).
-
----
+**Data visualization method.** Built using Claude Code's `dataviz` skill (form → color → validate → marks → interaction → accessibility), not eyeballed. The palette below is the skill's validated reference instance (`references/palette.md`) — categorical, sequential, diverging, and status ramps all pass the skill's `validate_palette.js` script in both light and dark mode (re-run whenever a palette value changes). Brand reuses the palette's validated "violet" categorical slot 7 rather than an unvalidated hex.
 
 ## 2. Design tokens
 
-Defined as CSS custom properties in `frontend/app/globals.css`, mapped into Tailwind v4's `@theme inline` block so pages use utility classes (`bg-surface`, `text-ink-primary`, `border-hairline`, `bg-brand`, …) instead of raw `zinc-*`/`red-*` values. This is the single place the whole app's palette can be retuned later — the same rationale `shared/config` gives for centralizing env var reads on the backend.
+Defined as CSS custom properties in `frontend/app/globals.css`, mapped into Tailwind v4's `@theme inline` block. Three states, not two — see §3 for the theming model.
+
+### Neutrals & chrome
 
 | Role | Light | Dark | Tailwind utility |
 |---|---|---|---|
-| Page plane (app background, outside cards) | `#f9f9f7` | `#0d0d0d` | `bg-plane` |
-| Surface (cards, inputs, popovers) | `#fcfcfb` | `#1a1a19` | `bg-surface` |
-| Primary ink (headings, values) | `#0b0b0b` | `#ffffff` | `text-ink-primary` |
-| Secondary ink (body, labels) | `#52514e` | `#c3c2b7` | `text-ink-secondary` |
-| Muted ink (placeholders, axis, timestamps) | `#898781` | `#898781` | `text-ink-muted` |
-| Hairline border | `rgba(11,11,11,.10)` | `rgba(255,255,255,.10)` | `border-hairline` |
-| Gridline (table dividers, chart baselines) | `#e1e0d9` | `#2c2c2a` | `border-grid` |
-| **Brand** (primary actions, links, active nav, focus ring) | `#4a3aa7` | `#9085e9` | `bg-brand` / `text-brand` |
-| Status — good (under budget, income) | `#0ca30c` | `#0ca30c` | `text-status-good` / `bg-status-good` |
-| Status — warning (approaching a limit) | `#fab219` | `#fab219` | `text-status-warning` / `bg-status-warning` |
-| Status — critical (over budget, expense emphasis) | `#d03b3b` | `#d03b3b` | `text-status-critical` / `bg-status-critical` |
+| Page plane | `#f9f9f7` | `#0d0d0d` | `bg-plane` |
+| Surface (cards, table rows) | `#fcfcfb` | `#1a1a19` | `bg-surface` |
+| Surface, raised (popovers, dialogs) | `#ffffff` | `#232322` | `bg-surface-raised` |
+| Primary ink | `#0b0b0b` | `#ffffff` | `text-ink-primary` |
+| Secondary ink | `#52514e` | `#c3c2b7` | `text-ink-secondary` |
+| Muted ink | `#898781` | `#898781` | `text-ink-muted` |
+| Hairline | `rgba(11,11,11,.10)` | `rgba(255,255,255,.10)` | `border-hairline` |
+| Hairline, strong | `rgba(11,11,11,.18)` | `rgba(255,255,255,.18)` | `border-hairline-strong` |
+| Gridline | `#e1e0d9` | `#2c2c2a` | `border-grid` |
+| Baseline / axis | `#c3c2b7` | `#383835` | n/a — chart use only |
 
-Status colors are **fixed, never themed** (same hex both modes, per the data-viz method) and are reserved exclusively for state — never reused as a fourth "brand" color or a chart series color, so a status pill is never mistaken for a category. Every status color ships with an icon or label, never carries meaning by hue alone (light-mode warning is only 1.79:1 contrast by design — it leans on the accompanying label/icon, not on being readable as text by itself).
+### Brand (violet — categorical slot 7)
 
-**Financial polarity** (income vs. expense, under vs. over budget) always maps to good/critical status roles above — never ad hoc `red-500`/`green-500` Tailwind defaults, so a color always means the same thing everywhere in the app.
+| Role | Light | Dark |
+|---|---|---|
+| `brand` | `#4a3aa7` | `#9085e9` |
+| `brand-hover` | `#3d2f8c` | `#a89fee` |
+| `brand-active` | `#302470` | `#bab3f2` |
+| `brand-subtle` (selected-nav, tinted backgrounds) | `#efecfa` | `#2b2557` |
+| `brand-foreground` (text/icon on a solid `brand` fill) | `#ffffff` | `#1a1230` |
 
-## 3. Typography
+`brand-foreground`, not a hardcoded `text-white`, is load-bearing: `brand` flips to a *light* violet in dark mode, and a fixed white label on it drops to near-unreadable contrast. This was a real bug in `Button`'s `primary` variant caught during the Phase 2 primitive rebuild, fixed by introducing this token rather than a `dark:` override.
 
-Keep **Geist Sans** (already wired via `next/font/google` in `app/layout.tsx`) — it's self-hosted at build time (no runtime webfont request, no extra network hop), already integrated, and a deliberate, good choice; no reason to replace it with a system-font stack.
+### Status (fixed — never themed)
 
-Fixed scale (use these, don't invent one-off sizes):
+| Role | Hex | Light-surface contrast | Notes |
+|---|---|---|---|
+| `status-good` | `#0ca30c` | 3.27:1 | text-safe as `status-good-text` (`#006300` light / `#0ca30c` dark) |
+| `status-warning` | `#fab219` | 1.79:1 | icon + label only, never bare text |
+| `status-serious` | `#ec835a` | 2.57:1 | icon + label only, never bare text |
+| `status-critical` | `#d03b3b` | 4.68:1 | text-safe |
 
-| Role | Classes |
+Four tiers, not three — `serious` was added in this revamp (the reference palette always had it; the original doc only adopted three). Sub-3:1 contrast on `warning`/`serious` against a light surface is **by design**, per the dataviz skill's own reference: the mitigation is the icon + label pairing (see `Badge.tsx`), never darkening the hex. Each status also has a `-subtle` background-wash token (e.g. `status-warning-subtle`) for badge fills.
+
+### Chart palettes
+
+Full detail and validation results live in `frontend/app/styleguide` (a dev-only route rendering every token as a live swatch) and were re-confirmed via the dataviz skill's `validate_palette.js` in both modes before adoption. Categorical: 8 fixed slots (`chart-1`…`chart-8`), never cycled — a 9th category folds into "Other" (see `CategorySpendChart.tsx`). Sequential: single-hue blue ramp, 13 steps. Diverging: blue↔red poles with a neutral gray midpoint (poles only implemented today; per-chart interpolation is left to the chart that needs it, not pre-baked as unused tokens).
+
+### Elevation, radius, motion
+
+- **Radius:** `--radius-control` (0.5rem, inputs/buttons/small chrome), `--radius-card` (0.875rem, panels/dialogs), `--radius-pill` (999px, pills/badges/toggle tracks) — as Tailwind utilities `rounded-control`/`rounded-card`/`rounded-pill`.
+- **Shadow:** `--shadow-sm/md/lg/popover` — used only on Radix overlay content (`Dialog`, `DropdownMenu`, `Tooltip`) and the styleguide's elevation demo. Everything else stays flat per §1.
+- **Motion:** `--duration-fast` (120ms, hover/focus states), `--duration-base` (200ms, dialogs/drawers), `--duration-slow` (320ms, progress-bar fills); `--ease-out`/`--ease-in-out`. A global `@media (prefers-reduced-motion: reduce)` rule in `globals.css` collapses every transition/animation to near-zero duration app-wide — no per-component opt-in required.
+
+## 3. Theming — three states, not two
+
+`globals.css` defines light values on a bare `:root`, dark values under `@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme="light"])`, and dark values again under `:root[data-theme="dark"]` for an explicit user choice. The toggle wins over the OS setting either way. `ThemeProvider` (`components/theme/ThemeProvider.tsx`) persists the choice to `localStorage` (`finora-theme`); a synchronous inline `<script>` in `app/layout.tsx` (`components/theme/no-flash-script.ts`) applies the stored `data-theme` attribute before hydration, so there's no flash of the wrong theme on first paint. `ThemeToggle` lives in the dashboard sidebar footer.
+
+## 4. Typography
+
+- **Geist Sans** — UI workhorse: body copy, forms, tables, nav, and (per the dataviz skill's own rule) everything inside a chart, including hero figures like `StatTile` values. Loaded via `next/font/google` in `app/layout.tsx`.
+- **Geist Mono** — tabular figures where columns must align (money in tables, timestamps).
+- **Fraunces** (new) — display serif for page titles (`font-display` utility, mapped from `--font-fraunces`), the landing page, and empty/error-state headings. Never used inside a chart component — that's the one place the dataviz skill's "system sans only" rule is enforced as written; everywhere else, "editorial" means the serif is available for headline moments.
+
+`tabular-nums` is required on every rendered money amount and every numeric table column.
+
+## 5. Dependencies
+
+Installed for the revamp (all version-checked for React 19 peer compatibility before install, per CLAUDE.md §10):
+
+| Package | Used for |
 |---|---|
-| Hero figure / stat-tile value | `text-3xl font-semibold tracking-tight tabular-nums` |
-| Page title | `text-2xl font-semibold tracking-tight` |
-| Section label | `text-xs font-semibold uppercase tracking-wide text-ink-muted` |
-| Body | `text-sm text-ink-secondary` |
-| Micro (timestamps, helper text) | `text-xs text-ink-muted` |
+| `radix-ui` (unified package) | `Dialog`, `AlertDialog` (via `ConfirmDialog`), `DropdownMenu`, `Tooltip`, `Slot` (`Button`'s `asChild`) |
+| `lucide-react` | Every icon in the app — direct imports per file, no wrapper layer (see below) |
+| `recharts` | `CategorySpendChart` (§6) |
+| `sonner` | Global toast host (`AppToaster`, mounted once in `AppProviders`) — not yet consumed by any page's mutation flow, ready for the next page that needs a non-blocking success/error toast instead of an inline `Alert` |
+| `class-variance-authority`, `clsx` + `tailwind-merge` (`lib/cn.ts`) | Component variant APIs (`Button`, others as they're extended) |
+| `cmdk`, `react-day-picker`, `date-fns`, `motion` | Installed and approved, **not yet consumed** — reserved for a command palette (replacing the flat "Search" nav item) and native `<input type="date">` fields ever needing a richer picker. Don't remove these speculatively; don't add new usage without a real page that needs them either. |
 
-`tabular-nums` is required on every rendered money amount and every table column of numbers, so digits align vertically — a detail generic Tailwind starters never set and real finance products always do.
+`components/icons.tsx` (a lucide-react-backed compatibility layer preserving the old hand-rolled icon API) existed only to let pages migrate one at a time without touching every import path at once. It was deleted, along with the now-callerless `ComingSoon.tsx`, once all 13 pages were migrated to importing `lucide-react` directly — see git history for the exact commit. Any new page imports icons directly from `lucide-react`, not through a wrapper.
 
-## 4. Spacing & shape
+## 6. Component inventory (`frontend/components/ui/`)
 
-- **Radius:** `rounded-md` (6px) for inputs/badges/small controls, `rounded-xl` (12px) for cards/panels, `rounded-full` for pill buttons and status chips. Never mix `rounded-lg`/`rounded-md` for the same role across pages (the pre-redesign code did this inconsistently — normalize it as pages are touched).
-- **Card padding:** `p-6` standard panel, `p-5` for a compact stat tile.
-- **No shadows.** Depth comes from the plane/surface contrast plus a 1px hairline border — not `shadow-sm`/`shadow-md`. Flat is the deliberate look (see §1); shadows on a near-black dark surface read muddy anyway.
+- **`Button`** — `cva`-based variants `primary`/`secondary`/`danger`/`ghost`, sizes `sm`/`md`/`icon`. `size="md"` is `h-10`, pixel-identical to `Input`/`Select`'s own height (see below) for any row mixing a button with a labeled field. `asChild` (Radix `Slot`) renders the button's classes onto a single child element instead of a `<button>` — for a `Link` styled as a button, avoiding invalid `<button><a>` nesting.
+- **`Input`/`Select`** — `fieldClasses` sets an explicit `h-10` (native date/number controls have different intrinsic heights than a `<select>`, most visible in Safari) and now carry a `focus:` ring (`focus:ring-2 focus:ring-brand/25`) plus an `error`-driven red border/ring — both were previously missing entirely (the `error` prop rendered a message but never restyled the field). `className` styles the control itself; `wrapperClassName` styles the field's outer wrapper `<div>` — the actual grid/flex item for `col-span-*`/`flex-1`.
+- **`Card`, `Badge`, `StatTile`, `EmptyState`, `Skeleton`/`SkeletonRows`, `BudgetBar`/`BudgetLegend`, `Avatar`** — same roles as before, rebuilt on the current token set. `Badge` gained the `serious` status tier. `Avatar` (new) renders initials on a `brand-subtle` circle — used in the sidebar footer and the profile page, one implementation instead of two ad hoc ones.
+- **`Alert`** — new. Replaces the hand-copied `bg-status-critical/10` banner markup that used to be redefined per page; `success`/`error`/`info` variants, each with an icon.
+- **`Dialog`, `ConfirmDialog`, `DropdownMenu`, `Tooltip`** — new, all Radix-based (`components/ui/Dialog.tsx`, `ConfirmDialog.tsx`, `DropdownMenu.tsx`, `Tooltip.tsx`). `ConfirmDialog` is the fix for the audit's blocking finding that every destructive delete fired immediately on click with no confirmation — it's now wired into every delete action across accounts/transactions/budgets/goals. Entrance/exit animation uses Tailwind's built-in `data-[state=...]` variants against Radix's own state attributes, not an animation plugin.
+- **`components/theme/`** — `ThemeProvider`, `ThemeToggle`, `AppToaster` (theme-aware `sonner` host), `no-flash-script.ts`.
+- **`components/dashboard/`** — `DashboardShell` (the Client Component interactive shell — auth guard, nav polling, responsive drawer), `SidebarNav` (shared between the desktop `<aside>` and the mobile drawer, so they can't drift apart), `nav-items.ts` (grouped nav config), `CategorySpendChart.tsx` (§6).
+- **`components/providers/AppProviders.tsx`** — single composition point for every app-wide client provider (`ThemeProvider` → Radix `TooltipProvider` → `AuthProvider` → `AppToaster`), replacing ad hoc provider nesting in `layout.tsx`.
 
-## 5. Component inventory (`frontend/components/ui/`)
+## 7. Reports charts
 
-New shared primitives, replacing the copy-pasted class-string constants that used to live at the top of every page file (`inputClasses`, `primaryButtonClasses`, etc., redefined near-identically five times):
+Two complementary, non-redundant views on the reports page, per the dataviz skill's form step:
 
-- `Button.tsx` — variants `primary` (brand fill), `secondary` (hairline outline), `danger` (critical outline, for destructive actions), `ghost` (text-only, for table-row inline actions); sizes `sm`/`md`. Base classes include `whitespace-nowrap` — a pill (`rounded-full`) button whose label wraps to two lines renders as a tall stacked oval, not a pill; this was a real, visible bug (`+ Add account`/`+ Add budget`/`+ Add goal` all wrapped mid-label whenever the surrounding flex/grid row left them less width than their content wanted) fixed once here rather than patched per call site. **`size="md"` is `h-10` — an explicit height, not padding-derived — so it is pixel-identical to `Input`/`Select`'s own `h-10`.** Any button that shares an `items-end` row with a labeled field (every "Add X" form submit button in this app, plus Reports' "Run report" and Search's "Search") needs this: with height left to padding alone, a button measures shorter than a field (36px vs 40px) and, bottom-aligned via `items-end`, visibly floats a few pixels short of the field beside it — this is what "the New category button looks misaligned" and "the Add account button looks off" both were, confirmed by measuring real bounding boxes (`getBoundingClientRect`), not by eyeballing a screenshot. `size="sm"` is deliberately left padding-derived (≈30px) since it's used in compact contexts with no adjacent field to match (table row action icons, pagination, pill toggles) where a 40px box would look oversized — but the three `sm` buttons that DO sit beside a labeled field in an `items-end` row (transactions' "New category" toggle and "Add category" submit, goals' per-goal "Update") each get `className="h-10"` at the call site to match, rather than changing `sm` globally. **Rule going forward: before shipping any new button placed inside a `flex ... items-end` row alongside an `Input`/`Select`, measure or explicitly set its height to match `h-10` — never assume padding alone will produce the same box height as a sibling field.**
-- `Input.tsx`, `Select.tsx` — consistent field chrome, built-in label + inline error slot. Two className props, not one, and they are not interchangeable: **`className`** styles the input/select element itself (an inner-element width override like `w-24`, or a text utility like `tabular-nums`); **`wrapperClassName`** styles the field's outer wrapper `<div>` — required for any layout class that must land on the actual grid/flex item, most importantly `col-span-*` in a CSS grid or `flex-1`/a fixed width in a flex row. This distinction exists because of a real bug: the transactions page's "New transaction" form passed `lg:col-span-4` etc. via `className`, which put it on the `<select>`/`<input>` — not a grid item, since its parent (the `Field` wrapper) is the actual direct child of the `grid` container — so the span was silently a no-op, and all five fields collapsed to implicit 1-column-wide slots at the left edge of the row with the rest of the row's width going unused, each field's own text truncating (`Checki▾`, `07/2…`) because a native `<select>`/date `<input>` sizes to content when nothing stretches it. Caught via a real browser screenshot, not by reading the code — the bug is invisible in the JSX and only obvious once rendered. **Rule going forward:** any `col-span-*`/grid- or flex-sizing class goes in `wrapperClassName`; anything else stays in `className`. `fieldClasses` (the class string every `Input`/`Select` renders with) sets an explicit `h-10` rather than relying on `py-*` alone: native `<input type="date">` and `<input type="number">` controls render with browser-supplied internal chrome (a calendar/stepper widget) that gives them a different intrinsic height than a `<select>` or plain text input even with identical padding — most visible in Safari/WebKit, where a date field in the same row as an account/category `<select>` rendered visibly "deeper" despite sharing the exact same Tailwind classes (caught from a real user-supplied screenshot, confirmed by measuring both engines: Chrome already rendered every field at an identical 38px, WebKit did not until `h-10` was added, after which every field type measured an identical 40px in both). An explicit height is what forces every field in a row to be pixel-identical regardless of control type or rendering engine — padding alone doesn't, because a browser can still grow a control past its content-box padding to fit its own native affordance. `globals.css` also strips the native number-input spin button (`input[type="number"]::-webkit-inner/outer-spin-button` + `appearance: textfield`) for the same reason: it's chrome no other field type in the same row has, so it read as visually heavier than its neighbors.
-- `Card.tsx` — the one surface-panel wrapper every page's sections use.
-- `Badge.tsx` — status pill (takes a `status: "good" | "warning" | "critical" | "neutral"` prop, renders the right color + accessible text, never color alone).
-- `EmptyState.tsx` — icon + message + optional CTA button, replacing bare "No transactions found." text and the old `ComingSoon` component's plain dashed box.
-- `Skeleton.tsx` — loading placeholder blocks (a shimmering gray bar), replacing literal "Loading…" text — standard perceived-performance pattern in real products.
-- `StatTile.tsx` — a labeled hero number + optional delta, the data-viz method's "stat tile" form for headline metrics (total balance, this month's spend, etc.).
-- `BudgetBar.tsx` — the bullet-style budget-vs-actual mark described in §6.
-- `../icons.tsx` — the hand-rolled icon set (wallet, arrows, list, target, chart, gear, search, user, plus, trash, pencil, log-out, check) as named exports of small inline-SVG components, `currentColor`-themed, `16`/`20`px.
+- **`CategorySpendChart`** (new) — a horizontal Recharts bar chart answering "where did the money go": actual spend per category, fixed 8-slot categorical color order (9th+ folds into "Other"), direct axis labels instead of a separate legend, recessive gridlines, rounded bar ends, a token-driven hover tooltip. Colors are wired as `fill="var(--color-chart-N)"` directly in the SVG, so the chart re-themes with the light/dark toggle for free — no re-render/recompute logic needed.
+- **`BudgetBar`/`BudgetLegend`** (unchanged from the original doc) — answers "am I over budget per category": a bullet-style track + target marker, fill color following *status*, not entity. Kept as the right form for a magnitude-vs-target comparison; the bar chart doesn't replace it, it adds the composition view the bullet bars never provided.
 
-## 6. Reports chart: budget-vs-actual bullet bar
+Money values without a currency field in their API contract (`Budget`, `ReportSummary`/`CategorySummary` — see `lib/types.ts`) render via `lib/format.ts#formatNumber` (a plain grouped decimal), never `formatCurrency` with a guessed currency — guessing would misrepresent a non-USD user's numbers. `Account`/`Transaction` do carry a real `currency` field and use `formatCurrency` throughout.
 
-Per the data-viz method's form step: this is a **magnitude-vs-target comparison**, not a trend or a distribution — the right form is a bullet-style bar, not a line/donut/multi-series chart. Per category: a track (the full width = 100%+ of budgeted amount, capped visually at say 130% so a large overspend doesn't distort the bar), a filled bar for actual spend, and a vertical marker line at the 100%-of-budgeted point (the target). Fill color follows **status**, not a fixed brand or category hue: `good` under 80% of budget used, `warning` 80–100%, `critical` over 100% — with the numeric budgeted/actual/remaining figures always shown as text alongside (never color-alone, per the method's accessibility rule), and a three-item legend (a small swatch + label per status) shown once above the list, not repeated per row. Headline totals (total budgeted/actual/remaining) render as `StatTile`s above the per-category list, so the page reads "totals first, detail below" rather than forcing a scan of every row to find the overall picture.
+## 8. RSC pattern
 
-## 7. Page-level layout decisions
+Server Component shell, Client Component leaf: a page/layout that has real static structure stays a Server Component and renders the interactive parts as a Client Component child, passed through untouched rather than re-rendered. Applied at the shell level (`app/dashboard/layout.tsx` is a Server Component; `DashboardShell` is the Client Component it renders) and demonstrated at the page level (`app/styleguide/page.tsx` is a Server Component; the interactive demos live in `ComponentsShowcase.tsx`).
 
-- **Landing (`app/page.tsx`):** wordmark + a short, confident value line, primary/secondary CTA using `Button`. A restrained radial brand-tinted glow behind the wordmark (low-opacity, no animation) — the only decorative flourish in the whole app, deliberately spent on the one page whose entire job is a first impression.
-- **Auth (`login`/`register`):** two-pane layout on `md:` and up — a dark, brand-tinted left panel (wordmark + 2–3 short value bullets) and the form on the right; stacks to form-only on mobile. Replaces the previous bare centered card, which wasted the entire viewport on small screens and said nothing about the product.
-- **Dashboard shell (`layout.tsx`):** sidebar nav items get icons; the active item gets a left accent bar + tinted brand background instead of a full invert; the signed-in user's name/email now renders above the logout control (previously logout was the only identity cue in the entire shell).
-- **Dashboard overview (`dashboard/page.tsx`):** was a single "signed in as {name}" card and nothing else. Replaced with a real overview: a short greeting, four `StatTile`s (total balance across accounts, this calendar month's spend, budgets on track vs. total this month, nearest goal's progress), and a five-row "recent activity" list. All computed client-side from **existing** endpoints already used elsewhere (`/accounts`, `/transactions?page_size=5`, `/budgets`, `/reports/summary` for the current month, `/goals`) — no new backend endpoints, no new API contract.
-- **Accounts/Transactions/Budgets/Goals:** the previous pattern kept a full create-form permanently open above every list, which is a lot of visual weight for an action used occasionally. Each list now leads with a compact header + a "+ Add" `Button` that reveals the create form in place; everything else (tables, filters, per-row edit/delete) keeps its existing behavior, just restyled with the new primitives, `Badge` for type/status, and `Skeleton`/`EmptyState` for loading/empty states. **The "+ Add"/"Cancel" toggle button always lives in the page-level header row, next to the `<h1>`** — never inside the "New X" card's own header. Budgets/Goals established this; Accounts/Transactions were fixed to match (they originally put the toggle inside the create-form card's mini-header instead, which read as two different conventions for the same interaction across four otherwise-identical CRUD pages). The revealed card underneath just carries a plain section label (`NEW ACCOUNT`/`NEW TRANSACTION`), no duplicate button.
+This does **not** extend to server-side data fetching for authenticated pages: auth tokens live in `localStorage` (a documented Phase 0 simplification in `lib/auth-context.tsx`/`lib/api.ts`, deferred to a future httpOnly-cookie + `middleware.ts` migration), which is only readable client-side. Every dashboard page's actual data fetching therefore stays a `"use client"` component calling `apiFetch` in a `useEffect` — the RSC migration's real, deliverable scope for this app is confining `"use client"` to genuinely interactive/data-dependent code and hoisting everything else (layout chrome, static page structure) to the server, not fetching data server-side under a client-only auth model that hasn't itself been migrated. Every dashboard route also has `loading.tsx` (skeleton) and `error.tsx`; a root `app/not-found.tsx` covers unmatched routes.
 
-## 8. What this pass does **not** touch
+## 9. Responsive shell
 
-No changes to `lib/api.ts`, `lib/auth-context.tsx`, any data-fetching logic, query params, request/response shapes, or backend code. This is presentation-layer only — every page's actual CRUD behavior, validation, and API contract usage from Phase 2/3 stays exactly as verified then. `profile`/`settings`/`search` remain `ComingSoon` (unstarted Phase 5 scope, restyled with the new `EmptyState` component but not built out).
+The dashboard sidebar was a fixed `w-60` at every viewport with no responsive behavior at all (a blocking audit finding). Now: a fixed 256px sidebar at `lg:` (1024px) and up; below that, a topbar with a hamburger opens a Radix `Dialog`-based slide-in drawer (focus trap, `Escape`-to-close, backdrop) rendering the same `SidebarNav` content. Page-level header rows (an `<h1>` plus one or two action buttons) use `flex-wrap` so a second button drops to its own line on narrow viewports instead of overflowing off-screen — found and fixed via an actual 390px-width screenshot, not by inspection.
+
+## 10. Known, deliberate gaps
+
+- **Command palette / `⌘K` search** — `cmdk` is installed and approved but not wired up; the sidebar still has a flat "Search" nav item pointing at `/dashboard/search`. A real command palette is future work, not silently dropped.
+- **Native date fields** — `react-day-picker`/`date-fns` are installed but every date input in the app is still a plain `<input type="date">`. Revisit if a richer picker (range selection, keyboard nav beyond the native control) becomes a real need.
+- **`sonner` toasts** — the host is mounted app-wide; no page has been converted from its inline `Alert` success/error pattern to a toast yet. Both are legitimate patterns for different cases (a toast for a transient confirmation, an inline `Alert` for a persistent form-validation state) — this isn't a to-do to eliminate `Alert`, just an unused capability.
+- **Currency-less domains** — `Budget`/`Goal`/`ReportSummary` carry no currency field server-side (see §7). Fixing this properly is a backend contract change (adding a `currency` field to budget-service's domain types and migrating existing records), out of scope for a frontend-only revamp; `formatNumber` is the honest interim treatment, not a permanent design decision.

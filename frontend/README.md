@@ -21,68 +21,44 @@ This pass builds:
 - Client-side auth guarding and a small `fetch` wrapper with automatic
   token refresh (see below).
 
-## Phase 5 scope — live screens
+## Screens
 
-Phase 5 ("wire every screen to live APIs") replaced five of the stub pages
-with real screens, each talking to the gateway via `lib/api.ts`:
+All 13 routes are live, each talking to the gateway via `lib/api.ts`:
 
-- **Accounts** (`app/dashboard/accounts/page.tsx`) — full CRUD against
-  expense-service (`GET/POST /api/v1/accounts`,
-  `PUT/DELETE /api/v1/accounts/:id`). Inline per-row edit, create form.
-- **Transactions** (`app/dashboard/transactions/page.tsx`) — full CRUD +
-  server-side pagination/filtering against expense-service
-  (`GET/POST /api/v1/transactions`, `PUT/DELETE /api/v1/transactions/:id`).
-  Also does inline category management (`GET/POST /api/v1/categories`,
-  create+list only by deliberate backend design — no edit/delete UI implied).
-  If the user has no accounts yet, the create form is replaced with a
-  link to `/dashboard/accounts` rather than allowing a doomed submit.
-- **Budgets** (`app/dashboard/budgets/page.tsx`) — full CRUD against
-  budget-service (`GET/POST /api/v1/budgets`,
-  `PUT/DELETE /api/v1/budgets/:id`). `category` is a free-text field (with
-  a `<datalist>` of existing expense-service category names as a soft
-  suggestion), not an id — matches the backend's loose, case-insensitive
+- **Landing** (`app/page.tsx`), **login**/**register** — public, unauthenticated.
+- **Overview** (`app/dashboard/page.tsx`) — stat tiles + recent activity +
+  nearest goal, computed client-side from endpoints every other page
+  already uses (`/accounts`, `/transactions`, `/budgets`, `/reports/summary`,
+  `/goals`) — no dedicated overview endpoint.
+- **Accounts** — full CRUD against expense-service (`GET/POST
+  /api/v1/accounts`, `PUT/DELETE /api/v1/accounts/:id`).
+- **Transactions** — full CRUD + server-side pagination/filtering against
+  expense-service, plus inline category management (`GET/POST
+  /api/v1/categories`, create+list only by deliberate backend design) and
+  CSV import.
+- **Budgets** — full CRUD against budget-service. `category` is a free-text
+  field (with a `<datalist>` suggestion from expense-service's real
+  categories), not an id — matches the backend's loose, case-insensitive
   matching for reports.
-- **Goals** (`app/dashboard/goals/page.tsx`) — full CRUD against
-  budget-service (`GET/POST /api/v1/goals`, `PUT/DELETE /api/v1/goals/:id`),
-  rendered as cards with a CSS progress bar. "Log progress" PUTs a new
-  absolute `current_amount` — it is manual entry, not computed from
-  transactions.
-- **Reports** (`app/dashboard/reports/page.tsx`) — `GET
-  /api/v1/reports/summary?from&to` against budget-service's real
-  budget-vs-actual computation (which itself calls expense-service
-  server-side). Defaults the date range to the current calendar month and
-  auto-runs on mount since the backend requires both `from` and `to`
-  with no implicit default. Deliberately no charting library — a CSS
-  table/bar is enough for this phase (see Known simplifications below).
+- **Goals** — full CRUD against budget-service, manual progress logging
+  (`current_amount` is a plain field the user sets, never derived from
+  transactions).
+- **Reports** — `GET /api/v1/reports/summary?from&to` against
+  budget-service's cross-service budget-vs-actual computation, plus a
+  Recharts bar chart (spend by category) and the bullet-bar budget-vs-actual
+  list — see the design doc §7 for why both, not one or the other.
+- **Notifications**, **search**, **profile**, **settings** — see the design
+  doc for each; search composes a client-side filter over existing list
+  endpoints rather than a dedicated search endpoint (none exists in the
+  fleet, and building one isn't justified at this app's data volumes).
 
-Remaining stubs (`Search`, `Profile`, `Settings`) are out of scope for
-Phase 5 and still render `ComingSoon`.
+## Design system
 
-## Design system (2026-07-19 redesign)
-
-A professional design pass replaced the unthemed Tailwind-starter look (raw
-`zinc-*` grays, ad hoc class strings repeated per page, no icons, plain
-"Loading…" text) with a real design system — full rationale, palette
-source, and every rejected alternative documented in
+The app went through a full editorial-data-product redesign — every token,
+every shared component, every page. Full rationale, every rejected
+alternative, and the current token/component inventory live in
 **`architecture/frontend-design-system.md`** (read that file, not this
-summary, before touching any page's visual layer). In short: CSS design
-tokens in `app/globals.css` (`bg-plane`/`bg-surface`/`text-ink-*`/`bg-brand`/
-`bg-status-*`, all correct in both light and dark with no `dark:` variant
-needed at the call site — the underlying CSS variable itself flips value),
-a hand-rolled icon set (`components/icons.tsx`, ~14 glyphs, no icon-library
-dependency), and shared primitives in `components/ui/` (`Button`, `Input`,
-`Select`, `Card`, `Badge`, `EmptyState`, `Skeleton`, `StatTile`,
-`BudgetBar`) that replaced the near-identical `inputClasses`/
-`primaryButtonClasses`/etc. constants every page used to redefine. The
-dashboard overview (`app/dashboard/page.tsx`) was rebuilt from a bare
-"signed in as {name}" card into a real overview (stat tiles, recent
-activity, nearest goal) computed from endpoints every other page already
-uses — no new backend endpoints. The reports page's budget-vs-actual visual
-was built using Claude Code's `dataviz` skill method (form → validated
-color → marks → accessibility), not eyeballed — see the design doc §6 for
-why a bullet-bar, not a chart library, is the right form for that data.
-This pass changed **no data-fetching logic, API contracts, or backend
-code** — presentation only.
+summary, before touching any page's visual layer).
 
 ## Tech choices
 
@@ -107,30 +83,32 @@ code** — presentation only.
 
 ```
 app/
-  page.tsx                 landing page (links to /login, /register)
+  page.tsx                 landing page (Server Component)
   login/page.tsx           two-pane auth layout via components/AuthShell.tsx
   register/page.tsx
+  not-found.tsx            root 404
+  styleguide/page.tsx      dev-only live token/component reference (Server shell + Client demo)
   dashboard/
-    layout.tsx              sidebar shell (icons, active-item accent) + auth guard + logout
-    page.tsx                 real overview: stat tiles, recent activity, nearest goal
-    accounts/page.tsx         live — full CRUD (expense-service)
-    transactions/page.tsx     live — full CRUD + pagination/filters + inline categories
-    budgets/page.tsx          live — full CRUD (budget-service)
-    goals/page.tsx             live — full CRUD + progress logging (budget-service)
-    reports/page.tsx          live — budget-vs-actual summary (budget-service), BudgetBar visual
-    search/page.tsx           stub
-    profile/page.tsx          stub
-    settings/page.tsx         stub
+    layout.tsx              Server Component shell — renders DashboardShell
+    loading.tsx              skeleton shown during route-segment navigation
+    error.tsx                 route error boundary
+    page.tsx                   overview: stat tiles, recent activity, nearest goal
+    accounts/, transactions/, budgets/, goals/, reports/,
+    notifications/, search/, profile/, settings/         one page.tsx each — all live
 components/
-  icons.tsx                  hand-rolled icon set (~14 glyphs), no icon-library dependency
   AuthShell.tsx              two-pane brand/form layout shared by login + register
-  ComingSoon.tsx             shared placeholder used by the remaining stub pages
+  theme/                     ThemeProvider, ThemeToggle, AppToaster, no-flash-script.ts
+  dashboard/                 DashboardShell, SidebarNav, nav-items.ts, CategorySpendChart.tsx
+  providers/AppProviders.tsx  single composition point for every app-wide client provider
   ui/
-    Button.tsx, Input.tsx, Card.tsx, Badge.tsx, EmptyState.tsx,
-    Skeleton.tsx, StatTile.tsx, BudgetBar.tsx   — see architecture/frontend-design-system.md §5
+    Button, Input/Select, Card, Badge, EmptyState, Skeleton, StatTile,
+    BudgetBar, Alert, Avatar, Dialog, ConfirmDialog, DropdownMenu, Tooltip
+    — see architecture/frontend-design-system.md §6
 lib/
   api.ts                     fetch wrapper: base URL, auth header, 401→refresh→retry-once
   auth-context.tsx           AuthProvider/useAuth: token presence check, login(), logout()
+  format.ts                  Intl-based currency/number/date formatting
+  cn.ts                      clsx + tailwind-merge combinator
   types.ts                   User/auth shapes + Account, Category, Transaction, Budget,
                              Goal, ReportSummary, CategorySummary
 ```
@@ -212,38 +190,31 @@ engineer knows exactly what to harden next:
    clear the session in another tab until that tab makes its own API call
    and gets a 401.
 
-5. **Remaining stub pages have no real data.** Search/Profile/Settings
-   pages are still static "Coming soon" placeholders — no fetching, no
-   forms. Accounts/Transactions/Budgets/Goals/Reports were wired to live
-   APIs in Phase 5 (see above).
+5. **No data-fetching library, still.** Every page (all 13, now live) uses
+   the same plain `apiFetch` + `useState`/`useEffect` pattern — no React
+   Query/SWR. This means: no shared cache between pages (each page
+   refetches from scratch on mount/navigation), no background
+   refetch/stale-while-revalidate, and no automatic retry beyond the single
+   401-refresh retry already in `lib/api.ts`. Revisit if cross-page data
+   sharing grows enough to justify the dependency.
 
-6. **No data-fetching library, still.** Phase 5 added five more pages
-   with real fetches, all using the same plain `apiFetch` + `useState`/
-   `useEffect` pattern as Phase 0 — no React Query/SWR. This means: no
-   shared cache between pages (each page refetches from scratch on
-   mount/navigation), no background refetch/stale-while-revalidate, and
-   no automatic retry beyond the single 401-refresh retry already in
-   `lib/api.ts`. Revisit if the page count or cross-page data sharing
-   grows enough to justify the dependency.
-
-7. **Simple page-based pagination, no prefetch.** The Transactions list
+6. **Simple page-based pagination, no prefetch.** The Transactions list
    uses `page`/`page_size` query params and refetches on every
    prev/next click — no prefetching the next page, no infinite scroll,
    no URL-encoded pagination state (a page refresh resets to page 1).
 
-8. **Manual-only goal progress.** `Goal.current_amount` is updated by the
+7. **Manual-only goal progress.** `Goal.current_amount` is updated by the
    user typing a new absolute total into the "Log progress" field — it is
    never derived from transactions or budgets, matching the backend
    contract (`PUT /api/v1/goals/:id` takes `current_amount` as a plain
    field, not a computed value).
 
-9. **No optimistic updates.** Every create/edit/delete on the five new
-   pages waits for the gateway response before updating local state (or
+8. **No optimistic updates.** Every create/edit/delete waits for the gateway response before updating local state (or
    re-fetches the current page/list) — there is no optimistic UI that
    assumes success and rolls back on failure. Simpler to reason about at
    this scale; revisit if perceived latency becomes a UX problem.
 
-10. **Free-text budget categories, no cross-check against expense
+9. **Free-text budget categories, no cross-check against expense
     categories.** `Budget.category` is a plain string with a `<datalist>`
     suggestion drawn from `GET /api/v1/categories`, but nothing stops a
     user from typing a name that doesn't match any expense-service

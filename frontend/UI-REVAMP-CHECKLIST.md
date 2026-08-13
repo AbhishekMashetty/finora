@@ -1,6 +1,6 @@
 # Finora UI/UX Revamp — Audit & Checklist
 
-**Status:** Proposal, awaiting sign-off. Nothing here is implemented yet.
+**Status:** Implemented (direction B — editorial data-product, big-bang delivery). Kept as the historical audit/decision record; for the current state of the system, read `architecture/frontend-design-system.md`, not this file.
 **Scope:** `frontend/` — 13 routes, 8 UI primitives, 19 icons, ~4,600 LOC.
 **Companion doc:** `architecture/frontend-design-system.md` is the frontend's constitution. It must be rewritten in the same change that implements this (CLAUDE.md §6), because several of its current rules are explicitly what this proposal changes.
 
