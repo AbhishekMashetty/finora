@@ -37,7 +37,23 @@ spec:
           # stdout, so `kubectl logs` shows real operational events, not
           # health-check noise. Inspect the file directly for a post-mortem:
           # `kubectl exec mongo-user-0 -n finora -- cat /data/db/mongod.log`.
-          command: ["mongod", "--quiet", "--logpath", "/data/db/mongod.log", "--logappend"]
+          #
+          # --wiredTigerCacheSizeGB 0.25: mongod sizes its default cache off
+          # the *host's* visible memory (max((RAM-1GB)*0.5, 256MB)), not the
+          # container's cgroup limit below — on an 8GB Docker Desktop VM
+          # that's ~3.5GB requested against a 512Mi limit, so the container
+          # gets OOMKilled within seconds of starting. Pin it well under the
+          # memory limit instead (leaves headroom for the rest of mongod).
+          #
+          # --bind_ip_all: setting `command` here (Kubernetes' ENTRYPOINT
+          # override) replaces the official mongo image's docker-entrypoint.sh
+          # instead of layering on top of it — and that script is what
+          # normally injects --bind_ip_all when none is given. Without it,
+          # mongod defaults to binding 127.0.0.1 only: readiness/liveness
+          # probes (which exec inside the Pod) still pass, but every other
+          # Pod's connection is refused. Set it explicitly since we're
+          # bypassing the script that would otherwise do it for us.
+          command: ["mongod", "--quiet", "--logpath", "/data/db/mongod.log", "--logappend", "--wiredTigerCacheSizeGB", "0.25", "--bind_ip_all"]
           ports:
             - containerPort: 27017
               name: mongo

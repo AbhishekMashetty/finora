@@ -20,7 +20,7 @@ spec:
       containers:
         - name: mongo
           image: mongo:7
-          command: ["mongod", "--quiet", "--logpath", "/data/db/mongod.log", "--logappend"]
+          command: ["mongod", "--quiet", "--logpath", "/data/db/mongod.log", "--logappend", "--wiredTigerCacheSizeGB", "0.25", "--bind_ip_all"]
           ports:
             - containerPort: 27017
               name: mongo
