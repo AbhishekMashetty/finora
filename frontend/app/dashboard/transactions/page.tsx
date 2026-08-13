@@ -11,7 +11,9 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { List, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { formatCurrency, formatDate, formatSignedAmount } from "@/lib/format";
 import type { Account, Category, ImportResult, Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
@@ -19,7 +21,8 @@ import { Card } from "@/components/ui/Card";
 import { TransactionTypeBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { ListIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from "@/components/icons";
+import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const PAGE_SIZE = 20;
 
@@ -344,7 +347,7 @@ export default function TransactionsPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink-primary">Transactions</h1>
+        <h1 className="font-display text-2xl font-medium text-ink-primary">Transactions</h1>
         {refDataLoaded && hasAccounts && (
           <div className="flex gap-2">
             <Button
@@ -356,7 +359,7 @@ export default function TransactionsPage() {
                 setShowCreateForm(false);
               }}
             >
-              <UploadIcon size={16} />
+              <Upload size={16} strokeWidth={1.75} />
               {showImportForm ? "Cancel" : "Import CSV"}
             </Button>
             <Button
@@ -368,7 +371,7 @@ export default function TransactionsPage() {
                 setShowImportForm(false);
               }}
             >
-              <PlusIcon size={16} />
+              <Plus size={16} strokeWidth={1.75} />
               {showCreateForm ? "Cancel" : "Add transaction"}
             </Button>
           </div>
@@ -473,7 +476,7 @@ export default function TransactionsPage() {
 
       {refDataError && (
         <Card className="mt-6">
-          <p className="text-sm text-status-critical">{refDataError}</p>
+          <Alert variant="error">{refDataError}</Alert>
         </Card>
       )}
 
@@ -563,7 +566,7 @@ export default function TransactionsPage() {
                 className="h-10"
                 onClick={() => setShowNewCategory((prev) => !prev)}
               >
-                <PlusIcon size={14} />
+                <Plus size={14} strokeWidth={1.75} />
                 {showNewCategory ? "Cancel" : "New category"}
               </Button>
               <div className="min-w-[200px] flex-1">
@@ -577,7 +580,7 @@ export default function TransactionsPage() {
             </div>
 
             {showNewCategory && (
-              <div className="flex flex-wrap items-end gap-3 rounded-md border border-dashed border-hairline p-3">
+              <div className="flex flex-wrap items-end gap-3 rounded-control border border-dashed border-hairline p-3">
                 <Input
                   label="New category name"
                   wrapperClassName="w-56"
@@ -646,7 +649,7 @@ export default function TransactionsPage() {
                   type="file"
                   accept=".csv,text/csv"
                   onChange={handleImportFileChange}
-                  className="h-10 rounded-md border border-hairline bg-surface px-3 text-sm text-ink-primary outline-none file:mr-3 file:h-full file:rounded-md file:border-0 file:bg-plane file:px-3 file:text-xs file:font-medium file:text-ink-primary focus:border-brand"
+                  className="h-10 rounded-control border border-hairline bg-surface px-3 text-sm text-ink-primary outline-none file:mr-3 file:h-full file:rounded-control file:border-0 file:bg-plane file:px-3 file:text-xs file:font-medium file:text-ink-primary focus:border-brand focus:ring-2 focus:ring-brand/25"
                 />
               </div>
             </div>
@@ -661,7 +664,7 @@ export default function TransactionsPage() {
 
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={isImporting || !importFile || !importAccountId}>
-                <UploadIcon size={16} />
+                <Upload size={16} strokeWidth={1.75} />
                 {isImporting ? "Importing…" : "Import"}
               </Button>
               {importError && <p className="text-sm text-status-critical">{importError}</p>}
@@ -669,7 +672,7 @@ export default function TransactionsPage() {
           </form>
 
           {importResult && (
-            <div className="mt-4 rounded-md border border-hairline p-3">
+            <div className="mt-4 rounded-control border border-hairline p-3">
               <p className="text-sm text-ink-primary">
                 Imported <span className="tabular-nums font-medium">{importResult.imported}</span>,
                 skipped <span className="tabular-nums font-medium">{importResult.skipped}</span>.
@@ -691,10 +694,14 @@ export default function TransactionsPage() {
       {/* List */}
       <Card className="mt-6 p-0">
         {isLoading && <SkeletonRows rows={6} />}
-        {!isLoading && loadError && <p className="p-6 text-sm text-status-critical">{loadError}</p>}
+        {!isLoading && loadError && (
+          <div className="p-6">
+            <Alert variant="error">{loadError}</Alert>
+          </div>
+        )}
         {!isLoading && !loadError && transactions.length === 0 && (
           <EmptyState
-            icon={<ListIcon size={24} />}
+            icon={<List size={24} strokeWidth={1.75} />}
             title="No transactions found"
             description="Log a transaction above, or adjust your filters."
           />
@@ -702,9 +709,9 @@ export default function TransactionsPage() {
         {!isLoading && !loadError && transactions.length > 0 && (
           <div className="overflow-x-auto">
             {rowError && (
-              <p className="m-4 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-                {rowError}
-              </p>
+              <div className="m-4">
+                <Alert variant="error">{rowError}</Alert>
+              </div>
             )}
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-hairline text-xs uppercase text-ink-muted">
@@ -793,7 +800,7 @@ export default function TransactionsPage() {
                     </tr>
                   ) : (
                     <tr key={tx.id} className="hover:bg-plane">
-                      <td className="px-6 py-3 text-ink-secondary">{tx.date.slice(0, 10)}</td>
+                      <td className="px-6 py-3 text-ink-secondary">{formatDate(tx.date)}</td>
                       <td className="px-6 py-3 text-ink-secondary">{accountLabel(tx.account_id)}</td>
                       <td className="px-6 py-3 text-ink-secondary">{categoryLabel(tx.category_id)}</td>
                       <td className="px-6 py-3 text-ink-muted">{tx.note || "—"}</td>
@@ -801,8 +808,7 @@ export default function TransactionsPage() {
                         <div className="flex items-center gap-2">
                           <TransactionTypeBadge type={tx.type} />
                           <span className="tabular-nums text-ink-primary">
-                            {tx.type === "income" ? "+" : "-"}
-                            {tx.amount.toFixed(2)} {tx.currency}
+                            {formatSignedAmount(tx.amount, tx.currency, tx.type)}
                           </span>
                         </div>
                       </td>
@@ -814,17 +820,23 @@ export default function TransactionsPage() {
                             aria-label="Edit transaction"
                             onClick={() => startEdit(tx)}
                           >
-                            <PencilIcon size={16} />
+                            <Pencil size={16} strokeWidth={1.75} />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Delete transaction"
-                            onClick={() => handleDelete(tx.id)}
-                            disabled={deletingId === tx.id}
-                          >
-                            <TrashIcon size={16} />
-                          </Button>
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Delete transaction"
+                                disabled={deletingId === tx.id}
+                              >
+                                <Trash2 size={16} strokeWidth={1.75} />
+                              </Button>
+                            }
+                            title="Delete this transaction?"
+                            description="This can't be undone."
+                            onConfirm={() => handleDelete(tx.id)}
+                          />
                         </div>
                       </td>
                     </tr>

@@ -9,6 +9,7 @@ import type { LoginResponse } from "@/lib/types";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Alert } from "@/components/ui/Alert";
 
 function LoginForm() {
   const router = useRouter();
@@ -43,7 +44,7 @@ function LoginForm() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink-primary">
+      <h1 className="font-display text-3xl font-medium tracking-tight text-ink-primary">
         Log in to Finora
       </h1>
       <p className="mt-2 text-sm text-ink-secondary">
@@ -54,9 +55,9 @@ function LoginForm() {
       </p>
 
       {justRegistered && (
-        <p className="mt-4 rounded-md bg-status-good/10 px-3 py-2 text-sm text-status-good-text">
+        <Alert variant="success" className="mt-4">
           Account created. Please log in.
-        </p>
+        </Alert>
       )}
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
@@ -81,11 +82,7 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        {error && (
-          <p className="rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-            {error}
-          </p>
-        )}
+        {error && <Alert variant="error">{error}</Alert>}
 
         <Button type="submit" disabled={isSubmitting} className="mt-2">
           {isSubmitting ? "Logging in…" : "Log in"}

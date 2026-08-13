@@ -7,14 +7,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Flag, Inbox, List, Target, Wallet } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { formatCurrency, formatDate, formatSignedAmount } from "@/lib/format";
 import type { Account, Goal, ReportSummary, Transaction, User } from "@/lib/types";
 import { StatTile } from "@/components/ui/StatTile";
 import { Card } from "@/components/ui/Card";
-import { SkeletonRows } from "@/components/ui/Skeleton";
+import { Skeleton, SkeletonRows } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TransactionTypeBadge } from "@/components/ui/Badge";
-import { FlagIcon, InboxIcon, ListIcon, TargetIcon, WalletIcon } from "@/components/icons";
+import { Alert } from "@/components/ui/Alert";
 
 function currentMonthRange(): { from: string; to: string } {
   const now = new Date();
@@ -103,10 +105,10 @@ export default function DashboardOverviewPage() {
   if (isLoading) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-ink-primary">Overview</h1>
+        <Skeleton className="h-8 w-56" />
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-hairline bg-surface p-5">
+            <div key={i} className="rounded-card border border-hairline bg-surface p-5">
               <SkeletonRows rows={2} />
             </div>
           ))}
@@ -118,10 +120,10 @@ export default function DashboardOverviewPage() {
   if (error || !data) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-ink-primary">Overview</h1>
-        <p className="mt-6 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
+        <h1 className="font-display text-2xl font-medium text-ink-primary">Overview</h1>
+        <Alert variant="error" className="mt-6">
           {error ?? "Something went wrong."}
-        </p>
+        </Alert>
       </div>
     );
   }
@@ -130,31 +132,31 @@ export default function DashboardOverviewPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink-primary">
+      <h1 className="font-display text-2xl font-medium text-ink-primary">
         Welcome back, {user.name.split(" ")[0]}
       </h1>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Total balance"
-          icon={<WalletIcon size={16} />}
-          value={`${totalBalance.toFixed(2)} ${currency}`}
+          icon={<Wallet size={16} strokeWidth={1.75} />}
+          value={formatCurrency(totalBalance, currency)}
         />
         <StatTile
           label="This month's spend"
-          icon={<ListIcon size={16} />}
-          value={`${monthSpend.toFixed(2)} ${currency}`}
+          icon={<List size={16} strokeWidth={1.75} />}
+          value={formatCurrency(monthSpend, currency)}
           tone={monthSpend > 0 ? "critical" : "neutral"}
         />
         <StatTile
           label="Budgets on track"
-          icon={<TargetIcon size={16} />}
+          icon={<Target size={16} strokeWidth={1.75} />}
           value={budgetsTotal > 0 ? `${budgetsOnTrack} / ${budgetsTotal}` : "—"}
           tone={budgetsTotal > 0 && budgetsOnTrack < budgetsTotal ? "critical" : "good"}
         />
         <StatTile
           label="Next goal"
-          icon={<FlagIcon size={16} />}
+          icon={<Flag size={16} strokeWidth={1.75} />}
           value={
             nearestGoal
               ? `${Math.round((nearestGoal.current_amount / nearestGoal.target_amount) * 100)}%`
@@ -171,7 +173,7 @@ export default function DashboardOverviewPage() {
           {recentTransactions.length === 0 ? (
             <div className="mt-4">
               <EmptyState
-                icon={<InboxIcon size={24} />}
+                icon={<Inbox size={24} strokeWidth={1.75} />}
                 title="No transactions yet"
                 description="Log your first transaction to see it here."
               />
@@ -182,13 +184,12 @@ export default function DashboardOverviewPage() {
                 <li key={tx.id} className="flex items-center justify-between py-3 text-sm">
                   <div>
                     <p className="text-ink-primary">{tx.note || "—"}</p>
-                    <p className="text-xs text-ink-muted">{tx.date.slice(0, 10)}</p>
+                    <p className="text-xs text-ink-muted">{formatDate(tx.date)}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <TransactionTypeBadge type={tx.type} />
                     <span className="tabular-nums text-ink-primary">
-                      {tx.type === "income" ? "+" : "-"}
-                      {tx.amount.toFixed(2)} {tx.currency}
+                      {formatSignedAmount(tx.amount, tx.currency, tx.type)}
                     </span>
                   </div>
                 </li>
@@ -197,7 +198,7 @@ export default function DashboardOverviewPage() {
           )}
           <Link
             href="/dashboard/transactions"
-            className="mt-4 inline-block text-xs font-medium text-brand"
+            className="mt-4 inline-block text-xs font-medium text-brand hover:underline"
           >
             View all transactions →
           </Link>
@@ -210,31 +211,30 @@ export default function DashboardOverviewPage() {
           {nearestGoal ? (
             <div className="mt-4">
               <p className="text-lg font-medium text-ink-primary">{nearestGoal.name}</p>
-              <p className="mt-1 text-sm text-ink-muted">
-                Due {nearestGoal.target_date.slice(0, 10)}
-              </p>
-              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-ink-muted/15">
+              <p className="mt-1 text-sm text-ink-muted">Due {formatDate(nearestGoal.target_date)}</p>
+              <div className="mt-4 h-2 w-full overflow-hidden rounded-pill bg-ink-muted/15">
                 <div
-                  className="h-full rounded-full bg-brand"
+                  className="h-full rounded-pill bg-brand transition-[width] duration-[var(--duration-slow)]"
                   style={{
                     width: `${Math.min(100, (nearestGoal.current_amount / nearestGoal.target_amount) * 100)}%`,
                   }}
                 />
               </div>
               <p className="mt-2 text-sm tabular-nums text-ink-secondary">
-                {nearestGoal.current_amount.toFixed(2)} / {nearestGoal.target_amount.toFixed(2)}
+                {formatCurrency(nearestGoal.current_amount, currency)} /{" "}
+                {formatCurrency(nearestGoal.target_amount, currency)}
               </p>
             </div>
           ) : (
             <div className="mt-4">
               <EmptyState
-                icon={<FlagIcon size={24} />}
+                icon={<Flag size={24} strokeWidth={1.75} />}
                 title="No goals yet"
                 description="Set a savings goal to track your progress."
               />
             </div>
           )}
-          <Link href="/dashboard/goals" className="mt-4 inline-block text-xs font-medium text-brand">
+          <Link href="/dashboard/goals" className="mt-4 inline-block text-xs font-medium text-brand hover:underline">
             View all goals →
           </Link>
         </Card>

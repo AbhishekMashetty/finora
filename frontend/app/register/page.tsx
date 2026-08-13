@@ -8,6 +8,7 @@ import type { RegisterResponse } from "@/lib/types";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Alert } from "@/components/ui/Alert";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function RegisterPage() {
 
   return (
     <AuthShell>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink-primary">
+      <h1 className="font-display text-3xl font-medium tracking-tight text-ink-primary">
         Create your account
       </h1>
       <p className="mt-2 text-sm text-ink-secondary">
@@ -82,11 +83,7 @@ export default function RegisterPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        {error && (
-          <p className="rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-            {error}
-          </p>
-        )}
+        {error && <Alert variant="error">{error}</Alert>}
 
         <Button type="submit" disabled={isSubmitting} className="mt-2">
           {isSubmitting ? "Creating account…" : "Create account"}

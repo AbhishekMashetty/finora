@@ -4,6 +4,7 @@
 // viewport on larger screens.
 
 import type { ReactNode } from "react";
+import { Check } from "lucide-react";
 
 const VALUE_BULLETS = [
   "See every account and transaction in one place",
@@ -18,11 +19,13 @@ export function AuthShell({ children }: { children: ReactNode }) {
           theme (a `bg-ink-primary` token would invert to white in dark mode,
           which is not the intent — this pane is always dark). */}
       <div className="hidden w-[40%] flex-col justify-between bg-[#0b0b0b] p-10 text-[#f9f9f7] md:flex">
-        <div className="text-xl font-semibold tracking-tight">Finora</div>
+        <div className="font-display text-2xl font-medium tracking-tight">Finora</div>
         <ul className="flex flex-col gap-4 text-sm text-[#f9f9f7]/80">
           {VALUE_BULLETS.map((bullet) => (
-            <li key={bullet} className="flex gap-2">
-              <span className="text-[#9085e9]">＋</span>
+            <li key={bullet} className="flex gap-2.5">
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#9085e9]/20 text-[#9085e9]">
+                <Check size={11} strokeWidth={2.5} />
+              </span>
               {bullet}
             </li>
           ))}

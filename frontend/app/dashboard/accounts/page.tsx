@@ -4,7 +4,9 @@
 // GET/POST /api/v1/accounts, PUT/DELETE /api/v1/accounts/:id.
 
 import { useEffect, useState, type FormEvent } from "react";
+import { Pencil, Plus, Trash2, Wallet } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
 import type { Account } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
@@ -12,7 +14,8 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { PencilIcon, PlusIcon, TrashIcon, WalletIcon } from "@/components/icons";
+import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 // Must match expense-service's domain.ValidAccountType exactly
 // (services/expense-service/internal/domain/account.go) — anything else is a
@@ -57,22 +60,7 @@ export default function AccountsPage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await apiFetch<{ accounts: Account[] }>("/api/v1/accounts");
-        if (!cancelled) setAccounts(data.accounts ?? []);
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err instanceof ApiError ? err.message : "Could not load accounts.");
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    loadAccounts();
   }, []);
 
   async function handleCreate(event: FormEvent) {
@@ -149,14 +137,14 @@ export default function AccountsPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink-primary">Accounts</h1>
+        <h1 className="font-display text-2xl font-medium text-ink-primary">Accounts</h1>
         <Button
           type="button"
           variant={showCreateForm ? "secondary" : "primary"}
           size="sm"
           onClick={() => setShowCreateForm((prev) => !prev)}
         >
-          <PlusIcon size={16} />
+          <Plus size={16} strokeWidth={1.75} />
           {showCreateForm ? "Cancel" : "Add account"}
         </Button>
       </div>
@@ -196,22 +184,20 @@ export default function AccountsPage() {
             </Button>
           </form>
 
-          {createError && (
-            <p className="mt-3 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-              {createError}
-            </p>
-          )}
+          {createError && <Alert variant="error" className="mt-3">{createError}</Alert>}
         </Card>
       )}
 
       <Card className="mt-6 p-0">
         {isLoading && <SkeletonRows rows={4} />}
         {!isLoading && loadError && (
-          <p className="p-6 text-sm text-status-critical">{loadError}</p>
+          <div className="p-6">
+            <Alert variant="error">{loadError}</Alert>
+          </div>
         )}
         {!isLoading && !loadError && accounts.length === 0 && (
           <EmptyState
-            icon={<WalletIcon size={24} />}
+            icon={<Wallet size={24} strokeWidth={1.75} />}
             title="No accounts yet"
             description="Add an account above to start tracking balances and transactions."
           />
@@ -219,9 +205,9 @@ export default function AccountsPage() {
         {!isLoading && !loadError && accounts.length > 0 && (
           <div className="overflow-x-auto">
             {rowError && (
-              <p className="m-4 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-                {rowError}
-              </p>
+              <div className="m-4">
+                <Alert variant="error">{rowError}</Alert>
+              </div>
             )}
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-hairline text-xs uppercase text-ink-muted">
@@ -279,9 +265,7 @@ export default function AccountsPage() {
                             Cancel
                           </Button>
                         </div>
-                        {editError && (
-                          <p className="mt-2 text-xs text-status-critical">{editError}</p>
-                        )}
+                        {editError && <p className="mt-2 text-xs text-status-critical">{editError}</p>}
                       </td>
                     </tr>
                   ) : (
@@ -292,7 +276,7 @@ export default function AccountsPage() {
                       </td>
                       <td className="px-6 py-3 text-ink-secondary">{account.currency}</td>
                       <td className="px-6 py-3 tabular-nums text-ink-primary">
-                        {account.balance.toFixed(2)}
+                        {formatCurrency(account.balance, account.currency)}
                       </td>
                       <td className="px-6 py-3 text-right">
                         <div className="flex justify-end gap-1">
@@ -302,17 +286,23 @@ export default function AccountsPage() {
                             aria-label="Edit account"
                             onClick={() => startEdit(account)}
                           >
-                            <PencilIcon size={16} />
+                            <Pencil size={16} strokeWidth={1.75} />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Delete account"
-                            onClick={() => handleDelete(account.id)}
-                            disabled={deletingId === account.id}
-                          >
-                            <TrashIcon size={16} />
-                          </Button>
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Delete account"
+                                disabled={deletingId === account.id}
+                              >
+                                <Trash2 size={16} strokeWidth={1.75} />
+                              </Button>
+                            }
+                            title={`Delete ${account.name}?`}
+                            description="This can't be undone. Transactions on this account are not deleted."
+                            onConfirm={() => handleDelete(account.id)}
+                          />
                         </div>
                       </td>
                     </tr>
