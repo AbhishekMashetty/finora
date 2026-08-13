@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { SkeletonRows } from "@/components/ui/Skeleton";
+import { Alert } from "@/components/ui/Alert";
 
 // A short list of common IANA timezones, offered as soft <datalist>
 // suggestions — not a strict dropdown, since the backend accepts any real
@@ -87,11 +88,11 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink-primary">Settings</h1>
+      <h1 className="font-display text-2xl font-medium text-ink-primary">Settings</h1>
 
       <Card className="mt-6 max-w-md">
         {isLoading && <SkeletonRows rows={2} />}
-        {!isLoading && loadError && <p className="text-sm text-status-critical">{loadError}</p>}
+        {!isLoading && loadError && <Alert variant="error">{loadError}</Alert>}
         {!isLoading && !loadError && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
@@ -129,8 +130,8 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {saveError && <p className="text-sm text-status-critical">{saveError}</p>}
-            {saved && <p className="text-sm text-status-good-text">Settings updated.</p>}
+            {saveError && <Alert variant="error">{saveError}</Alert>}
+            {saved && <Alert variant="success">Settings updated.</Alert>}
 
             <div>
               <Button type="submit" size="sm" disabled={isSaving}>

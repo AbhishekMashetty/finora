@@ -9,24 +9,16 @@
 // design: this feed is read/acknowledge only.
 
 import { useEffect, useState } from "react";
+import { Bell, Check } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
 import type { Notification } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { BellIcon, CheckIcon } from "@/components/icons";
-
-function formatTimestamp(iso: string): string {
-  const date = new Date(iso);
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { Alert } from "@/components/ui/Alert";
 
 const PAGE_SIZE = 20;
 
@@ -93,7 +85,7 @@ export default function NotificationsPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink-primary">Notifications</h1>
+        <h1 className="font-display text-2xl font-medium text-ink-primary">Notifications</h1>
         <Button
           size="sm"
           variant={unreadOnly ? "primary" : "secondary"}
@@ -108,10 +100,14 @@ export default function NotificationsPage() {
 
       <Card className="mt-6 overflow-hidden p-0">
         {isLoading && <SkeletonRows rows={4} />}
-        {!isLoading && loadError && <p className="p-6 text-sm text-status-critical">{loadError}</p>}
+        {!isLoading && loadError && (
+          <div className="p-6">
+            <Alert variant="error">{loadError}</Alert>
+          </div>
+        )}
         {!isLoading && !loadError && notifications.length === 0 && (
           <EmptyState
-            icon={<BellIcon size={24} />}
+            icon={<Bell size={24} strokeWidth={1.75} />}
             title={unreadOnly ? "No unread notifications" : "No notifications yet"}
             description={
               unreadOnly
@@ -124,9 +120,7 @@ export default function NotificationsPage() {
           <ul className="flex flex-col divide-y divide-hairline">
             {rowError && (
               <li className="p-4">
-                <p className="rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-                  {rowError}
-                </p>
+                <Alert variant="error">{rowError}</Alert>
               </li>
             )}
             {notifications.map((n) => (
@@ -144,7 +138,7 @@ export default function NotificationsPage() {
                       {!n.read && <Badge status="warning">New</Badge>}
                     </div>
                     <p className="mt-1 text-sm text-ink-secondary">{n.message}</p>
-                    <p className="mt-1 text-xs text-ink-muted">{formatTimestamp(n.created_at)}</p>
+                    <p className="mt-1 text-xs text-ink-muted">{formatDateTime(n.created_at)}</p>
                   </div>
                 </div>
                 {!n.read && (
@@ -155,7 +149,7 @@ export default function NotificationsPage() {
                     disabled={markingId === n.id}
                     onClick={() => handleMarkRead(n.id)}
                   >
-                    <CheckIcon size={16} />
+                    <Check size={16} strokeWidth={1.75} />
                     {markingId === n.id ? "Marking…" : "Mark read"}
                   </Button>
                 )}

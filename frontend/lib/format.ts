@@ -49,3 +49,7 @@ export function formatDate(
   if (Number.isNaN(date.getTime())) return dateStr;
   return new Intl.DateTimeFormat(locale, options).format(date);
 }
+
+export function formatDateTime(dateStr: string, locale = DEFAULT_LOCALE): string {
+  return formatDate(dateStr, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, locale);
+}

@@ -13,7 +13,8 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { SkeletonRows } from "@/components/ui/Skeleton";
-import { UserIcon } from "@/components/icons";
+import { Alert } from "@/components/ui/Alert";
+import { Avatar } from "@/components/ui/Avatar";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -68,17 +69,15 @@ export default function ProfilePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink-primary">Profile</h1>
+      <h1 className="font-display text-2xl font-medium text-ink-primary">Profile</h1>
 
       <Card className="mt-6 max-w-md">
         {isLoading && <SkeletonRows rows={3} />}
-        {!isLoading && loadError && <p className="text-sm text-status-critical">{loadError}</p>}
+        {!isLoading && loadError && <Alert variant="error">{loadError}</Alert>}
         {!isLoading && !loadError && user && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-brand">
-                <UserIcon size={20} />
-              </span>
+              <Avatar name={user.name} size={40} />
               <div>
                 <p className="text-sm font-medium text-ink-primary">{user.name}</p>
                 <p className="text-xs text-ink-muted">{user.email}</p>
@@ -105,8 +104,8 @@ export default function ProfilePage() {
                 }}
               />
 
-              {saveError && <p className="text-sm text-status-critical">{saveError}</p>}
-              {saved && <p className="text-sm text-status-good-text">Profile updated.</p>}
+              {saveError && <Alert variant="error">{saveError}</Alert>}
+              {saved && <Alert variant="success">Profile updated.</Alert>}
 
               <div>
                 <Button type="submit" size="sm" disabled={isSaving || name.trim() === ""}>

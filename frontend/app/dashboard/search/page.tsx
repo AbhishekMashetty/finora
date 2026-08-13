@@ -18,21 +18,17 @@
 // a new one invented here.
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { Flag, List, Search, Target, Wallet } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 import type { Account, Budget, Category, Goal, Transaction } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TransactionTypeBadge } from "@/components/ui/Badge";
-import {
-  FlagIcon,
-  ListIcon,
-  SearchIcon,
-  TargetIcon,
-  WalletIcon,
-} from "@/components/icons";
+import { Alert } from "@/components/ui/Alert";
 
 interface SearchResults {
   accounts: Account[];
@@ -101,7 +97,7 @@ export default function SearchPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-ink-primary">Search</h1>
+      <h1 className="font-display text-2xl font-medium text-ink-primary">Search</h1>
 
       <Card className="mt-6">
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
@@ -116,22 +112,22 @@ export default function SearchPage() {
             />
           </div>
           <Button type="submit" size="md" disabled={isSearching || query.trim() === ""}>
-            <SearchIcon size={16} />
+            <Search size={16} strokeWidth={1.75} />
             {isSearching ? "Searching…" : "Search"}
           </Button>
         </form>
       </Card>
 
       {error && (
-        <p className="mt-6 rounded-md bg-status-critical/10 px-3 py-2 text-sm text-status-critical">
-          {error}
-        </p>
+        <div className="mt-6">
+          <Alert variant="error">{error}</Alert>
+        </div>
       )}
 
       {!error && !hasSearched && (
         <Card className="mt-6">
           <EmptyState
-            icon={<SearchIcon size={24} />}
+            icon={<Search size={24} strokeWidth={1.75} />}
             title="Search your finances"
             description="Find an account, transaction, budget, or goal by name."
           />
@@ -141,7 +137,7 @@ export default function SearchPage() {
       {!error && hasSearched && results && totalMatches === 0 && (
         <Card className="mt-6">
           <EmptyState
-            icon={<SearchIcon size={24} />}
+            icon={<Search size={24} strokeWidth={1.75} />}
             title="No matches"
             description={`Nothing found for "${query}".`}
           />
@@ -151,7 +147,7 @@ export default function SearchPage() {
       {!error && hasSearched && results && totalMatches > 0 && (
         <div className="mt-6 flex flex-col gap-6">
           {results.accounts.length > 0 && (
-            <ResultSection title="Accounts" icon={<WalletIcon size={16} />} href="/dashboard/accounts">
+            <ResultSection title="Accounts" icon={<Wallet size={16} strokeWidth={1.75} />} href="/dashboard/accounts">
               {results.accounts.map((a) => (
                 <li key={a.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <span className="text-ink-primary">{a.name}</span>
@@ -162,17 +158,17 @@ export default function SearchPage() {
           )}
 
           {results.transactions.length > 0 && (
-            <ResultSection title="Transactions" icon={<ListIcon size={16} />} href="/dashboard/transactions">
+            <ResultSection title="Transactions" icon={<List size={16} strokeWidth={1.75} />} href="/dashboard/transactions">
               {results.transactions.map((t) => (
                 <li key={t.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <div>
                     <span className="text-ink-primary">{t.note || "—"}</span>
-                    <span className="ml-2 text-xs text-ink-muted">{t.date.slice(0, 10)}</span>
+                    <span className="ml-2 text-xs text-ink-muted">{formatDate(t.date)}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <TransactionTypeBadge type={t.type} />
                     <span className="tabular-nums text-ink-primary">
-                      {t.amount.toFixed(2)} {t.currency}
+                      {formatCurrency(t.amount, t.currency)}
                     </span>
                   </div>
                 </li>
@@ -181,12 +177,12 @@ export default function SearchPage() {
           )}
 
           {results.budgets.length > 0 && (
-            <ResultSection title="Budgets" icon={<TargetIcon size={16} />} href="/dashboard/budgets">
+            <ResultSection title="Budgets" icon={<Target size={16} strokeWidth={1.75} />} href="/dashboard/budgets">
               {results.budgets.map((b) => (
                 <li key={b.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <span className="capitalize text-ink-primary">{b.category}</span>
                   <span className="tabular-nums text-ink-muted">
-                    {b.amount.toFixed(2)} / {b.period}
+                    {formatNumber(b.amount)} / {b.period}
                   </span>
                 </li>
               ))}
@@ -194,12 +190,12 @@ export default function SearchPage() {
           )}
 
           {results.goals.length > 0 && (
-            <ResultSection title="Goals" icon={<FlagIcon size={16} />} href="/dashboard/goals">
+            <ResultSection title="Goals" icon={<Flag size={16} strokeWidth={1.75} />} href="/dashboard/goals">
               {results.goals.map((g) => (
                 <li key={g.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <span className="text-ink-primary">{g.name}</span>
                   <span className="tabular-nums text-ink-muted">
-                    {g.current_amount.toFixed(2)} / {g.target_amount.toFixed(2)}
+                    {formatNumber(g.current_amount)} / {formatNumber(g.target_amount)}
                   </span>
                 </li>
               ))}
@@ -218,9 +214,9 @@ function ResultSection({
   children,
 }: {
   title: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   href: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <Card className="overflow-hidden p-0">
@@ -229,7 +225,7 @@ function ResultSection({
           {icon}
           {title}
         </span>
-        <Link href={href} className="text-xs font-medium text-brand">
+        <Link href={href} className="text-xs font-medium text-brand hover:underline">
           View all →
         </Link>
       </div>
