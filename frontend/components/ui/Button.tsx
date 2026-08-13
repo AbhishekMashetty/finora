@@ -3,6 +3,7 @@
 // string constants that used to be redefined at the top of every page file.
 
 import type { ButtonHTMLAttributes } from "react";
+import { Slot } from "radix-ui";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
@@ -43,8 +44,12 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  /** Render as the single child element instead of a <button> — for a Link styled as a button. */
+  asChild?: boolean;
+}
 
-export function Button({ variant, size, className, ...props }: ButtonProps) {
-  return <button className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+export function Button({ variant, size, className, asChild, ...props }: ButtonProps) {
+  const Comp = asChild ? Slot.Root : "button";
+  return <Comp className={cn(buttonVariants({ variant, size }), className)} {...props} />;
 }
