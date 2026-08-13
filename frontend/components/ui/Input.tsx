@@ -1,6 +1,7 @@
 // Shared form-field primitives. See architecture/frontend-design-system.md §5.
 
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { cn } from "@/lib/cn";
 
 // h-10 is load-bearing, not decorative: native <input type="date">/
 // type="number"> controls render with browser-supplied internal chrome
@@ -12,13 +13,15 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react
 // sizing so every field in a row is pixel-identical regardless of type or
 // browser, instead of leaving each native control to size itself.
 const fieldClasses =
-  "h-10 rounded-md border border-hairline bg-surface px-3 text-sm text-ink-primary outline-none focus:border-brand disabled:opacity-50";
+  "h-10 w-full rounded-control border border-hairline bg-surface px-3 text-sm text-ink-primary outline-none transition-colors duration-[var(--duration-fast)] focus:border-brand focus:ring-2 focus:ring-brand/25 disabled:opacity-50";
+
+const errorFieldClasses = "border-status-critical focus:border-status-critical focus:ring-status-critical/20";
 
 function Field({
   label,
   htmlFor,
   error,
-  wrapperClassName = "",
+  wrapperClassName,
   children,
 }: {
   label?: string;
@@ -28,14 +31,18 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={`flex flex-col gap-1 ${wrapperClassName}`}>
+    <div className={cn("flex flex-col gap-1", wrapperClassName)}>
       {label && (
         <label htmlFor={htmlFor} className="text-xs font-medium text-ink-secondary">
           {label}
         </label>
       )}
       {children}
-      {error && <p className="text-xs text-status-critical">{error}</p>}
+      {error && (
+        <p className="text-xs text-status-critical" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -57,10 +64,15 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   wrapperClassName?: string;
 }
 
-export function Input({ label, error, wrapperClassName, className = "", id, ...props }: InputProps) {
+export function Input({ label, error, wrapperClassName, className, id, ...props }: InputProps) {
   return (
     <Field label={label} htmlFor={id} error={error} wrapperClassName={wrapperClassName}>
-      <input id={id} className={`${fieldClasses} ${className}`} {...props} />
+      <input
+        id={id}
+        aria-invalid={!!error}
+        className={cn(fieldClasses, error && errorFieldClasses, className)}
+        {...props}
+      />
     </Field>
   );
 }
@@ -71,10 +83,23 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   wrapperClassName?: string;
 }
 
-export function Select({ label, error, wrapperClassName, className = "", id, children, ...props }: SelectProps) {
+export function Select({
+  label,
+  error,
+  wrapperClassName,
+  className,
+  id,
+  children,
+  ...props
+}: SelectProps) {
   return (
     <Field label={label} htmlFor={id} error={error} wrapperClassName={wrapperClassName}>
-      <select id={id} className={`${fieldClasses} ${className}`} {...props}>
+      <select
+        id={id}
+        aria-invalid={!!error}
+        className={cn(fieldClasses, error && errorFieldClasses, className)}
+        {...props}
+      >
         {children}
       </select>
     </Field>

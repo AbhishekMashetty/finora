@@ -1,4 +1,5 @@
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ComponentsShowcase } from "./ComponentsShowcase";
 
 export const metadata = {
   title: "Styleguide",
@@ -158,6 +159,13 @@ export default function StyleguidePage() {
             <div key={v} className="h-12 flex-1" style={{ background: `var(${v})` }} />
           ))}
         </div>
+      </section>
+
+      <section className="mb-12">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-ink-muted">
+          Components
+        </h2>
+        <ComponentsShowcase />
       </section>
 
       <section className="mb-12">

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
-import { AuthProvider } from "@/lib/auth-context";
-import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { AppProviders } from "@/components/providers/AppProviders";
 import { noFlashThemeScript } from "@/components/theme/no-flash-script";
 import "./globals.css";
 
@@ -63,9 +62,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
