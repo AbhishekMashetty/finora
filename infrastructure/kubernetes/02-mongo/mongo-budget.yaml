@@ -1,0 +1,73 @@
+# Same shape as mongo-user.yaml (see that file for the full StatefulSet-vs-
+# Deployment and log-redirect rationale) — budget-service's own database,
+# per CLAUDE.md §2's "one MongoDB per service, never shared."
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-budget
+  namespace: finora
+spec:
+  serviceName: mongo-budget
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-budget
+  template:
+    metadata:
+      labels:
+        app: mongo-budget
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7
+          command: ["mongod", "--quiet", "--logpath", "/data/db/mongod.log", "--logappend"]
+          ports:
+            - containerPort: 27017
+              name: mongo
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-budget
+  namespace: finora
+spec:
+  clusterIP: None
+  selector:
+    app: mongo-budget
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongo

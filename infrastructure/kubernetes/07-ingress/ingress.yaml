@@ -1,0 +1,52 @@
+# Single host, path-based routing — not two subdomains (api.finora.local +
+# finora.local) — deliberately, for one concrete reason: the browser's page
+# origin and every API call then share the same origin
+# (http://finora.local), so CORS is never actually triggered by the app in
+# normal use. CORS_ALLOWED_ORIGINS in the shared ConfigMap is still set
+# correctly as defense in depth, but this Ingress shape is what makes it a
+# non-issue day to day, instead of a recurring local-k8s gotcha to debug.
+#
+# /api routes to the gateway before the catch-all / — ingress-nginx matches
+# the longest/most specific path first regardless of rule order, so this
+# isn't order-sensitive, but it's written in match-priority order for
+# readability. The gateway's own routes are already prefixed /api/v1/...
+# (CLAUDE.md §5), so no path rewriting is needed here at all — the request
+# path forwarded to the gateway Service is identical to what the browser
+# sent.
+#
+# Requires the ingress-nginx controller running in the cluster first — see
+# infrastructure/kubernetes/README.md for the install command (not vendored
+# here; it's a third-party project's own manifest, referenced by pinned
+# version instead of copied into this repo).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: finora
+  namespace: finora
+  annotations:
+    # Slightly above MAX_REQUEST_BODY_BYTES (1 MiB, applied gateway-wide by
+    # shared/middleware.BodyLimit — including the transactions CSV-import
+    # endpoint) on purpose: a body over the app's own limit should reach the
+    # gateway and come back as its real 400 VALIDATION_ERROR envelope, not
+    # get silently truncated by the ingress controller first.
+    nginx.ingress.kubernetes.io/proxy-body-size: 2m
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: finora.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000

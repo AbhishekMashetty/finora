@@ -1,0 +1,29 @@
+# Local kind cluster config for running the whole Finora fleet on a
+# MacBook. Only exists to let ingress-nginx bind host ports 80/443 straight
+# through to the kind node — this is the standard shape from kind's own
+# ingress documentation (https://kind.sigs.k8s.io/docs/user/ingress/), not
+# anything Finora-specific.
+#
+#   kind create cluster --name finora --config infrastructure/kind-config.yaml
+#
+# The node-labels patch is what lets ingress-nginx's kind-specific install
+# manifest target this node via its nodeSelector
+# (ingress-ready: "true") — without it, the ingress-nginx controller Pod
+# has nowhere it's willing to schedule to.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP

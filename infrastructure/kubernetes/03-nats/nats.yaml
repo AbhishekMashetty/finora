@@ -1,0 +1,88 @@
+# NATS JetStream — one shared instance for the whole fleet (unlike Mongo,
+# an event bus is cross-service infrastructure, not data a single service
+# owns, so this is deliberately the one StatefulSet other services' pods
+# all point at — see shared/eventbus's doc comment and docker-compose.yml's
+# nats service for the same reasoning). StatefulSet for the same
+# single-writer/one-PVC reasoning as Mongo (see mongo-user.yaml).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nats
+  namespace: finora
+spec:
+  serviceName: nats
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+  template:
+    metadata:
+      labels:
+        app: nats
+    spec:
+      containers:
+        - name: nats
+          image: nats:2-alpine
+          # -js: enable JetStream. -sd /data: persist stream/consumer state
+          # to the mounted PVC — without an explicit store dir, JetStream
+          # defaults to a location that doesn't survive Pod recreation,
+          # silently defeating the whole point of durable consumers. -m:
+          # expose the monitoring/healthz endpoint the probes below use.
+          args: ["-js", "-sd", "/data", "-m", "8222"]
+          ports:
+            - containerPort: 4222
+              name: client
+            - containerPort: 8222
+              name: monitor
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8222
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8222
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: finora
+spec:
+  clusterIP: None
+  selector:
+    app: nats
+  ports:
+    - port: 4222
+      targetPort: 4222
+      name: client
+    - port: 8222
+      targetPort: 8222
+      name: monitor

@@ -1,0 +1,72 @@
+# The only Deployment fronted by the Ingress (07-ingress/ingress.yaml routes
+# the /api path here) and the only one besides user-service that needs
+# finora-secrets — it verifies (never issues) access tokens, so it only
+# actually reads JWT_ACCESS_SECRET, but gets the whole Secret object rather
+# than a second one split out for a single unused dev-placeholder key (see
+# 04-services/user-service.yaml's comment on why it and this Deployment are
+# the only two with secretRef at all).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: finora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: gateway
+          image: finora/gateway:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: finora-config
+            - secretRef:
+                name: finora-secrets
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: finora
+spec:
+  selector:
+    app: gateway
+  ports:
+    - port: 8080
+      targetPort: 8080

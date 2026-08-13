@@ -1,0 +1,66 @@
+# Same shape as expense-service.yaml (see that file for the envFrom/
+# security-context/termination-grace rationale) — no JWT secret needed here
+# either, same reasoning.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: budget-service
+  namespace: finora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: budget-service
+  template:
+    metadata:
+      labels:
+        app: budget-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: budget-service
+          image: finora/budget-service:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8083
+          envFrom:
+            - configMapRef:
+                name: finora-config
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8083
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: budget-service
+  namespace: finora
+spec:
+  selector:
+    app: budget-service
+  ports:
+    - port: 8083
+      targetPort: 8083

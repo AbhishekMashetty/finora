@@ -1,0 +1,85 @@
+# Every non-secret value from the repo root .env.example, unchanged in
+# name and meaning, translated to in-cluster addressing:
+#   - docker-compose service names (mongo-user, nats, user-service, ...)
+#     become Kubernetes Service names in the `finora` namespace — DNS
+#     resolution works the same way, just via kube-dns/CoreDNS instead of
+#     Docker's embedded DNS.
+#   - CORS_ALLOWED_ORIGINS and TRUSTED_PROXIES are the two values that
+#     actually change meaning, not just mechanism — see the comments below.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finora-config
+  namespace: finora
+data:
+  LOG_LEVEL: "info"
+  # gin reads this directly at package init (shared across all 5 Go
+  # services) — "release" disables gin's debug-mode route-registration
+  # logging. See .env.example; unchanged from docker-compose.
+  GIN_MODE: "release"
+  SHUTDOWN_TIMEOUT: "10s"
+  # Kept equal to docker-compose's value even though Kubernetes has its own
+  # pod termination grace period (terminationGracePeriodSeconds, defaulted
+  # below on every Deployment) — the two are independent: this env var
+  # controls shared/server's own internal drain-then-shutdown timing,
+  # terminationGracePeriodSeconds controls how long the kubelet waits after
+  # SIGTERM before sending SIGKILL. The latter must be >= DRAIN_DELAY +
+  # SHUTDOWN_TIMEOUT + margin, or Kubernetes kills the process mid-drain.
+  DRAIN_DELAY: "5s"
+  # The frontend is served from the same Ingress host as the API
+  # (path-based routing — see 07-ingress/ingress.yaml), so in practice
+  # every browser request to the gateway is same-origin and never triggers
+  # a CORS preflight at all. This is still set correctly (not left as the
+  # docker-compose default of http://localhost:3000, which is wrong here)
+  # as defense in depth for any client that does call the gateway
+  # cross-origin.
+  CORS_ALLOWED_ORIGINS: "http://finora.local"
+
+  # ---- Rate limiting (gateway only) ----
+  RATE_LIMIT_REQUESTS_PER_SECOND: "10"
+  RATE_LIMIT_BURST: "20"
+  # kind's default CNI (kindnet) hands out pod IPs from 10.244.0.0/16 — the
+  # ingress-nginx controller pod that terminates every external request
+  # lives in that range, so this trusts its X-Forwarded-For the same way
+  # TRUSTED_PROXIES would trust a real ingress controller/load balancer in
+  # production (see shared/middleware.RateLimit's doc comment). Left empty
+  # in docker-compose because there's no reverse proxy in front of the
+  # gateway there — this is the one value that's a Kubernetes-specific
+  # addition, not a straight port of the docker-compose default.
+  # If your kind cluster uses a different CNI/pod CIDR, update this to match
+  # (`kubectl cluster-info dump | grep -m1 cluster-cidr`).
+  TRUSTED_PROXIES: "10.244.0.0/16"
+
+  # ---- Request body size limit (gateway only) ----
+  MAX_REQUEST_BODY_BYTES: "1048576"
+
+  # ---- Auth ----
+  JWT_ACCESS_TTL: "15m"
+  JWT_REFRESH_TTL: "168h"
+
+  # ---- Ports (container-internal — matches each Deployment's containerPort
+  # and each Service's targetPort below) ----
+  GATEWAY_PORT: "8080"
+  USER_SERVICE_PORT: "8081"
+  EXPENSE_SERVICE_PORT: "8082"
+  BUDGET_SERVICE_PORT: "8083"
+  NOTIFICATION_SERVICE_PORT: "8084"
+
+  # ---- Downstream service addresses (in-cluster Service DNS) ----
+  USER_SERVICE_URL: "http://user-service:8081"
+  EXPENSE_SERVICE_URL: "http://expense-service:8082"
+  BUDGET_SERVICE_URL: "http://budget-service:8083"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8084"
+
+  # ---- NATS ----
+  NATS_URL: "nats://nats:4222"
+  NATS_PORT: "4222"
+  OUTBOX_RELAY_INTERVAL: "2s"
+
+  # ---- Per-service MongoDB (one Service per service — never shared,
+  # matches CLAUDE.md §2's "one MongoDB per service" rule exactly as
+  # enforced in docker-compose) ----
+  USER_SERVICE_MONGO_URI: "mongodb://mongo-user:27017/finora_users"
+  EXPENSE_SERVICE_MONGO_URI: "mongodb://mongo-expense:27017/finora_expenses"
+  BUDGET_SERVICE_MONGO_URI: "mongodb://mongo-budget:27017/finora_budgets"
+  NOTIFICATION_SERVICE_MONGO_URI: "mongodb://mongo-notification:27017/finora_notifications"

@@ -1,0 +1,75 @@
+# No JWT secret here (and no JWT_* keys used) — expense-service trusts the
+# X-User-Id header the gateway sets after verifying a token; it never parses
+# a JWT itself (CLAUDE.md §2, "the gateway is the only JWT validator").
+# envFrom pulls the whole shared ConfigMap rather than cherry-picking keys —
+# unused keys are harmless (Go's config loader only reads what it names by
+# key), and it keeps every Deployment in this fleet identically simple
+# instead of hand-maintaining a different subset per service.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: expense-service
+  namespace: finora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: expense-service
+  template:
+    metadata:
+      labels:
+        app: expense-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: expense-service
+          # Built + loaded locally via infrastructure/kubernetes/scripts/build-and-load.sh
+          # — never pulled from a registry, hence imagePullPolicy: Never.
+          image: finora/expense-service:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: finora-config
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8082
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+      # Must exceed DRAIN_DELAY + SHUTDOWN_TIMEOUT (5s + 10s from the shared
+      # ConfigMap) with margin, or the kubelet SIGKILLs mid-drain — see
+      # 01-config/configmap.yaml's DRAIN_DELAY comment.
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: expense-service
+  namespace: finora
+spec:
+  selector:
+    app: expense-service
+  ports:
+    - port: 8082
+      targetPort: 8082

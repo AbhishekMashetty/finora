@@ -1,0 +1,69 @@
+# No envFrom here — NEXT_PUBLIC_API_BASE_URL is inlined into the client
+# JS bundle at Docker build time (see frontend/Dockerfile's ARG/ENV pair and
+# frontend/README.md), not read from the environment at runtime, so a
+# ConfigMap/Secret on this Deployment would do nothing. The value baked in
+# by scripts/build-and-load.sh is http://finora.local — the Ingress host
+# below, not an in-cluster Service name, because it has to be a URL the
+# browser (outside the cluster) can actually resolve.
+#
+# No dedicated health endpoint (Next.js doesn't have one here) — probes hit
+# `/`, same as frontend/Dockerfile's own HEALTHCHECK.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: finora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: frontend
+          image: finora/frontend:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: finora
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000

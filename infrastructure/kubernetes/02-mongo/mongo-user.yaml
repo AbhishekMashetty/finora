@@ -1,0 +1,101 @@
+# mongo-user: expense-service and budget-service each get their own
+# identical-shape file (mongo-expense.yaml, mongo-budget.yaml,
+# mongo-notification.yaml) — CLAUDE.md §2's "one MongoDB per service,
+# never shared" holds exactly as strictly here as in docker-compose; there
+# is no single shared Mongo StatefulSet, on purpose.
+#
+# StatefulSet, not Deployment+PVC: a Deployment's RollingUpdate strategy can
+# briefly run two Pod replicas at once, and two Pods both trying to mount
+# the same ReadWriteOnce PVC deadlocks the rollout. StatefulSet guarantees
+# at most one Pod per volumeClaimTemplate slot at a time, which is the
+# correct primitive for a single-instance stateful workload even at
+# replicas: 1 — this is the same reasoning that makes a StatefulSet, not a
+# Deployment, the textbook answer for "one database, one disk."
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-user
+  namespace: finora
+spec:
+  serviceName: mongo-user
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-user
+  template:
+    metadata:
+      labels:
+        app: mongo-user
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7
+          # mongod's default verbosity logs a connection-lifecycle line
+          # quartet per client, including every probe below — same
+          # reasoning as docker-compose.yml's x-mongo-command anchor:
+          # redirect to a file inside the persistent volume instead of
+          # stdout, so `kubectl logs` shows real operational events, not
+          # health-check noise. Inspect the file directly for a post-mortem:
+          # `kubectl exec mongo-user-0 -n finora -- cat /data/db/mongod.log`.
+          command: ["mongod", "--quiet", "--logpath", "/data/db/mongod.log", "--logappend"]
+          ports:
+            - containerPort: 27017
+              name: mongo
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        # kind's default StorageClass, backed by rancher.io/local-path
+        # (the local-path-provisioner kind installs out of the box) —
+        # provisions a hostPath-backed volume on the node automatically, no
+        # manual PersistentVolume needed. Data survives Pod
+        # restarts/rescheduling as long as the node itself (the kind
+        # container) isn't deleted; `kind delete cluster` does delete it.
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
+---
+# Headless Service (clusterIP: None) — the idiomatic StatefulSet pairing:
+# gives each Pod a stable DNS identity (mongo-user-0.mongo-user...) even
+# though nothing here addresses replicas individually at replicas: 1. The
+# Service's own name (mongo-user) is what every consumer actually uses,
+# via USER_SERVICE_MONGO_URI in the shared ConfigMap.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-user
+  namespace: finora
+spec:
+  clusterIP: None
+  selector:
+    app: mongo-user
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongo
