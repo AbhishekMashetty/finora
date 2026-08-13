@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 export default function NotFound() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-plane px-6 py-24 text-center">
-      <Compass size={28} strokeWidth={1.75} className="text-ink-muted" />
+      <Compass size={28} strokeWidth={1.75} className="text-ink-muted" aria-hidden="true" />
       <div>
         <h1 className="font-display text-2xl font-medium text-ink-primary">Page not found</h1>
         <p className="mt-1 text-sm text-ink-muted">

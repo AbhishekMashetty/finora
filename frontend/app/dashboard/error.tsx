@@ -12,13 +12,12 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
     console.error(error);
   }, [error]);
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
-      <AlertTriangle size={28} strokeWidth={1.75} className="text-status-critical" />
+      <AlertTriangle size={28} strokeWidth={1.75} className="text-status-critical" aria-hidden="true" />
       <div>
         <h2 className="text-sm font-medium text-ink-primary">Something went wrong</h2>
         <p className="mt-1 text-sm text-ink-muted">

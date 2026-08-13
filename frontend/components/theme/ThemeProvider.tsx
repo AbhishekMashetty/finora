@@ -45,9 +45,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
 
   useEffect(() => {
+    // Reading localStorage (a browser-only external system) must happen
+    // post-mount, not during render, to avoid an SSR/client mismatch — see
+    // lib/auth-context.tsx's AuthProvider for the same documented pattern.
     const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
     const initial: Theme =
       stored === "light" || stored === "dark" ? stored : "system";
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(initial);
     setResolvedTheme(
       initial === "system" ? (systemPrefersDark() ? "dark" : "light") : initial,

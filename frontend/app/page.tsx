@@ -30,7 +30,7 @@ export default function Home() {
 
       <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
         <div className="mb-4 flex items-center gap-1.5 rounded-pill border border-hairline bg-surface px-3 py-1 text-xs font-medium text-ink-secondary">
-          <ShieldCheck size={14} strokeWidth={1.75} className="text-brand" />
+          <ShieldCheck size={14} strokeWidth={1.75} className="text-brand" aria-hidden="true" />
           Your data, your accounts — nothing shared
         </div>
         <h1 className="font-display text-5xl font-medium tracking-tight text-ink-primary sm:text-6xl">
@@ -55,7 +55,7 @@ export default function Home() {
           {FEATURES.map(({ icon: Icon, title, description }) => (
             <div key={title} className="flex flex-col items-start gap-3 text-left">
               <span className="flex h-9 w-9 items-center justify-center rounded-control bg-brand-subtle text-brand">
-                <Icon size={18} strokeWidth={1.75} />
+                <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
               </span>
               <h2 className="text-sm font-semibold text-ink-primary">{title}</h2>
               <p className="text-sm text-ink-secondary">{description}</p>

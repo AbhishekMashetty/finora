@@ -112,7 +112,7 @@ export default function SearchPage() {
             />
           </div>
           <Button type="submit" size="md" disabled={isSearching || query.trim() === ""}>
-            <Search size={16} strokeWidth={1.75} />
+            <Search size={16} strokeWidth={1.75} aria-hidden="true" />
             {isSearching ? "Searching…" : "Search"}
           </Button>
         </form>
@@ -127,7 +127,7 @@ export default function SearchPage() {
       {!error && !hasSearched && (
         <Card className="mt-6">
           <EmptyState
-            icon={<Search size={24} strokeWidth={1.75} />}
+            icon={<Search size={24} strokeWidth={1.75} aria-hidden="true" />}
             title="Search your finances"
             description="Find an account, transaction, budget, or goal by name."
           />
@@ -137,7 +137,7 @@ export default function SearchPage() {
       {!error && hasSearched && results && totalMatches === 0 && (
         <Card className="mt-6">
           <EmptyState
-            icon={<Search size={24} strokeWidth={1.75} />}
+            icon={<Search size={24} strokeWidth={1.75} aria-hidden="true" />}
             title="No matches"
             description={`Nothing found for "${query}".`}
           />
@@ -147,7 +147,7 @@ export default function SearchPage() {
       {!error && hasSearched && results && totalMatches > 0 && (
         <div className="mt-6 flex flex-col gap-6">
           {results.accounts.length > 0 && (
-            <ResultSection title="Accounts" icon={<Wallet size={16} strokeWidth={1.75} />} href="/dashboard/accounts">
+            <ResultSection title="Accounts" icon={<Wallet size={16} strokeWidth={1.75} aria-hidden="true" />} href="/dashboard/accounts">
               {results.accounts.map((a) => (
                 <li key={a.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <span className="text-ink-primary">{a.name}</span>
@@ -158,7 +158,7 @@ export default function SearchPage() {
           )}
 
           {results.transactions.length > 0 && (
-            <ResultSection title="Transactions" icon={<List size={16} strokeWidth={1.75} />} href="/dashboard/transactions">
+            <ResultSection title="Transactions" icon={<List size={16} strokeWidth={1.75} aria-hidden="true" />} href="/dashboard/transactions">
               {results.transactions.map((t) => (
                 <li key={t.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <div>
@@ -177,7 +177,7 @@ export default function SearchPage() {
           )}
 
           {results.budgets.length > 0 && (
-            <ResultSection title="Budgets" icon={<Target size={16} strokeWidth={1.75} />} href="/dashboard/budgets">
+            <ResultSection title="Budgets" icon={<Target size={16} strokeWidth={1.75} aria-hidden="true" />} href="/dashboard/budgets">
               {results.budgets.map((b) => (
                 <li key={b.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <span className="capitalize text-ink-primary">{b.category}</span>
@@ -190,7 +190,7 @@ export default function SearchPage() {
           )}
 
           {results.goals.length > 0 && (
-            <ResultSection title="Goals" icon={<Flag size={16} strokeWidth={1.75} />} href="/dashboard/goals">
+            <ResultSection title="Goals" icon={<Flag size={16} strokeWidth={1.75} aria-hidden="true" />} href="/dashboard/goals">
               {results.goals.map((g) => (
                 <li key={g.id} className="flex items-center justify-between px-6 py-3 text-sm">
                   <span className="text-ink-primary">{g.name}</span>

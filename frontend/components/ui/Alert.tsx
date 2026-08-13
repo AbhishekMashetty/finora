@@ -33,7 +33,7 @@ export function Alert({
         className,
       )}
     >
-      <Icon size={16} strokeWidth={1.75} className="mt-0.5 shrink-0" />
+      <Icon size={16} strokeWidth={1.75} className="mt-0.5 shrink-0" aria-hidden="true" />
       <span>{children}</span>
     </div>
   );

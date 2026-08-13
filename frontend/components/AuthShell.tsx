@@ -24,7 +24,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           {VALUE_BULLETS.map((bullet) => (
             <li key={bullet} className="flex gap-2.5">
               <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#9085e9]/20 text-[#9085e9]">
-                <Check size={11} strokeWidth={2.5} />
+                <Check size={11} strokeWidth={2.5} aria-hidden="true" />
               </span>
               {bullet}
             </li>

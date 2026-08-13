@@ -67,7 +67,22 @@ export default function GoalsPage() {
   }
 
   useEffect(() => {
-    loadGoals();
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiFetch<{ goals: Goal[] }>("/api/v1/goals");
+        if (!cancelled) setGoals(data.goals ?? []);
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof ApiError ? err.message : "Could not load goals.");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleCreate(event: FormEvent) {
@@ -181,7 +196,7 @@ export default function GoalsPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-medium text-ink-primary">Goals</h1>
         <Button size="sm" variant={isAddOpen ? "secondary" : "primary"} onClick={() => setIsAddOpen((v) => !v)}>
-          <Plus size={16} strokeWidth={1.75} />
+          <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
           {isAddOpen ? "Cancel" : "Add goal"}
         </Button>
       </div>
@@ -244,12 +259,12 @@ export default function GoalsPage() {
         {!isLoading && !loadError && goals.length === 0 && (
           <Card>
             <EmptyState
-              icon={<Flag size={24} strokeWidth={1.75} />}
+              icon={<Flag size={24} strokeWidth={1.75} aria-hidden="true" />}
               title="No goals yet"
               description="Set a savings goal to track your progress."
               action={
                 <Button size="sm" onClick={() => setIsAddOpen(true)}>
-                  <Plus size={16} strokeWidth={1.75} />
+                  <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
                   Add goal
                 </Button>
               }
@@ -302,7 +317,7 @@ export default function GoalsPage() {
                             aria-label="Edit goal"
                             onClick={() => startEdit(goal)}
                           >
-                            <Pencil size={16} strokeWidth={1.75} />
+                            <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />
                           </Button>
                           <ConfirmDialog
                             trigger={
@@ -312,7 +327,7 @@ export default function GoalsPage() {
                                 aria-label="Delete goal"
                                 disabled={deletingId === goal.id}
                               >
-                                <Trash2 size={16} strokeWidth={1.75} />
+                                <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
                               </Button>
                             }
                             title={`Delete "${goal.name}"?`}

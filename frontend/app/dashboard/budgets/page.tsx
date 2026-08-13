@@ -158,7 +158,7 @@ export default function BudgetsPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-medium text-ink-primary">Budgets</h1>
         <Button size="sm" variant={isAddOpen ? "secondary" : "primary"} onClick={() => setIsAddOpen((v) => !v)}>
-          <Plus size={16} strokeWidth={1.75} />
+          <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
           {isAddOpen ? "Cancel" : "Add budget"}
         </Button>
       </div>
@@ -223,12 +223,12 @@ export default function BudgetsPage() {
         {!isLoading && loadError && <Alert variant="error">{loadError}</Alert>}
         {!isLoading && !loadError && budgets.length === 0 && (
           <EmptyState
-            icon={<Target size={24} strokeWidth={1.75} />}
+            icon={<Target size={24} strokeWidth={1.75} aria-hidden="true" />}
             title="No budgets yet"
             description="Add a budget to start tracking your spending."
             action={
               <Button size="sm" onClick={() => setIsAddOpen(true)}>
-                <Plus size={16} strokeWidth={1.75} />
+                <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
                 Add budget
               </Button>
             }
@@ -310,7 +310,7 @@ export default function BudgetsPage() {
                             aria-label="Edit budget"
                             onClick={() => startEdit(budget)}
                           >
-                            <Pencil size={16} strokeWidth={1.75} />
+                            <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />
                           </Button>
                           <ConfirmDialog
                             trigger={
@@ -320,7 +320,7 @@ export default function BudgetsPage() {
                                 aria-label="Delete budget"
                                 disabled={deletingId === budget.id}
                               >
-                                <Trash2 size={16} strokeWidth={1.75} />
+                                <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
                               </Button>
                             }
                             title={`Delete the ${budget.category} budget?`}

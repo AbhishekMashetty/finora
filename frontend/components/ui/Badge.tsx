@@ -46,7 +46,7 @@ export function Badge({
 export function TransactionTypeBadge({ type }: { type: "income" | "expense" }) {
   return (
     <Badge status={type === "income" ? "good" : "critical"}>
-      {type === "income" ? <ArrowUp size={12} strokeWidth={2} /> : <ArrowDown size={12} strokeWidth={2} />}
+      {type === "income" ? <ArrowUp size={12} strokeWidth={2} aria-hidden="true" /> : <ArrowDown size={12} strokeWidth={2} aria-hidden="true" />}
       {type === "income" ? "Income" : "Expense"}
     </Badge>
   );

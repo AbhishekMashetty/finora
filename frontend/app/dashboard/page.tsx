@@ -139,24 +139,24 @@ export default function DashboardOverviewPage() {
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Total balance"
-          icon={<Wallet size={16} strokeWidth={1.75} />}
+          icon={<Wallet size={16} strokeWidth={1.75} aria-hidden="true" />}
           value={formatCurrency(totalBalance, currency)}
         />
         <StatTile
           label="This month's spend"
-          icon={<List size={16} strokeWidth={1.75} />}
+          icon={<List size={16} strokeWidth={1.75} aria-hidden="true" />}
           value={formatCurrency(monthSpend, currency)}
           tone={monthSpend > 0 ? "critical" : "neutral"}
         />
         <StatTile
           label="Budgets on track"
-          icon={<Target size={16} strokeWidth={1.75} />}
+          icon={<Target size={16} strokeWidth={1.75} aria-hidden="true" />}
           value={budgetsTotal > 0 ? `${budgetsOnTrack} / ${budgetsTotal}` : "—"}
           tone={budgetsTotal > 0 && budgetsOnTrack < budgetsTotal ? "critical" : "good"}
         />
         <StatTile
           label="Next goal"
-          icon={<Flag size={16} strokeWidth={1.75} />}
+          icon={<Flag size={16} strokeWidth={1.75} aria-hidden="true" />}
           value={
             nearestGoal
               ? `${Math.round((nearestGoal.current_amount / nearestGoal.target_amount) * 100)}%`
@@ -173,7 +173,7 @@ export default function DashboardOverviewPage() {
           {recentTransactions.length === 0 ? (
             <div className="mt-4">
               <EmptyState
-                icon={<Inbox size={24} strokeWidth={1.75} />}
+                icon={<Inbox size={24} strokeWidth={1.75} aria-hidden="true" />}
                 title="No transactions yet"
                 description="Log your first transaction to see it here."
               />
@@ -228,7 +228,7 @@ export default function DashboardOverviewPage() {
           ) : (
             <div className="mt-4">
               <EmptyState
-                icon={<Flag size={24} strokeWidth={1.75} />}
+                icon={<Flag size={24} strokeWidth={1.75} aria-hidden="true" />}
                 title="No goals yet"
                 description="Set a savings goal to track your progress."
               />

@@ -40,7 +40,7 @@ export function SidebarNav({
                     : "text-ink-secondary hover:bg-plane hover:text-ink-primary",
                 )}
               >
-                <Icon size={18} strokeWidth={1.75} />
+                <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
                 <span className="flex-1">{item.label}</span>
                 {item.href === "/dashboard/notifications" && unreadCount > 0 && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-pill bg-status-critical px-1 text-[10px] font-semibold text-white">

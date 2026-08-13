@@ -60,7 +60,25 @@ export default function AccountsPage() {
   }
 
   useEffect(() => {
-    loadAccounts();
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiFetch<{ accounts: Account[] }>("/api/v1/accounts");
+        if (!cancelled) {
+          setAccounts(data.accounts ?? []);
+          setLoadError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof ApiError ? err.message : "Could not load accounts.");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleCreate(event: FormEvent) {
@@ -144,7 +162,7 @@ export default function AccountsPage() {
           size="sm"
           onClick={() => setShowCreateForm((prev) => !prev)}
         >
-          <Plus size={16} strokeWidth={1.75} />
+          <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
           {showCreateForm ? "Cancel" : "Add account"}
         </Button>
       </div>
@@ -197,7 +215,7 @@ export default function AccountsPage() {
         )}
         {!isLoading && !loadError && accounts.length === 0 && (
           <EmptyState
-            icon={<Wallet size={24} strokeWidth={1.75} />}
+            icon={<Wallet size={24} strokeWidth={1.75} aria-hidden="true" />}
             title="No accounts yet"
             description="Add an account above to start tracking balances and transactions."
           />
@@ -286,7 +304,7 @@ export default function AccountsPage() {
                             aria-label="Edit account"
                             onClick={() => startEdit(account)}
                           >
-                            <Pencil size={16} strokeWidth={1.75} />
+                            <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />
                           </Button>
                           <ConfirmDialog
                             trigger={
@@ -296,7 +314,7 @@ export default function AccountsPage() {
                                 aria-label="Delete account"
                                 disabled={deletingId === account.id}
                               >
-                                <Trash2 size={16} strokeWidth={1.75} />
+                                <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
                               </Button>
                             }
                             title={`Delete ${account.name}?`}

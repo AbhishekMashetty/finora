@@ -85,7 +85,7 @@ export function ComponentsShowcase() {
         <ConfirmDialog
           trigger={
             <Button variant="danger" size="sm">
-              <Trash2 size={14} strokeWidth={1.75} />
+              <Trash2 size={14} strokeWidth={1.75} aria-hidden="true" />
               Delete item
             </Button>
           }

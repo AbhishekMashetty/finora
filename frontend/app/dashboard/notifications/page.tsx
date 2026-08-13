@@ -107,7 +107,7 @@ export default function NotificationsPage() {
         )}
         {!isLoading && !loadError && notifications.length === 0 && (
           <EmptyState
-            icon={<Bell size={24} strokeWidth={1.75} />}
+            icon={<Bell size={24} strokeWidth={1.75} aria-hidden="true" />}
             title={unreadOnly ? "No unread notifications" : "No notifications yet"}
             description={
               unreadOnly
@@ -149,7 +149,7 @@ export default function NotificationsPage() {
                     disabled={markingId === n.id}
                     onClick={() => handleMarkRead(n.id)}
                   >
-                    <Check size={16} strokeWidth={1.75} />
+                    <Check size={16} strokeWidth={1.75} aria-hidden="true" />
                     {markingId === n.id ? "Marking…" : "Mark read"}
                   </Button>
                 )}

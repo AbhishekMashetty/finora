@@ -63,7 +63,7 @@ export function DropdownMenuCheckboxItem({
       {...props}
     >
       <DropdownMenuPrimitive.ItemIndicator className="absolute left-2">
-        <Check size={14} strokeWidth={2} />
+        <Check size={14} strokeWidth={2} aria-hidden="true" />
       </DropdownMenuPrimitive.ItemIndicator>
       {children}
     </DropdownMenuPrimitive.CheckboxItem>

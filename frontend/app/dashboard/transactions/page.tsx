@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { List, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
-import { formatCurrency, formatDate, formatSignedAmount } from "@/lib/format";
+import { formatDate, formatSignedAmount } from "@/lib/format";
 import type { Account, Category, ImportResult, Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
@@ -359,7 +359,7 @@ export default function TransactionsPage() {
                 setShowCreateForm(false);
               }}
             >
-              <Upload size={16} strokeWidth={1.75} />
+              <Upload size={16} strokeWidth={1.75} aria-hidden="true" />
               {showImportForm ? "Cancel" : "Import CSV"}
             </Button>
             <Button
@@ -371,7 +371,7 @@ export default function TransactionsPage() {
                 setShowImportForm(false);
               }}
             >
-              <Plus size={16} strokeWidth={1.75} />
+              <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
               {showCreateForm ? "Cancel" : "Add transaction"}
             </Button>
           </div>
@@ -566,7 +566,7 @@ export default function TransactionsPage() {
                 className="h-10"
                 onClick={() => setShowNewCategory((prev) => !prev)}
               >
-                <Plus size={14} strokeWidth={1.75} />
+                <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
                 {showNewCategory ? "Cancel" : "New category"}
               </Button>
               <div className="min-w-[200px] flex-1">
@@ -664,7 +664,7 @@ export default function TransactionsPage() {
 
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={isImporting || !importFile || !importAccountId}>
-                <Upload size={16} strokeWidth={1.75} />
+                <Upload size={16} strokeWidth={1.75} aria-hidden="true" />
                 {isImporting ? "Importing…" : "Import"}
               </Button>
               {importError && <p className="text-sm text-status-critical">{importError}</p>}
@@ -701,7 +701,7 @@ export default function TransactionsPage() {
         )}
         {!isLoading && !loadError && transactions.length === 0 && (
           <EmptyState
-            icon={<List size={24} strokeWidth={1.75} />}
+            icon={<List size={24} strokeWidth={1.75} aria-hidden="true" />}
             title="No transactions found"
             description="Log a transaction above, or adjust your filters."
           />
@@ -820,7 +820,7 @@ export default function TransactionsPage() {
                             aria-label="Edit transaction"
                             onClick={() => startEdit(tx)}
                           >
-                            <Pencil size={16} strokeWidth={1.75} />
+                            <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />
                           </Button>
                           <ConfirmDialog
                             trigger={
@@ -830,7 +830,7 @@ export default function TransactionsPage() {
                                 aria-label="Delete transaction"
                                 disabled={deletingId === tx.id}
                               >
-                                <Trash2 size={16} strokeWidth={1.75} />
+                                <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
                               </Button>
                             }
                             title="Delete this transaction?"

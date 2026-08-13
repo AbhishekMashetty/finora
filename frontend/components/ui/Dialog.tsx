@@ -32,7 +32,7 @@ export function DialogContent({
           className="absolute right-4 top-4 rounded-control p-1 text-ink-muted transition-colors hover:bg-plane hover:text-ink-primary focus-visible:outline-2 focus-visible:outline-brand"
           aria-label="Close"
         >
-          <X size={16} strokeWidth={1.75} />
+          <X size={16} strokeWidth={1.75} aria-hidden="true" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>

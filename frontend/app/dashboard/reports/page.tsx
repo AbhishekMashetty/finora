@@ -59,7 +59,26 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
-    runReport(initialRange.from, initialRange.to);
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams({ from: initialRange.from, to: initialRange.to });
+        const data = await apiFetch<{ summary: ReportSummary }>(
+          `/api/v1/reports/summary?${params.toString()}`
+        );
+        if (!cancelled) setSummary(data.summary);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : "Could not load report.");
+          setSummary(null);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -114,7 +133,7 @@ export default function ReportsPage() {
       {!isLoading && !error && summary && summary.categories.length === 0 && (
         <Card className="mt-6">
           <EmptyState
-            icon={<BarChart3 size={24} strokeWidth={1.75} />}
+            icon={<BarChart3 size={24} strokeWidth={1.75} aria-hidden="true" />}
             title="No budgets found for this range"
             description="Add a budget to see a report."
           />

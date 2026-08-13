@@ -115,7 +115,7 @@ function SidebarFooter({ user, onLogout }: { user: User | null; onLogout: () => 
           onClick={onLogout}
           className="flex items-center gap-1.5 rounded-control px-2 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-plane hover:text-ink-primary"
         >
-          <LogOut size={16} strokeWidth={1.75} />
+          <LogOut size={16} strokeWidth={1.75} aria-hidden="true" />
           Log out
         </button>
       </div>
@@ -156,7 +156,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           aria-label="Open menu"
           className="flex h-9 w-9 items-center justify-center rounded-control text-ink-secondary hover:bg-plane hover:text-ink-primary"
         >
-          <Menu size={20} strokeWidth={1.75} />
+          <Menu size={20} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
 
@@ -180,7 +180,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 aria-label="Close menu"
                 className="flex h-9 w-9 items-center justify-center rounded-control text-ink-muted hover:bg-plane hover:text-ink-primary"
               >
-                <X size={18} strokeWidth={1.75} />
+                <X size={18} strokeWidth={1.75} aria-hidden="true" />
               </DialogPrimitive.Close>
             </div>
             <div className="mt-2 flex flex-1 flex-col overflow-y-auto">

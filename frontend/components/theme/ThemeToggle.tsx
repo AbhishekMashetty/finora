@@ -34,7 +34,7 @@ export function ThemeToggle() {
                 : "text-ink-muted hover:text-ink-primary"
             }`}
           >
-            <Icon size={14} strokeWidth={2} />
+            <Icon size={14} strokeWidth={2} aria-hidden="true" />
           </button>
         );
       })}
