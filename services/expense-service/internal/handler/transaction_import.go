@@ -30,12 +30,23 @@ import (
 // Credit are their own concept, resolved in the service layer
 // (resolveImportAmount), not folded into "amount" here.
 var importColumnAliases = map[string][]string{
-	"date":        {"date", "transaction date", "posted date"},
-	"description": {"description", "merchant", "payee", "note"},
-	"amount":      {"amount"},
-	"debit":       {"debit"},
-	"credit":      {"credit"},
-	"type":        {"type"},
+	"date":        {"date", "transaction date", "trans. date", "posted date", "posting date", "posted"},
+	"description": {"description", "merchant", "payee", "payee name", "name", "memo", "note"},
+	"amount":      {"amount", "amount (usd)", "transaction amount"},
+	"debit":       {"debit", "debit amount", "withdrawal"},
+	"credit":      {"credit", "credit amount", "deposit"},
+	"type":        {"type", "transaction type"},
+}
+
+var supportedStatementSources = map[string]bool{
+	"generic":          true,
+	"american_express": true,
+	"apple_card":       true,
+	"bank_of_america":  true,
+	"capital_one":      true,
+	"chase":            true,
+	"discover":         true,
+	"wells_fargo":      true,
 }
 
 // ImportCSV handles POST /api/v1/transactions/import — a multipart/form-data
@@ -64,7 +75,16 @@ func (h *TransactionHandler) ImportCSV(c *gin.Context) {
 	}
 	defer f.Close()
 
-	rows, parseErr := parseImportCSV(f)
+	source := strings.ToLower(strings.TrimSpace(c.PostForm("source")))
+	if source == "" {
+		source = "generic"
+	}
+	if !supportedStatementSources[source] {
+		httpx.Fail(c, http.StatusBadRequest, httpx.CodeValidation, "unsupported statement source", gin.H{"field": "source"})
+		return
+	}
+
+	rows, parseErr := parseImportCSV(f, source)
 	if parseErr != nil {
 		httpx.Fail(c, http.StatusBadRequest, httpx.CodeValidation, parseErr.Error(), gin.H{"field": "file"})
 		return
@@ -91,7 +111,7 @@ func (h *TransactionHandler) ImportCSV(c *gin.Context) {
 // value-level validation (parseImportDate/parseImportAmount) will then
 // reject with a specific message. Only a structurally unusable file (empty,
 // or missing the date/amount columns entirely) is a parse-level error here.
-func parseImportCSV(r io.Reader) ([]domain.ImportRow, error) {
+func parseImportCSV(r io.Reader, source string) ([]domain.ImportRow, error) {
 	reader := csv.NewReader(r)
 	reader.FieldsPerRecord = -1 // tolerate ragged rows; each is still parsed, just with blanks for missing fields
 
@@ -134,14 +154,31 @@ func parseImportCSV(r io.Reader) ([]domain.ImportRow, error) {
 			// dropping everything after the bad line.
 			return nil, errors.New("could not parse the uploaded file as CSV: " + err.Error())
 		}
-		rows = append(rows, domain.ImportRow{
+		row := domain.ImportRow{
 			Date:        field(record, dateIdx),
 			Description: field(record, descIdx),
 			Amount:      field(record, amountIdx),
 			Debit:       field(record, debitIdx),
 			Credit:      field(record, creditIdx),
 			Type:        field(record, typeIdx),
-		})
+		}
+
+		// American Express and Discover exports represent card purchases as
+		// positive amounts and payments/refunds as negative amounts. Finora's
+		// generic signed format uses the opposite convention, so preserve the
+		// amount and provide the explicit type override the service already
+		// understands. Other profiles either use signed amounts (Chase, Bank
+		// of America, Wells Fargo), separate Debit/Credit columns (Capital One),
+		// or a Type column (Apple Card).
+		if row.Type == "" && (source == "american_express" || source == "discover") {
+			amount := strings.TrimSpace(row.Amount)
+			if strings.HasPrefix(amount, "-") || (strings.HasPrefix(amount, "(") && strings.HasSuffix(amount, ")")) {
+				row.Type = "income"
+			} else if amount != "" {
+				row.Type = "expense"
+			}
+		}
+		rows = append(rows, row)
 	}
 	return rows, nil
 }
