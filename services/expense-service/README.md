@@ -27,7 +27,7 @@ never confirm the existence of another user's data.
 | GET    | `/api/v1/transactions/:id`| -                                                            | `200 {transaction}`                         |
 | PUT    | `/api/v1/transactions/:id`| `{account_id, category_id?, type, amount, currency, date, note?}` | `200 {transaction}`                    |
 | DELETE | `/api/v1/transactions/:id`| -                                                            | `204`                                        |
-| POST   | `/api/v1/transactions/import` | `multipart/form-data: account_id, file` (CSV)           | `200 {imported, skipped, errors: [{row, message}]}` |
+| POST   | `/api/v1/transactions/import` | `multipart/form-data: account_id, source, file` (CSV)   | `200 {imported, skipped, errors: [{row, message}]}` |
 | GET    | `/api/v1/categories`      | -                                                            | `200 {categories: []}`                       |
 | POST   | `/api/v1/categories`      | `{name, type}`                                               | `201 {category}`                            |
 
@@ -52,14 +52,21 @@ field (accepts RFC3339 or `YYYY-MM-DD`).
 `POST /transactions/import` bulk-creates transactions from an uploaded CSV
 (e.g. a downloaded credit card statement export), all attached to the
 `account_id` form field and inheriting that account's `currency` — the CSV
-itself carries no currency column. Header matching is case-insensitive
-against a small alias list, since real exports don't agree on column names:
+itself carries no currency column. The optional `source` profile supports
+`american_express`, `apple_card`, `bank_of_america`, `capital_one`, `chase`,
+`discover`, and `wells_fargo` in addition to the default `generic` format.
+Profiles handle issuer-specific sign/type conventions; for example, positive
+American Express and Discover amounts are purchases, while Apple Card exports
+use values such as `Purchase`, `Payment`, and `Credit`. Header matching is
+case-insensitive against an explicit alias list:
 
 | Field | Recognized headers |
 |---|---|
-| Date (required) | `date`, `transaction date`, `posted date` |
-| Description (optional) | `description`, `merchant`, `payee`, `note` |
-| Type (optional) | `type` — `income` or `expense`; if absent, inferred from whichever amount shape is present (see below) |
+| Date (required) | `date`, `transaction date`, `trans. date`, `posted date`, `posting date`, `posted` |
+| Description (optional) | `description`, `merchant`, `payee`, `payee name`, `name`, `memo`, `note` |
+| Amount | `amount`, `amount (usd)`, `transaction amount` |
+| Debit / credit | `debit`, `debit amount`, `withdrawal`; `credit`, `credit amount`, `deposit` |
+| Type (optional) | `type`, `transaction type`; normalized statement vocabulary or inferred from the amount shape |
 
 The amount itself is carried one of two shapes — **exactly one must be present** (Amount wins if a file somehow has both):
 
