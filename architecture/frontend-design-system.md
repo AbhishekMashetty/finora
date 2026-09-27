@@ -14,6 +14,18 @@ Every rule below is chosen the same way `CLAUDE.md` chooses backend rules: pick 
 
 **Rejected alternative: an icon library (lucide-react, heroicons).** ~14 fixed, simple glyphs are needed across the whole app (nav items + a few action icons). Hand-rolling them as inline SVG in `frontend/components/icons.tsx` avoids a dependency for what amounts to a dozen `<path>` elements, keeps them trivially themeable via `currentColor`, and adds effectively zero bundle weight versus importing a whole icon package (even tree-shaken).
 
+### Product shell refresh (2026-09)
+
+The application shell uses a deep evergreen desktop rail, emerald action color,
+restrained panel shadows, a 1440px content cap, and a compact mobile navigation
+menu. This replaces the previous always-visible light sidebar, which compressed
+content on small screens and gave every surface the same visual weight.
+
+The transaction importer previews a selected CSV before upload, reports its
+row/column count, detects unambiguous issuer shapes, and lets the user override
+the statement source. Preview stays client-side: it improves confidence before
+a bulk write without adding a temporary-upload lifecycle to the backend.
+
 **Rejected alternative: a charting library (recharts, visx, chart.js).** The one real chart need — budget-vs-actual per category — is a bullet-style comparison (a target line plus a filled bar), which is a few `<div>`s and a `<svg>` marker line, not a general-purpose charting problem. Hand-rolled per the data-viz method below. If Phase 5+ ever needs genuinely complex charts (multi-series time trends, stacked area), revisit then — don't pay the dependency cost now for a need that doesn't exist yet (`plan.md`'s "don't introduce complexity before there's a legitimate reason," applied to the frontend).
 
 **Data visualization method.** Built using Claude Code's `dataviz` skill (form → color → validate → marks → interaction → accessibility), not eyeballed. Concretely: colors below are the skill's validated default palette (`references/palette.md`), chosen because rolling a fresh brand palette and hand-checking colorblind-safety/contrast per shade is exactly the kind of "reasoning about ΔE" the skill says never to do — the reference palette is already validated (CVD ΔE, contrast, both color-scheme modes) so adopting it outright is strictly safer than inventing new hex values and re-deriving that work. The one deviation: **brand/accent** below reuses the palette's validated "violet" categorical slot rather than introducing an unvalidated hex, since violet doesn't collide with the two hues this app actually needs for financial polarity (green/red, reserved below).

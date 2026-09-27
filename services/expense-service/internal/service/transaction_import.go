@@ -111,10 +111,7 @@ func buildImportedTransaction(userID string, account *domain.Account, row domain
 		return nil, err
 	}
 
-	txType := domain.TransactionType(strings.ToLower(strings.TrimSpace(row.Type)))
-	if txType == "" {
-		txType = inferredType
-	}
+	txType := normalizeImportType(row.Type, inferredType)
 	if !domain.ValidTransactionType(txType) {
 		return nil, fmt.Errorf("type must be income or expense, got %q", row.Type)
 	}
@@ -142,6 +139,25 @@ func buildImportedTransaction(userID string, account *domain.Account, row domain
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
+}
+
+// normalizeImportType translates the vocabulary used by common bank and
+// credit-card exports into Finora's income/expense model. Apple Card, for
+// example, emits values such as "Purchase", "Payment" and "Credit" rather
+// than Finora's own API words. Unknown values are intentionally returned as
+// is so the existing validation error tells the user exactly what failed.
+func normalizeImportType(raw string, inferred domain.TransactionType) domain.TransactionType {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	switch normalized {
+	case "":
+		return inferred
+	case "expense", "debit", "purchase", "sale", "charge", "withdrawal", "fee":
+		return domain.TransactionTypeExpense
+	case "income", "credit", "refund", "return", "deposit", "payment":
+		return domain.TransactionTypeIncome
+	default:
+		return domain.TransactionType(normalized)
+	}
 }
 
 // resolveImportAmount handles the two amount shapes a CSV can carry

@@ -272,6 +272,11 @@ paths:
                 account_id:
                   type: string
                   description: The account every imported transaction is attached to.
+                source:
+                  type: string
+                  default: generic
+                  enum: [generic, american_express, apple_card, bank_of_america, capital_one, chase, discover, wells_fargo]
+                  description: Statement profile used to interpret issuer-specific amount signs and transaction types.
                 file:
                   type: string
                   format: binary

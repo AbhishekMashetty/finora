@@ -89,4 +89,5 @@ Only the gateway and frontend ports are meant to be called by clients; service p
 | `architecture/database-design.md` | Per-service schema, indexes, the one-Mongo-per-service rule |
 | `architecture/repository-structure.md` | Monorepo layout, Go module strategy, Docker build-context convention |
 | `architecture/development-roadmap.md` | Phase 0–9 plan to a fully-working Finora |
+| `architecture/expense-product-gap-analysis.md` | Rocket Money/Monarch expense-feature gaps and prioritized Finora roadmap |
 | `docs/local-development.md` | Running this locally, health checks, troubleshooting |
