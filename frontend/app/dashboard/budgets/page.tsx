@@ -10,7 +10,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
-import type { Budget, Category } from "@/lib/types";
+import type { Budget, Category, ReportSummary } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
@@ -20,9 +20,18 @@ import { PencilIcon, PlusIcon, TargetIcon, TrashIcon } from "@/components/icons"
 
 const PERIODS = ["weekly", "monthly", "yearly"] as const;
 
+function currentMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  return {
+    from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10),
+    to: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10),
+  };
+}
+
 export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categoryNames, setCategoryNames] = useState<string[]>([]);
+  const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -47,8 +56,13 @@ export default function BudgetsPage() {
 
   async function loadBudgets() {
     try {
-      const data = await apiFetch<{ budgets: Budget[] }>("/api/v1/budgets");
+      const { from, to } = currentMonthRange();
+      const [data, report] = await Promise.all([
+        apiFetch<{ budgets: Budget[] }>("/api/v1/budgets"),
+        apiFetch<{ summary: ReportSummary }>(`/api/v1/reports/summary?from=${from}&to=${to}`),
+      ]);
       setBudgets(data.budgets ?? []);
+      setSummary(report.summary);
       setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : "Could not load budgets.");
@@ -61,13 +75,16 @@ export default function BudgetsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [budgetsData, categoriesData] = await Promise.all([
+        const { from, to } = currentMonthRange();
+        const [budgetsData, categoriesData, reportData] = await Promise.all([
           apiFetch<{ budgets: Budget[] }>("/api/v1/budgets"),
           apiFetch<{ categories: Category[] }>("/api/v1/categories"),
+          apiFetch<{ summary: ReportSummary }>(`/api/v1/reports/summary?from=${from}&to=${to}`),
         ]);
         if (!cancelled) {
           setBudgets(budgetsData.budgets ?? []);
           setCategoryNames((categoriesData.categories ?? []).map((c) => c.name));
+          setSummary(reportData.summary);
         }
       } catch (err) {
         if (!cancelled) {
@@ -142,7 +159,7 @@ export default function BudgetsPage() {
     setDeletingId(id);
     try {
       await apiFetch<null>(`/api/v1/budgets/${id}`, { method: "DELETE" });
-      setBudgets((prev) => prev.filter((b) => b.id !== id));
+      await loadBudgets();
     } catch (err) {
       setRowError(err instanceof ApiError ? err.message : "Could not delete budget.");
     } finally {
@@ -150,15 +167,55 @@ export default function BudgetsPage() {
     }
   }
 
+  const plannedMonthly = budgets.reduce((total, budget) => {
+    if (budget.period === "weekly") return total + budget.amount * 4.33;
+    if (budget.period === "yearly") return total + budget.amount / 12;
+    return total + budget.amount;
+  }, 0);
+  const actualMonthly = summary?.total_actual ?? 0;
+  const remainingMonthly = plannedMonthly - actualMonthly;
+
+  function categoryActual(category: string): number {
+    return summary?.categories.find((item) => item.category.toLowerCase() === category.toLowerCase())?.actual ?? 0;
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink-primary">Budgets</h1>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Plan</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-primary">Budgets</h1>
+          <p className="mt-1 text-sm text-ink-secondary">See the plan and this month&apos;s real spending in one place.</p>
+        </div>
         <Button size="sm" variant={isAddOpen ? "secondary" : "primary"} onClick={() => setIsAddOpen((v) => !v)}>
           <PlusIcon size={16} />
           {isAddOpen ? "Cancel" : "Add budget"}
         </Button>
       </div>
+
+      {!isLoading && budgets.length > 0 && (
+        <div className="mt-7 grid gap-4 sm:grid-cols-3">
+          <Card className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Monthly plan</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-ink-primary">${plannedMonthly.toFixed(0)}</p>
+            <p className="mt-1 text-xs text-ink-muted">Weekly and yearly budgets normalized</p>
+          </Card>
+          <Card className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Spent this month</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-ink-primary">${actualMonthly.toFixed(0)}</p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-grid">
+              <div className={`h-full rounded-full ${actualMonthly > plannedMonthly ? "bg-status-critical" : "bg-brand"}`} style={{ width: `${Math.min(100, plannedMonthly > 0 ? (actualMonthly / plannedMonthly) * 100 : 0)}%` }} />
+            </div>
+          </Card>
+          <Card className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Available</p>
+            <p className={`mt-2 text-2xl font-semibold tabular-nums ${remainingMonthly < 0 ? "text-status-critical" : "text-status-good-text"}`}>
+              {remainingMonthly < 0 ? "−" : ""}${Math.abs(remainingMonthly).toFixed(0)}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">Across all active budgets</p>
+          </Card>
+        </div>
+      )}
 
       <datalist id="category-suggestions">
         {categoryNames.map((name) => (
@@ -247,6 +304,8 @@ export default function BudgetsPage() {
                 <tr>
                   <th className="px-6 py-3 font-medium">Category</th>
                   <th className="px-6 py-3 font-medium">Amount</th>
+                  <th className="px-6 py-3 font-medium">This month</th>
+                  <th className="px-6 py-3 font-medium">Progress</th>
                   <th className="px-6 py-3 font-medium">Period</th>
                   <th className="px-6 py-3 font-medium text-right">Actions</th>
                 </tr>
@@ -263,6 +322,8 @@ export default function BudgetsPage() {
                           className="w-full"
                         />
                       </td>
+                      <td className="px-6 py-3 text-ink-muted">—</td>
+                      <td className="px-6 py-3 text-ink-muted">—</td>
                       <td className="px-6 py-3">
                         <Input
                           type="number"
@@ -300,6 +361,20 @@ export default function BudgetsPage() {
                     <tr key={budget.id}>
                       <td className="px-6 py-3 font-medium capitalize text-ink-primary">{budget.category}</td>
                       <td className="px-6 py-3 tabular-nums text-ink-secondary">{budget.amount.toFixed(2)}</td>
+                      <td className="px-6 py-3 tabular-nums text-ink-secondary">${categoryActual(budget.category).toFixed(2)}</td>
+                      <td className="px-6 py-3">
+                        <div className="w-28">
+                          <div className="h-2 overflow-hidden rounded-full bg-grid">
+                            <div
+                              className={`h-full rounded-full ${categoryActual(budget.category) > budget.amount ? "bg-status-critical" : "bg-brand"}`}
+                              style={{ width: `${Math.min(100, (categoryActual(budget.category) / budget.amount) * 100)}%` }}
+                            />
+                          </div>
+                          <p className="mt-1 text-[11px] tabular-nums text-ink-muted">
+                            {Math.round((categoryActual(budget.category) / budget.amount) * 100)}%
+                          </p>
+                        </div>
+                      </td>
                       <td className="px-6 py-3 capitalize text-ink-secondary">{budget.period}</td>
                       <td className="px-6 py-3 text-right">
                         <div className="flex justify-end gap-1">
