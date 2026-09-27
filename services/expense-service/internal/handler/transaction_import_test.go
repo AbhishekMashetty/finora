@@ -80,12 +80,21 @@ func newImportTestRouter(svc domain.TransactionService) *gin.Engine {
 // makes these tests actually exercise ImportCSV's multipart/CSV parsing,
 // not just the service call behind it.
 func newImportRequest(t *testing.T, accountID string, includeFile bool, csvContent string) *http.Request {
+	return newImportRequestWithSource(t, accountID, includeFile, csvContent, "")
+}
+
+func newImportRequestWithSource(t *testing.T, accountID string, includeFile bool, csvContent, source string) *http.Request {
 	t.Helper()
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	if accountID != "" {
 		if err := writer.WriteField("account_id", accountID); err != nil {
 			t.Fatalf("failed to write account_id field: %v", err)
+		}
+	}
+	if source != "" {
+		if err := writer.WriteField("source", source); err != nil {
+			t.Fatalf("failed to write source field: %v", err)
 		}
 	}
 	if includeFile {
@@ -105,6 +114,46 @@ func newImportRequest(t *testing.T, accountID string, includeFile bool, csvConte
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("X-User-Id", "user-1")
 	return req
+}
+
+func TestTransactionHandler_ImportCSV_AmericanExpressPositiveCharges(t *testing.T) {
+	fake := &fakeTransactionServiceForImport{result: domain.ImportResult{Imported: 2, Errors: []domain.ImportRowError{}}}
+	router := newImportTestRouter(fake)
+
+	csv := "Date,Description,Amount\n09/10/2026,COFFEE SHOP,8.25\n09/11/2026,PAYMENT,-100.00\n"
+	req := newImportRequestWithSource(t, "acc-1", true, csv, "american_express")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if got := fake.lastRows[0].Type; got != "expense" {
+		t.Fatalf("expected positive Amex charge to be expense, got %q", got)
+	}
+	if got := fake.lastRows[1].Type; got != "income" {
+		t.Fatalf("expected negative Amex payment to be income, got %q", got)
+	}
+}
+
+func TestTransactionHandler_ImportCSV_AppleCardAliases(t *testing.T) {
+	fake := &fakeTransactionServiceForImport{result: domain.ImportResult{Imported: 1, Errors: []domain.ImportRowError{}}}
+	router := newImportTestRouter(fake)
+
+	csv := "Transaction Date,Clearing Date,Description,Merchant,Category,Type,Amount (USD)\n09/10/2026,09/11/2026,Market,Market,Food & Drink,Purchase,42.10\n"
+	req := newImportRequestWithSource(t, "acc-1", true, csv, "apple_card")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if got := fake.lastRows[0].Amount; got != "42.10" {
+		t.Fatalf("expected Amount (USD) alias to parse, got %q", got)
+	}
+	if got := fake.lastRows[0].Type; got != "Purchase" {
+		t.Fatalf("expected Apple Card type to be preserved for service normalization, got %q", got)
+	}
 }
 
 func TestTransactionHandler_ImportCSV_Success(t *testing.T) {
