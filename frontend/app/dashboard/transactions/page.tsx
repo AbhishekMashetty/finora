@@ -23,6 +23,55 @@ import { ListIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from "@/compone
 
 const PAGE_SIZE = 20;
 
+const STATEMENT_SOURCES = [
+  { value: "generic", label: "Generic CSV (signed amount)" },
+  { value: "american_express", label: "American Express" },
+  { value: "apple_card", label: "Apple Card" },
+  { value: "bank_of_america", label: "Bank of America" },
+  { value: "capital_one", label: "Capital One" },
+  { value: "chase", label: "Chase" },
+  { value: "discover", label: "Discover" },
+  { value: "wells_fargo", label: "Wells Fargo" },
+] as const;
+
+interface ImportPreview {
+  headers: string[];
+  rows: string[][];
+  rowCount: number;
+}
+
+function parseCSVLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function detectStatementSource(headers: string[]): string {
+  const normalized = headers.map((header) => header.toLowerCase().trim());
+  if (normalized.includes("amount (usd)") && normalized.includes("clearing date")) return "apple_card";
+  if (normalized.includes("debit") && normalized.includes("credit")) return "capital_one";
+  if (normalized.includes("trans. date")) return "discover";
+  return "generic";
+}
+
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -84,6 +133,8 @@ export default function TransactionsPage() {
   const [showImportForm, setShowImportForm] = useState(false);
   const [importAccountId, setImportAccountId] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importSource, setImportSource] = useState("generic");
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -225,8 +276,31 @@ export default function TransactionsPage() {
     }
   }
 
-  function handleImportFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setImportFile(event.target.files?.[0] ?? null);
+  async function handleImportFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setImportFile(file);
+    setImportPreview(null);
+    setImportResult(null);
+    setImportError(null);
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
+      if (lines.length === 0) {
+        setImportError("This file is empty.");
+        return;
+      }
+      const headers = parseCSVLine(lines[0]);
+      setImportPreview({
+        headers,
+        rows: lines.slice(1, 4).map(parseCSVLine),
+        rowCount: Math.max(0, lines.length - 1),
+      });
+      setImportSource(detectStatementSource(headers));
+    } catch {
+      setImportError("Could not preview this file. Make sure it is a valid CSV.");
+    }
   }
 
   async function handleImport(event: FormEvent) {
@@ -241,6 +315,7 @@ export default function TransactionsPage() {
     try {
       const body = new FormData();
       body.append("account_id", importAccountId);
+      body.append("source", importSource);
       body.append("file", importFile);
       const result = await apiFetch<ImportResult>("/api/v1/transactions/import", {
         method: "POST",
@@ -248,6 +323,7 @@ export default function TransactionsPage() {
       });
       setImportResult(result);
       setImportFile(null);
+      setImportPreview(null);
       if (page !== 1) {
         setPage(1);
       } else {
@@ -340,11 +416,17 @@ export default function TransactionsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasAccounts = accounts.length > 0;
+  const visibleIncome = transactions.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0);
+  const visibleSpend = transactions.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0);
 
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink-primary">Transactions</h1>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Activity</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-primary">Transactions</h1>
+          <p className="mt-1 text-sm text-ink-secondary">Review, clean up, and import your financial activity.</p>
+        </div>
         {refDataLoaded && hasAccounts && (
           <div className="flex gap-2">
             <Button
@@ -374,6 +456,23 @@ export default function TransactionsPage() {
           </div>
         )}
       </div>
+
+      {!isLoading && transactions.length > 0 && (
+        <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Matching records</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-ink-primary">{total.toLocaleString()}</p>
+          </Card>
+          <Card className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Income on this page</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-status-good-text">+${visibleIncome.toFixed(2)}</p>
+          </Card>
+          <Card className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Spend on this page</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-ink-primary">−${visibleSpend.toFixed(2)}</p>
+          </Card>
+        </div>
+      )}
 
       {/* Filters */}
       <Card className="mt-6">
@@ -618,15 +717,25 @@ export default function TransactionsPage() {
 
       {/* CSV import */}
       {refDataLoaded && hasAccounts && showImportForm && (
-        <Card className="mt-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Import from CSV
-          </h2>
-          <form onSubmit={handleImport} className="mt-4 flex flex-col gap-3">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+        <Card className="mt-6 overflow-hidden border-brand/20 bg-gradient-to-br from-surface to-brand/[0.04]">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Statement import</p>
+              <h2 className="mt-1 text-lg font-semibold text-ink-primary">Bring in your bank history</h2>
+              <p className="mt-1 max-w-2xl text-sm text-ink-secondary">
+                Upload the CSV downloaded from your bank or card issuer. Finora recognizes common
+                date, merchant, amount, debit, credit, and transaction-type columns.
+              </p>
+            </div>
+            <span className="rounded-full border border-status-good/20 bg-status-good/10 px-3 py-1 text-xs font-medium text-status-good-text">
+              Up to 5,000 rows
+            </span>
+          </div>
+
+          <form onSubmit={handleImport} className="mt-6 flex flex-col gap-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Select
                 label="Account"
-                wrapperClassName="lg:col-span-4"
                 value={importAccountId}
                 onChange={(e) => setImportAccountId(e.target.value)}
                 required
@@ -637,33 +746,84 @@ export default function TransactionsPage() {
                   </option>
                 ))}
               </Select>
-              <div className="flex flex-col gap-1 lg:col-span-8">
+              <Select
+                label="Statement source"
+                value={importSource}
+                onChange={(e) => setImportSource(e.target.value)}
+              >
+                {STATEMENT_SOURCES.map((source) => (
+                  <option key={source.value} value={source.value}>
+                    {source.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="rounded-xl border border-dashed border-brand/30 bg-plane/70 p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-ink-primary">Choose a CSV statement</p>
+                  <p className="mt-1 text-xs text-ink-muted">The file stays in this import flow and is sent only when you confirm.</p>
+                </div>
+                <div className="flex flex-col gap-1 sm:w-[360px]">
                 <label htmlFor="import-file" className="text-xs font-medium text-ink-secondary">
-                  Statement CSV
+                    CSV file
                 </label>
                 <input
                   id="import-file"
                   type="file"
                   accept=".csv,text/csv"
                   onChange={handleImportFileChange}
-                  className="h-10 rounded-md border border-hairline bg-surface px-3 text-sm text-ink-primary outline-none file:mr-3 file:h-full file:rounded-md file:border-0 file:bg-plane file:px-3 file:text-xs file:font-medium file:text-ink-primary focus:border-brand"
+                    className="h-11 rounded-lg border border-hairline bg-surface px-3 text-sm text-ink-primary outline-none file:mr-3 file:h-full file:rounded-md file:border-0 file:bg-brand/10 file:px-3 file:text-xs file:font-semibold file:text-brand focus:border-brand"
                 />
               </div>
             </div>
+            </div>
 
-            <p className="text-xs text-ink-muted">
-              Needs a Date column (e.g. &quot;Date&quot;/&quot;Transaction Date&quot;) and either an
-              &quot;Amount&quot; column (signed — negative for a charge) or separate
-              &quot;Debit&quot;/&quot;Credit&quot; columns (the shape most bank/card exports actually use).
-              Amounts accept &quot;$&quot;, thousands commas, and parenthesized negatives. Rows that
-              don&apos;t parse are skipped, not fatal to the rest of the file.
-            </p>
+            {importPreview && (
+              <div className="overflow-hidden rounded-xl border border-hairline bg-surface">
+                <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-ink-primary">Ready to import</p>
+                    <p className="text-xs text-ink-muted">
+                      {importPreview.rowCount.toLocaleString()} rows · {importPreview.headers.length} columns
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand">
+                    {STATEMENT_SOURCES.find((source) => source.value === importSource)?.label}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[680px] text-left text-xs">
+                    <thead className="bg-plane text-ink-muted">
+                      <tr>
+                        {importPreview.headers.slice(0, 6).map((header, index) => (
+                          <th key={`${header}-${index}`} className="px-4 py-2 font-medium">{header || `Column ${index + 1}`}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-hairline text-ink-secondary">
+                      {importPreview.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {importPreview.headers.slice(0, 6).map((_, cellIndex) => (
+                            <td key={cellIndex} className="max-w-[180px] truncate px-4 py-2">{row[cellIndex] || "—"}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button type="submit" disabled={isImporting || !importFile || !importAccountId}>
                 <UploadIcon size={16} />
-                {isImporting ? "Importing…" : "Import"}
+                {isImporting ? "Importing…" : `Import ${importPreview?.rowCount ?? ""} transactions`}
               </Button>
+              <p className="text-xs text-ink-muted">
+                Invalid rows are skipped and reported; valid rows still import.
+              </p>
               {importError && <p className="text-sm text-status-critical">{importError}</p>}
             </div>
           </form>
