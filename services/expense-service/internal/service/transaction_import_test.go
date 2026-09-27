@@ -193,6 +193,33 @@ func TestTransactionService_Import_ExplicitTypeOverridesSignInference(t *testing
 	}
 }
 
+func TestTransactionService_Import_NormalizesStatementTypeVocabulary(t *testing.T) {
+	svc, _, accountID := setupTransactionServiceWithAccount(t, "user-1")
+	ctx := context.Background()
+
+	rows := []domain.ImportRow{
+		{Date: "2026-09-10", Description: "Apple Store", Amount: "42.00", Type: "Purchase"},
+		{Date: "2026-09-11", Description: "Card payment", Amount: "100.00", Type: "Payment"},
+	}
+
+	result, err := svc.Import(ctx, "user-1", accountID, rows)
+	if err != nil || result.Imported != 2 {
+		t.Fatalf("expected both statement rows imported, result=%+v err=%v", result, err)
+	}
+
+	page, _ := svc.List(ctx, "user-1", domain.ListTransactionsInput{AccountID: accountID, PageSize: 10})
+	byNote := make(map[string]domain.Transaction)
+	for _, tx := range page.Transactions {
+		byNote[tx.Note] = tx
+	}
+	if byNote["Apple Store"].Type != domain.TransactionTypeExpense {
+		t.Fatalf("expected Purchase to normalize to expense, got %s", byNote["Apple Store"].Type)
+	}
+	if byNote["Card payment"].Type != domain.TransactionTypeIncome {
+		t.Fatalf("expected Payment to normalize to income, got %s", byNote["Card payment"].Type)
+	}
+}
+
 func TestTransactionService_Import_SkipsBadRowsButKeepsGoingAndReportsRowNumbers(t *testing.T) {
 	svc, _, accountID := setupTransactionServiceWithAccount(t, "user-1")
 	ctx := context.Background()
