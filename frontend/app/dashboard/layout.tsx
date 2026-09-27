@@ -127,18 +127,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex flex-1 bg-plane">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-hairline bg-surface p-4">
-        <div className="flex items-center gap-2 px-2 py-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand text-xs font-bold text-white">
+    <div className="min-h-screen flex-1 bg-plane lg:flex">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-white/10 bg-[#0c241d] p-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen">
+        <div className="flex items-center gap-3 px-2 py-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4be0ad] text-sm font-black text-[#08271d] shadow-lg shadow-emerald-950/20">
             F
           </span>
-          <span className="text-lg font-semibold tracking-tight text-ink-primary">
-            Finora
-          </span>
+          <div>
+            <span className="block text-lg font-semibold tracking-tight">Finora</span>
+            <span className="block text-[10px] uppercase tracking-[0.18em] text-emerald-100/55">Money, clarified</span>
+          </div>
         </div>
 
-        <nav className="mt-4 flex flex-1 flex-col gap-0.5">
+        <p className="mb-2 mt-8 px-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100/40">Workspace</p>
+        <nav className="flex flex-1 flex-col gap-1">
           {NAV_ITEMS.map((item) => {
             const isActive =
               item.href === "/dashboard"
@@ -149,16 +151,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                   isActive
-                    ? "border-brand bg-brand/10 text-brand"
-                    : "border-transparent text-ink-secondary hover:bg-plane hover:text-ink-primary"
+                    ? "bg-white/12 text-white shadow-sm"
+                    : "text-emerald-50/65 hover:bg-white/[0.07] hover:text-white"
                 }`}
               >
                 <Icon size={18} />
                 <span className="flex-1">{item.label}</span>
                 {item.href === "/dashboard/notifications" && unreadCount > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-semibold text-white">
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff756f] px-1 text-[10px] font-semibold text-white">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -167,23 +169,49 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-4 border-t border-hairline pt-4">
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-2">
           {user && (
             <div className="mb-2 px-2.5">
-              <p className="truncate text-sm font-medium text-ink-primary">{user.name}</p>
-              <p className="truncate text-xs text-ink-muted">{user.email}</p>
+              <p className="truncate text-sm font-medium text-white">{user.name}</p>
+              <p className="truncate text-xs text-emerald-50/50">{user.email}</p>
             </div>
           )}
           <button
             onClick={() => logout()}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-plane hover:text-ink-primary"
+            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-emerald-50/65 transition-colors hover:bg-white/10 hover:text-white"
           >
             <LogOutIcon size={18} />
             Log out
           </button>
         </div>
       </aside>
-      <main className="flex flex-1 flex-col p-8">{children}</main>
+
+      <div className="border-b border-hairline bg-surface/90 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-sm font-black text-white">F</span>
+            <span className="font-semibold tracking-tight text-ink-primary">Finora</span>
+          </Link>
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-lg border border-hairline px-3 py-2 text-sm font-medium text-ink-secondary">Menu</summary>
+            <nav className="absolute right-0 z-50 mt-2 grid w-64 grid-cols-2 gap-1 rounded-2xl border border-hairline bg-surface p-2 shadow-2xl">
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+                return (
+                  <Link key={item.href} href={item.href} className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm ${isActive ? "bg-brand/10 font-medium text-brand" : "text-ink-secondary hover:bg-plane"}`}>
+                    <Icon size={16} /> {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </details>
+        </div>
+      </div>
+
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+        <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+      </main>
     </div>
   );
 }
